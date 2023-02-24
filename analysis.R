@@ -2,7 +2,7 @@
 library("brms")
 library("broom")
 library("dplyr")
-library("tidymodels")
+library("tidyr")
 library("magrittr")
 library("stringr")
 
@@ -17,8 +17,8 @@ sulidae <- "Sula"
 pop_recode <- pop %>% 
   dplyr::select(-starts_with("X")) %>% 
   dplyr::mutate(
-    across(c(where(is.character), -atoll), as.numeric)
-  ) %>% 
+     across(c(where(is.character), -atoll), as.numeric)
+   ) %>% 
   tidyr::pivot_longer(!atoll, names_to = "species", values_to = "presence") %>% 
   dplyr::mutate(
     presence = ifelse(!is.na(presence), TRUE, FALSE),
@@ -30,9 +30,23 @@ pop_recode <- pop %>%
       .default = NULL
     )
   ) %>% 
-  drop_na(family)
+  tidyr::drop_na(family)
 
 joined <- left_join(pop_recode, envs, by = "atoll")
 
+tropicbirds <- joined[joined$family == "phaethontidae",]
+terns <- joined[joined$family == "laridae",]
+frigates <- joined[joined$family == "fregatidae",]
+boobies <- joined[joined$family == "sulidae",]
 
+simple_mod <- presence ~ number_islets*species + land_area_sqkm*species + human_population*species
 
+set.seed(1252)
+brm(formula = simple_mod,
+    family = bernoulli(link = "logit"),
+    data = tropicbirds,
+    warmup = 1000,
+    iter = 2000,
+    chains = 4,
+    thin = 1
+    )
