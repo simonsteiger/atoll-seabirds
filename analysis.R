@@ -6,6 +6,24 @@ library("tidyr")
 library("magrittr")
 library("stringr")
 
+# source("functions.R")
+
+fam_filter <- function(.data, v) {
+  .data %>% 
+    filter(family == v)
+}
+
+wrap_brm <- function(.data, formula) {
+  brm(formula = formula,
+      family = bernoulli(link = "logit"),
+      data = .data,
+      warmup = 1000,
+      iter = 2000,
+      chains = 4,
+      thin = 1
+  )
+}
+
 pop <- read.csv("data/atoll_seabird_populations_25Feb.csv")
 envs <- read.csv("data/seabird_atolls_envs_25Feb.csv")
 
@@ -34,19 +52,14 @@ pop_recode <- pop %>%
 
 joined <- left_join(pop_recode, envs, by = "atoll")
 
-tropicbirds <- joined[joined$family == "phaethontidae",]
-terns <- joined[joined$family == "laridae",]
-frigates <- joined[joined$family == "fregatidae",]
-boobies <- joined[joined$family == "sulidae",]
+birdfamilies <- c("phaethontidae", "laridae", "fregatidae", "sulidae")
 
+list_df <- set_names(birdfamilies) %>% 
+  map(~fam_filter(joined, v = .x))
+  
 simple_mod <- presence ~ number_islets*species + land_area_sqkm*species + human_population*species
 
 set.seed(1252)
-brm(formula = simple_mod,
-    family = bernoulli(link = "logit"),
-    data = tropicbirds,
-    warmup = 1000,
-    iter = 2000,
-    chains = 4,
-    thin = 1
-    )
+list_fit <- set_names(birdfamilies) %>% 
+  map(~wrap_brm(.data = list_df[[.x]], formula = simple_mod))
+
