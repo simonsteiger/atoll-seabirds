@@ -1,0 +1,168 @@
+---
+title: "Seabird analysis"
+output: pdf_document
+date: "2023-03-11"
+---
+
+
+```{r library}
+library("brms")
+library("broom")
+library("dplyr")
+library("tidyr")
+library("magrittr")
+library("stringr")
+library("tidymodels")
+library("themis")
+library("doParallel")
+library("glmnet")
+library("vip")
+library("forcats")
+```
+
+```{r setup data}
+pop <- read.csv("data/atoll_seabird_populations_11Mar.csv")
+envs <- read.csv("data/seabird_atolls_envs_10Mar.csv")
+
+pop_recode <- pop %>% 
+  dplyr::mutate(
+     across(c(where(is.character), -atoll), as.numeric)
+   ) %>%
+  tidyr::pivot_longer(!atoll, names_to = "species", values_to = "presence") %>% 
+  dplyr::mutate(
+    presence = as.factor(ifelse(!is.na(presence), TRUE, FALSE))
+  )
+
+# currently has all species, but we won't run predicitions for tubenoses
+
+species_names <- 
+  pop_recode$species %>% 
+  unique() %>% 
+  tolower() %>% 
+  sort()
+
+species_dfs <- left_join(pop_recode, envs, by = "atoll") %>%
+  group_split(species) %>%
+  set_names(species_names)
+```
+
+```{r}
+delete_vars <- c(
+  "seabird_data",
+  "lat",
+  "long",
+  "nearest_high_island",
+  "atoll",
+  "species",
+  "region",
+  "hurricanes_200km",
+  "hurricanes_100km"#,
+  # "hurricanes_50km",
+  # "tropical_storms_50km"
+  # multicollinearity for several hurricane categories
+  # probably ruins prediction
+  )
+
+species_split <- species_dfs$anous_stolidus %>%
+  select(-all_of(delete_vars)) %>% 
+  mutate(across(where(is.character), as.factor)) %>% 
+  initial_split(strata = presence)
+
+species_train <- training(species_split)
+species_test <- testing(species_split)
+
+set.seed(42)
+species_folds <- vfold_cv(species_train, v = 10, strata = presence)
+
+species_rec <- 
+  recipe(presence ~ ., data = species_train) %>%
+  step_impute_median(human_population) %>%
+  step_nzv(all_numeric_predictors()) %>% 
+  step_normalize()
+
+prep(species_rec)
+
+glmnet_spec <- 
+  logistic_reg(penalty = tune(), mixture = 1) %>%
+  set_engine("glmnet")
+
+wf_set <-
+  workflow_set(
+    list(basic = species_rec,
+         downsampling = species_rec %>% step_downsample(presence)),
+    list(glmnet = glmnet_spec)
+  )
+
+wf_set
+
+narrower_penalty <- penalty(range = c(-3, 0))
+
+doParallel::registerDoParallel()
+set.seed(345)
+tune_rs <- 
+  workflow_map(
+    wf_set,
+    "tune_grid",
+    resamples = species_folds,
+    grid = 15,
+    metrics = metric_set(accuracy, mn_log_loss, sensitivity, specificity),
+    param_info = parameters(narrower_penalty)
+  )
+
+tune_rs
+
+autoplot(tune_rs) + theme(legend.position = "none")
+
+rank_results(tune_rs, rank_metric = "sensitivity")
+
+rank_results(tune_rs, rank_metric = "mn_log_loss")
+
+downsample_rs <-
+  tune_rs %>%
+  extract_workflow_set_result("downsampling_glmnet")
+
+autoplot(downsample_rs)
+
+best_penalty <- 
+  downsample_rs %>%
+  select_by_one_std_err(-penalty, metric = "sensitivity")
+
+best_penalty
+
+final_fit <-  
+  wf_set %>% 
+  extract_workflow("downsampling_glmnet") %>%
+  finalize_workflow(best_penalty) %>%
+  last_fit(species_split)
+
+final_fit
+
+collect_metrics(final_fit)
+
+collect_predictions(final_fit) %>%
+  conf_mat(presence, .pred_class)
+
+species_vip <-
+  extract_fit_engine(final_fit) %>%
+  vi()
+
+species_vip
+
+species_vip %>%
+  ggplot(aes(Importance, fct_reorder(Variable, Importance), fill = Sign)) + 
+  geom_col() +
+  facet_wrap(vars(Sign), scales = "free_y") +
+  labs(y = NULL) +
+  theme(legend.position = "none")
+
+```
+
+
+
+
+
+
+
+
+
+
