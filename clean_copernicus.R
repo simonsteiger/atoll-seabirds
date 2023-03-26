@@ -1,30 +1,31 @@
 library(ncdf4)
 library(lubridate)
+library(ggplot2)
 
-nc_file <- nc_open("data/test_data.nc")
+nc_file <- nc_open("data/copernicus_nppv.nc")
 envs <- read.csv("data/seabird_atolls_envs_10Mar.csv")
 
-time <- nc_file$dim[[1]]$vals
-depth <- nc_file$dim[[2]]$vals
-latitude <- nc_file$dim[[3]]$vals
-longitude <- nc_file$dim[[4]]$vals
+# fix negative longitudes
+envs <- envs %>% 
+  mutate(
+    long = ifelse(long < 0, long + 360, long)
+  )
+
+latitude <- as.vector(nc_file$dim[[3]]$vals)
+longitude <- as.vector(nc_file$dim[[4]]$vals)
 
 x <- ncvar_get(nc_file, nc_file$var[[1]])
 
 matrix <- apply(x, c(1, 2), mean)
 
 colnames(matrix) <- latitude
-rownames(matrix) <- longitude
 
-cp_data <- data.frame(longitude = longitude, matrix) %>% 
+cp_data <- tibble::as_tibble(matrix) %>%
+  bind_cols(longitude = longitude) %>% 
   tidyr::pivot_longer(-longitude, names_to = "latitude", values_to = "nppv") %>% 
   mutate(
-    latitude = (stringr::str_remove(latitude, "X.")),
-    latitude = as.numeric(latitude) * -1
-  )
-
-target_lat <- envs[6, ]$lat
-target_long <- envs[6, ]$long
+    latitude = as.numeric(latitude)
+    )
 
 filter_copernicus <- function(cp_data, lat, long) {
   cp_data %>% 
@@ -34,13 +35,24 @@ filter_copernicus <- function(cp_data, lat, long) {
       longitude >= long - 1,
       longitude <= long + 1
     ) %>% 
-    summarise(mean = mean(nppv, na.rm = TRUE))
+    summarise(
+      mean_nppv = mean(nppv, na.rm = TRUE),
+      sd_nppv = sd(nppv, na.rm = TRUE)
+      )
 }
 
-purrr::map(
-  c(6, 7),
+out <- purrr::map(
+  seq_len(nrow(envs)),
   ~ filter_copernicus(cp_data, envs[.x, ]$lat, envs[.x, ]$long)
+  ) %>%
+  purrr::list_rbind() %>% 
+  mutate(
+    atoll = envs$atoll, .before = mean_nppv
   )
+
+ggplot(out, aes(atoll, mean_nppv)) +
+  geom_line() +
+  coord_flip()
 
 res <- data %>% 
   dplyr::filter(
