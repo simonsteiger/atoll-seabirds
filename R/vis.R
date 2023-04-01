@@ -13,11 +13,12 @@ box::use(
 )
 
 css_default_hover <- gir$girafe_css_bicolor(primary = "#1bf702", secondary = "#1bf702")
+css_box <- "font-family:Arial;padding:7px;background-color:#ffffff;color:#000000;border-radius:3px;"
 
 gir$set_girafe_defaults(
   opts_hover = gir$opts_hover(css = css_default_hover),
   opts_zoom = gir$opts_zoom(min = 1, max = 4),
-  opts_tooltip = gir$opts_tooltip(css = "padding:3px;background-color:#333333;color:white;"),
+  opts_tooltip = gir$opts_tooltip(css = css_box),
   opts_sizing = gir$opts_sizing(rescale = TRUE),
   opts_toolbar = gir$opts_toolbar(saveaspng = FALSE, position = "bottom", delay_mouseout = 5000)
 )
@@ -31,7 +32,7 @@ p <-
       x = long, 
       y = lat,
       color = mean_nppv,
-      tooltip = paste0("name: ", cop$out$atoll, "\nmean nppv: ", round(cop$out$mean_nppv, 2)),
+      tooltip = paste0("<b>Atoll</b> ", cop$out$atoll, "\n<b>NPPV</b> ", round(cop$out$mean_nppv, 2)),
       data_id = atoll
       ),
     size = 0.5,
