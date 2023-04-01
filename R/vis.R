@@ -12,12 +12,15 @@ box::use(
   R/load,
 )
 
-# sf_data <- sf$st_as_sf(cop$cp_data, coords = c("longitude", "latitude")) %>% 
-#   dp$filter(!is.na(nppv))
+css_default_hover <- gir$girafe_css_bicolor(primary = "#1bf702", secondary = "red")
 
-# gg$ggplot() +
-#   gg$geom_sf(data = sf_data) +
-#   gg$geom_point(data = cop$envs, gg$aes(x = long, y = lat), color = "red", size = 0.1)
+gir$set_girafe_defaults(
+  opts_hover = gir$opts_hover(css = css_default_hover),
+  opts_zoom = gir$opts_zoom(min = 1, max = 4),
+  opts_tooltip = gir$opts_tooltip(css = "padding:3px;background-color:#333333;color:white;"),
+  opts_sizing = gir$opts_sizing(rescale = TRUE),
+  opts_toolbar = gir$opts_toolbar(saveaspng = FALSE, position = "bottom", delay_mouseout = 5000)
+)
 
 p <- 
   gg$ggplot() +
@@ -28,10 +31,13 @@ p <-
       x = long, 
       y = lat,
       color = mean_nppv,
-      tooltip = paste0("name: ", cop$out$atoll, "\nmean nppv: ", round(cop$out$mean_nppv, 2))
+      tooltip = paste0("name: ", cop$out$atoll, "\nmean nppv: ", round(cop$out$mean_nppv, 2)),
+      data_id = atoll
       ),
     size = 1,
-    alpha = 0.8) +
+    alpha = 0.8,
+    hover_nearest = TRUE
+    ) +
   gg$scale_fill_viridis_c(option = "mako") +
   gg$scale_color_viridis_c(option = "inferno", begin = 0.4) +
   gg$coord_quickmap() +
@@ -44,3 +50,11 @@ lf$leaflet() %>%
                    options = lf$providerTileOptions(noWrap = TRUE)
   ) %>%
   lf$addMarkers(data = cop$envs %>% dp$select(lat, long))
+
+
+# sf_data <- sf$st_as_sf(cop$cp_data, coords = c("longitude", "latitude")) %>% 
+#   dp$filter(!is.na(nppv))
+
+# gg$ggplot() +
+#   gg$geom_sf(data = sf_data) +
+#   gg$geom_point(data = cop$envs, gg$aes(x = long, y = lat), color = "red", size = 0.1)
