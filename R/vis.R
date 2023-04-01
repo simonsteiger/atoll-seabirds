@@ -12,7 +12,7 @@ box::use(
   R/load,
 )
 
-css_default_hover <- gir$girafe_css_bicolor(primary = "#1bf702", secondary = "red")
+css_default_hover <- gir$girafe_css_bicolor(primary = "#1bf702", secondary = "#1bf702")
 
 gir$set_girafe_defaults(
   opts_hover = gir$opts_hover(css = css_default_hover),
@@ -34,14 +34,19 @@ p <-
       tooltip = paste0("name: ", cop$out$atoll, "\nmean nppv: ", round(cop$out$mean_nppv, 2)),
       data_id = atoll
       ),
-    size = 1,
+    size = 0.5,
     alpha = 0.8,
     hover_nearest = TRUE
     ) +
   gg$scale_fill_viridis_c(option = "mako") +
   gg$scale_color_viridis_c(option = "inferno", begin = 0.4) +
   gg$coord_quickmap() +
-  gg$theme_minimal()
+  gg$theme_minimal() +
+  gg$theme(legend.position = "bottom") +
+  gg$guides(
+    colour = gg$guide_colorbar(title.position = "bottom", title.hjust = 0.5, label.position = "top"),
+    fill = gg$guide_colorbar(title.position = "bottom", title.hjust = 0.5, label.position = "top")
+    )
 
 gir$girafe(ggobj = p)
 
