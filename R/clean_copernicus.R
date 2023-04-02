@@ -30,16 +30,19 @@ cp_data <- pr$set_names(load$names) %>%
 #' @export
 out <- 
   pr$map(
-  seq_len(nrow(envs)),
+  seq_len(nrow(envs)), # nrow envs = number of atolls
   ~ fn$filter_copernicus(cp_data, envs[.x, ]$lat, envs[.x, ]$long)
   ) %>%
-  pr$list_rbind() %>% 
+  pr$list_rbind() %>%
   dp$mutate(
     atoll = envs$atoll,
     lat = envs$lat,
-    long = envs$long,
-    .before = mean_nppv
+    long = envs$long
   )
+
+#' @export
+cop_envs <- dp$left_join(load$envs, out, by = "atoll", suffix = c("", ".dupl")) %>% 
+  dp$select(-ts$ends_with(".dupl"))
 
 # What was that for?
 # res <- data %>% 
