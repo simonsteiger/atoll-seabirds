@@ -22,14 +22,7 @@ envs <- load$envs %>%
   )
 
 #' @export
-# cp_data <- tbl$as_tibble(load$nc_mean) %>%
-#   dp$bind_cols(longitude = load$longitude) %>% 
-#   tdr$pivot_longer(-longitude, names_to = "latitude", values_to = "nppv") %>% 
-#   dp$mutate(
-#     latitude = as.numeric(latitude)
-#     )
-
-list_cp <- pr$set_names(load$names) %>% 
+cp_data <- pr$set_names(load$names) %>% 
   pr$map(~ fn$convert_to_tibble(load$list_matrix[[.x]], .x)) %>% 
   pr$reduce(dp$left_join, by = c("latitude", "longitude"))
   
@@ -38,7 +31,7 @@ list_cp <- pr$set_names(load$names) %>%
 out <- 
   pr$map(
   seq_len(nrow(envs)),
-  ~ filter_copernicus(cp_data, envs[.x, ]$lat, envs[.x, ]$long)
+  ~ fn$filter_copernicus(cp_data, envs[.x, ]$lat, envs[.x, ]$long)
   ) %>%
   pr$list_rbind() %>% 
   dp$mutate(
