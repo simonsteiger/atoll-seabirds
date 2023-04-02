@@ -1,9 +1,7 @@
 box::use(
-  sf,
   gg = ggplot2,
   dp = dplyr,
   magrittr[`%>%`],
-  lf = leaflet,
   gir = ggiraph,
 )
 
@@ -24,19 +22,16 @@ gir$set_girafe_defaults(
 
 p <- 
   gg$ggplot() +
-  gg$geom_raster(data = cop$cp_data, gg$aes(longitude, latitude, fill = log(nppv))) +
-  gir$geom_point_interactive(
+  gg$geom_raster(data = cop$cp_data, gg$aes(longitude, latitude, fill = nppv)) +
+  gg$geom_point(
     data = cop$out,
     gg$aes(
       x = long, 
       y = lat,
-      color = mean_nppv,
-      tooltip = paste0("<b>Atoll</b> ", cop$out$atoll, "\n<b>NPPV</b> ", round(cop$out$mean_nppv, 2)),
-      data_id = atoll
+      color = nppv,
       ),
     size = 0.5,
-    alpha = 0.8,
-    hover_nearest = TRUE
+    alpha = 0.8
     ) +
   gg$scale_fill_viridis_c(option = "mako") +
   gg$scale_color_viridis_c(option = "inferno", begin = 0.4) +
