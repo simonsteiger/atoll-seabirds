@@ -7,3 +7,5 @@ box::use(
 )
 
 write.csv(cop$cp_data, file = "data/cp_data.csv")
+
+write.csv(cop$out, file = "data/out.csv")

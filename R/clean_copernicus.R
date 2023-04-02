@@ -11,6 +11,7 @@ box::use(
 
 box::use(
   R/load,
+  R/global,
   fn = R/functions,
 )
 
@@ -22,9 +23,12 @@ envs <- load$envs %>%
   )
 
 #' @export
-cp_data <- pr$set_names(load$names) %>% 
+cp_data <- pr$set_names(global$names) %>% 
   pr$map(~ fn$convert_to_tibble(load$list_matrix[[.x]], .x)) %>% 
-  pr$reduce(dp$left_join, by = c("latitude", "longitude"))
+  pr$reduce(dp$left_join, by = c("latitude", "longitude")) %>%
+  dp$mutate(
+    dp$across(global$names, log)
+  )
   
 
 #' @export

@@ -1,11 +1,4 @@
 
-library("brms")
-library("broom")
-library("dplyr")
-library("tidyr")
-library("magrittr")
-library("stringr")
-
 pop <- read.csv("data/atoll_seabird_populations_10Mar.csv")
 envs <- read.csv("data/seabird_atolls_envs_10Mar.csv")
 
