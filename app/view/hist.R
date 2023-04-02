@@ -19,13 +19,12 @@ box::use(
 #' @export
 ui <- function(id) {
   ns <- sh$NS(id)
-  
-    bsl$card(
-      bsl$card_header(class = "bg-info", "Histogram"),
-      bsl$card_body_fill(
-        e4r$echarts4rOutput(ns("hist"), width = "100%")
-      )
-    
+
+  bsl$card(
+    bsl$card_header(class = "bg-info", "Histogram"),
+    bsl$card_body_fill(
+      e4r$echarts4rOutput(ns("hist"), width = "100%")
+    )
   )
 }
 
@@ -37,7 +36,7 @@ server <- function(id) {
       sh$observe({
         min_val <- round(min(disk$cp_data[[input$variable]], na.rm = TRUE), 2)
         max_val <- round(max(disk$cp_data[[input$variable]], na.rm = TRUE), 2)
-        
+
         sh$updateSliderInput(
           session = session,
           "slider",
@@ -46,12 +45,12 @@ server <- function(id) {
           value = c(min_val, max_val)
         )
       })
-      
+
       filtered_atolls <- sh$reactive(
-        disk$out %>% 
+        disk$out %>%
           dp$filter(.data[[input$variable]] %>% dp$between(min(input$slider), max(input$slider)))
       )
-      
+
       output$hist <- e4r$renderEcharts4r(draw$atoll_hist(filtered_atolls(), input$variable))
     }
   )

@@ -18,15 +18,13 @@ box::use(
 #' @export
 ui <- function(id) {
   ns <- sh$NS(id)
-  
-      bsl$card(
-        class = "m-8 shadow",
-        bsl$card_header(class = "bg-info", "Controls"),
-        bsl$card_body_fill(
-          inp$pick_var(ns("variable")),
-          inp$slider_range(ns("slider"))
-        
-      
+
+  bsl$card(
+    class = "m-8 shadow",
+    bsl$card_header(class = "bg-info", "Controls"),
+    bsl$card_body_fill(
+      inp$pick_var(ns("variable")),
+      inp$slider_range(ns("slider"))
     )
   )
 }
