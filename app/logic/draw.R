@@ -5,6 +5,7 @@ box::use(
   gir = ggiraph,
   sh = shiny,
   pal = palettes,
+  e4r = echarts4r,
 )
 
 box::use(
@@ -75,4 +76,12 @@ atoll_map <- function(atoll_data, fill) {
   )
   
   gir$girafe(ggobj = p())
+}
+
+#' @export
+atoll_hist <- function(df, var) {
+  df %>% 
+    e4r$e_charts() %>% 
+    e4r$e_histogram_(var) %>% 
+    e4r$e_tooltip()
 }

@@ -7,6 +7,7 @@ box::use(
   dp = dplyr,
   magrittr[`%>%`],
   emo,
+  e4r = echarts4r,
 )
 
 box::use(
@@ -18,11 +19,11 @@ box::use(
 #' @export
 ui <- function(id) {
   ns <- sh$NS(id)
-
+  
     bsl$card(
-      bsl$card_header(class = "bg-info", "Map"),
+      bsl$card_header(class = "bg-info", "Histogram"),
       bsl$card_body_fill(
-        gir$girafeOutput(ns("map"), width = "650px")
+        e4r$echarts4rOutput(ns("hist"), width = "100%")
       )
     
   )
@@ -43,7 +44,7 @@ server <- function(id) {
           min = min_val,
           max = max_val,
           value = c(min_val, max_val)
-          )
+        )
       })
       
       filtered_atolls <- sh$reactive(
@@ -51,7 +52,7 @@ server <- function(id) {
           dp$filter(.data[[input$variable]] %>% dp$between(min(input$slider), max(input$slider)))
       )
       
-      output$map <- gir$renderGirafe(draw$atoll_map(filtered_atolls(), input$variable))
+      output$hist <- e4r$renderEcharts4r(draw$atoll_hist(filtered_atolls(), input$variable))
     }
   )
 }
