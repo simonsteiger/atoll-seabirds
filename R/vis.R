@@ -9,7 +9,6 @@ box::use(
 
 box::use(
   cop = R/clean_copernicus,
-  R/load,
 )
 
 css_default_hover <- gir$girafe_css_bicolor(primary = "#1bf702", secondary = "#1bf702")
@@ -51,11 +50,11 @@ p <-
 
 gir$girafe(ggobj = p)
 
-lf$leaflet() %>% 
-  lf$addProviderTiles(lf$providers$Stamen.TonerLite,
-                   options = lf$providerTileOptions(noWrap = TRUE)
-  ) %>%
-  lf$addMarkers(data = cop$envs %>% dp$select(lat, long))
+# lf$leaflet() %>%
+#   lf$addProviderTiles(lf$providers$Stamen.TonerLite,
+#                    options = lf$providerTileOptions(noWrap = TRUE)
+#   ) %>%
+#   lf$addMarkers(data = cop$envs %>% dp$select(lat, long))
 
 
 # sf_data <- sf$st_as_sf(cop$cp_data, coords = c("longitude", "latitude")) %>% 

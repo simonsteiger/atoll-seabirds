@@ -5,11 +5,13 @@ box::use(
   tbl = tibble,
   st = stats,
   pr = purrr,
+  ts = tidyselect,
   magrittr[`%>%`],
 )
 
 box::use(
-  R/load
+  R/load,
+  fn = R/functions,
 )
 
 # fix negative longitudes
@@ -20,29 +22,21 @@ envs <- load$envs %>%
   )
 
 #' @export
-cp_data <- tbl$as_tibble(load$nc_mean) %>%
-  dp$bind_cols(longitude = load$longitude) %>% 
-  tdr$pivot_longer(-longitude, names_to = "latitude", values_to = "nppv") %>% 
-  dp$mutate(
-    latitude = as.numeric(latitude)
-    )
+# cp_data <- tbl$as_tibble(load$nc_mean) %>%
+#   dp$bind_cols(longitude = load$longitude) %>% 
+#   tdr$pivot_longer(-longitude, names_to = "latitude", values_to = "nppv") %>% 
+#   dp$mutate(
+#     latitude = as.numeric(latitude)
+#     )
 
-filter_copernicus <- function(cp_data, lat, long) {
-  cp_data %>% 
-    dp$filter(
-      latitude >= lat - 1,
-      latitude <= lat + 1,
-      longitude >= long - 1,
-      longitude <= long + 1
-    ) %>% 
-    dp$summarise(
-      mean_nppv = mean(nppv, na.rm = TRUE),
-      sd_nppv = st$sd(nppv, na.rm = TRUE)
-      )
-}
+list_cp <- pr$set_names(load$names) %>% 
+  pr$map(~ fn$convert_to_tibble(load$list_matrix[[.x]], .x)) %>% 
+  pr$reduce(dp$left_join, by = c("latitude", "longitude"))
+  
 
 #' @export
-out <- pr$map(
+out <- 
+  pr$map(
   seq_len(nrow(envs)),
   ~ filter_copernicus(cp_data, envs[.x, ]$lat, envs[.x, ]$long)
   ) %>%
