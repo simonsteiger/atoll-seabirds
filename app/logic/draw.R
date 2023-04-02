@@ -24,7 +24,7 @@ gir$set_girafe_defaults(
 )
 
 #' @export
-atoll_map <- function(fill) {
+atoll_map <- function(atoll_data, fill) {
   
   pal_name <- switch(fill,
     "nppv" = "mako",
@@ -36,13 +36,13 @@ atoll_map <- function(fill) {
     gg$ggplot() +
       gg$geom_raster(data = disk$cp_data, gg$aes(longitude, latitude, fill = .data[[fill]])) +
       gir$geom_point_interactive(
-        data = disk$out,
+        data = atoll_data,
         gg$aes(
           x = long, 
           y = lat,
           color = .data[[fill]],
           tooltip = paste0(
-            "<b>Atoll</b> ", disk$out$atoll, "\n<b>", toupper(fill),"</b> ", round(disk$out[[fill]], 2)
+            "<b>Atoll</b> ", atoll, "\n<b>", toupper(fill),"</b> ", round(.data[[fill]], 2)
           ),
           data_id = atoll
         ),

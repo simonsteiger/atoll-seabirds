@@ -5,12 +5,14 @@ box::use(
 
 box::use(
   app/view/map,
+  app/logic/theme,
 )
 
 #' @export
 ui <- function(id) {
   ns <- sh$NS(id)
   bsl$page(
+    theme = theme$light,
     map$ui(ns("map"))
   )
 }
