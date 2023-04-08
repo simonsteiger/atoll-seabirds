@@ -2,6 +2,7 @@ box::use(
   nc = ncdf4,
   ut = utils,
   pr = purrr,
+  ab = abind,
   magrittr[`%>%`],
 )
 
@@ -25,6 +26,11 @@ list_var <- pr$set_names(global$names) %>%
 #' @export
 list_matrix <- pr$set_names(global$names) %>% 
   pr$map(~ apply(list_var[[.x]], c(1, 2), mean))
+
+# deal with finer resolution data
+# integrate somehow, or separate stream for fine res data?
+list_matrix$temp <- ab$abind(list_matrix$temp_1, list_matrix$temp_2, along = 3)
+list_matrix$temp <- apply(list_matrix$temp, c(1, 2), mean)
 
 # list_matrix[[1]] <- colnames(latitude)
 # list_matrix[[2]] <- colnames(latitude)

@@ -1,2 +1,2 @@
 #' @export
-names <- c("nppv", "chl", "phyc")
+names <- c("nppv", "chl", "phyc", "temp_1", "temp_2")
