@@ -15,37 +15,42 @@ box::use(
   fn = R/functions,
 )
 
-# fix negative longitudes
-#' @export
-envs <- load$envs %>% 
-  dp$mutate(
-    long = ifelse(long < 0, long + 360, long)
+params <- tbl$tibble(
+  data = load$list_matrix,
+  name = global$names,
+  lat = c(rep(list(load$latitude), 3), rep(list(load$latitude_fine), 2)),
+  long = c(rep(list(load$longitude), 3), rep(list(load$longitude_fine), 2))
   )
 
 #' @export
-cp_data <- pr$set_names(global$names) %>% 
-  pr$map(~ fn$convert_to_tibble(load$list_matrix[[.x]], .x)) %>% 
+cp_data <- 
+  pr$pmap(
+    params,
+    fn$convert_to_tibble, 
+    .progress = "Converting matrices to tibbles..."
+    ) %>% 
+  pr$set_names(global$names) %>% 
   pr$reduce(dp$left_join, by = c("latitude", "longitude")) %>%
   dp$mutate(
     dp$across(global$names, log)
   )
-  
 
 #' @export
 out <- 
   pr$map(
-  seq_len(nrow(envs)), # nrow envs = number of atolls
-  ~ fn$filter_copernicus(cp_data, envs[.x, ]$lat, envs[.x, ]$long)
+  seq_len(nrow(load$envs_cp_coord)), # nrow load$envs_cp_coord = number of atolls
+  ~ fn$filter_copernicus(cp_data, load$envs_cp_coord[.x, ]$lat, load$envs_cp_coord[.x, ]$long),
+  .progress = "Summarising variables per atoll..."
   ) %>%
   pr$list_rbind() %>%
   dp$mutate(
-    atoll = envs$atoll,
-    lat = envs$lat,
-    long = envs$long
+    atoll = load$envs$atoll,
+    lat = load$envs$lat,
+    long = load$envs$long
   )
 
 #' @export
-cop_envs <- dp$left_join(load$envs, out, by = "atoll", suffix = c("", ".dupl")) %>% 
+envs <- dp$left_join(load$envs, out, by = "atoll", suffix = c("", ".dupl")) %>% 
   dp$select(-ts$ends_with(".dupl"))
 
 # What was that for?

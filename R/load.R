@@ -3,6 +3,7 @@ box::use(
   ut = utils,
   pr = purrr,
   ab = abind,
+  dp = dplyr,
   magrittr[`%>%`],
 )
 
@@ -11,7 +12,7 @@ box::use(
 )
 
 #' @export
-list_nc <- pr$set_names(global$names) %>%
+list_nc <- pr$set_names(global$names_load) %>%
   pr$map(~ nc$nc_open(paste0("data/copernicus_", .x, ".nc")))
 
 #' @export
@@ -20,24 +21,42 @@ latitude <- as.vector(list_nc$nppv$dim[[3]]$vals)
 #' @export
 longitude <- as.vector(list_nc$nppv$dim[[4]]$vals)
 
-list_var <- pr$set_names(global$names) %>% 
-  pr$map(~ nc$ncvar_get(list_nc[[.x]], list_nc[[.x]]$var[[1]]))
+#' @export
+latitude_fine <- as.vector(list_nc$temp_1$dim[[3]]$vals)
 
 #' @export
-list_matrix <- pr$set_names(global$names) %>% 
-  pr$map(~ apply(list_var[[.x]], c(1, 2), mean))
+longitude_fine <- as.vector(list_nc$temp_1$dim[[4]]$vals)
 
-# deal with finer resolution data
-# integrate somehow, or separate stream for fine res data?
-list_matrix$temp <- ab$abind(list_matrix$temp_1, list_matrix$temp_2, along = 3)
-list_matrix$temp <- apply(list_matrix$temp, c(1, 2), mean)
+list_var <- pr$set_names(global$names_load) %>% 
+  pr$map(~ nc$ncvar_get(list_nc[[.x]], list_nc[[.x]]$var[[1]]), .progress = "Getting variables...")
 
-# list_matrix[[1]] <- colnames(latitude)
-# list_matrix[[2]] <- colnames(latitude)
-# list_matrix[[3]] <- colnames(latitude)
+list_matrix <- pr$set_names(global$names_load) %>% 
+  pr$map(~ apply(list_var[[.x]], c(1, 2), mean), .progress = "Calculating means...")
+
+list_matrix$temp <- ab$abind(list_matrix$temp_1, list_matrix$temp_2, along = 3) %>% 
+  apply(., c(1, 2), mean)
+
+list_matrix$velo <- ab$abind(list_matrix$velo_1, list_matrix$velo_2, list_matrix$velo_3, list_matrix$velo_4, along = 3) %>% 
+  apply(., c(1, 2), mean)
+
+#' @export
+list_matrix <- list_matrix[-c(4:9)]
 
 #' @export
 envs <- ut$read.csv("data/seabird_atolls_envs_10Mar.csv")
+
+#' @export
+envs_cp_coord <- envs %>% 
+  dp$mutate(
+    long = ifelse(long < 0, long + 360, long)
+  )
+
+#' @export
+envs_ji_coord <- envs %>% 
+  dp$mutate(
+    long = long - 180,
+    long = ifelse(long < 0, long + 360, long)
+  )
 
 #' @export
 pop <- ut$read.csv("data/atoll_seabird_populations_10Mar.csv")

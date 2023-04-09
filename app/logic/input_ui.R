@@ -19,7 +19,7 @@ pick_var <- function(id) {
     plain = FALSE,
     animation = "smooth",
     icon = sh$icon("check"),
-    inline = TRUE
+    inline = FALSE
   ) 
 }
 

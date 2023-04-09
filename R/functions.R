@@ -7,17 +7,16 @@ box::use(
 )
 
 box::use(
-  R/load,
   R/global,
 )
 
 #' @export
-convert_to_tibble <- function(data, name) {
+convert_to_tibble <- function(data, name, lat, long) {
   data %>% 
     # maybe use set_colnames first, then as_tibble?
     tbl$as_tibble() %>%
-    set_colnames(load$latitude) %>%
-    dp$bind_cols(longitude = load$longitude) %>% 
+    set_colnames(lat) %>%
+    dp$bind_cols(longitude = long) %>% 
     tdr$pivot_longer(-longitude, names_to = "latitude", values_to = name) %>% 
     dp$mutate(
       latitude = as.numeric(latitude)
@@ -37,3 +36,17 @@ filter_copernicus <- function(cp_data, lat, long) {
       across(c(global$names), ~ mean(.x, na.rm = TRUE), .names = "{.col}")
     ) 
 }
+
+#' @export
+filter_jisao <- function(ji_data, lat, long) {
+  ji_data %>% 
+    dp$mutate(
+      dif_lat = abs(latitude - lat),
+      dif_long = abs(longitude - long)
+    ) %>% 
+    dp$filter(
+      dif_lat == min(dif_lat) & dif_long == min(dif_long)
+    ) %>% 
+  dp$select(-c(dif_lat, dif_long))
+}
+

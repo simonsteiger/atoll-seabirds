@@ -30,7 +30,9 @@ atoll_map <- function(atoll_data, fill) {
   pal_name <- switch(fill,
     "nppv" = "mako",
     "chl" = "vangogh3",
-    "phyc" = "okeeffe2"
+    "phyc" = "okeeffe2",
+    "temp" = "mako",
+    "velo" = "mako"
   )
   
   p <- sh$reactive(

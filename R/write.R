@@ -3,9 +3,14 @@ box::use(
 )
 
 box::use(
-  cop = R/clean_copernicus
+  cp = R/clean_copernicus,
+  ji = R/clean_jisao,
 )
 
-write.csv(cop$cp_data, file = "data/cp_data.csv")
+write.csv(cp$cp_data, file = "data/cp_data.csv")
 
-write.csv(cop$out, file = "data/out.csv")
+write.csv(cp$out, file = "data/out.csv")
+
+write.csv(ji$ji_data, file = "data/ji_data.csv")
+
+write.csv(ji$out, file = "data/out_ji.csv")
