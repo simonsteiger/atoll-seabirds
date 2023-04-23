@@ -32,7 +32,7 @@ cp_data <-
   pr$set_names(global$names) %>% 
   pr$reduce(dp$left_join, by = c("latitude", "longitude")) %>%
   dp$mutate(
-    dp$across(global$names, log)
+    dp$across(global$names, log1p)
   )
 
 #' @export
@@ -44,13 +44,13 @@ out <-
   ) %>%
   pr$list_rbind() %>%
   dp$mutate(
-    atoll = load$envs$atoll,
-    lat = load$envs$lat,
-    long = load$envs$long
+    atoll = load$envs_cp_coord$atoll,
+    lat = load$envs_cp_coord$lat,
+    long = load$envs_cp_coord$long
   )
 
 #' @export
-envs <- dp$left_join(load$envs, out, by = "atoll", suffix = c("", ".dupl")) %>% 
+envs <- dp$left_join(load$envs_cp_coord, out, by = "atoll", suffix = c("", ".dupl")) %>% 
   dp$select(-ts$ends_with(".dupl"))
 
 # What was that for?
