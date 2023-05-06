@@ -1,43 +1,72 @@
 using NetCDF # read
 using Statistics, DataFrames, Compat, Pipe # wrangling
 
-# First element is file path
-# Second entry is loaded variable
+# First element is key in dictionary
+# Second entry is csv file name
+# Third entry is variable name in nc file
 vars = [
-  ["nppv", "nppv"],
-  ["chl", "chl"],
-  ["phyc", "phyc"],
-  #=
-  name of sea surface temperature variable?
-  ["temp_1", "???"],
-  ["temp_2", "???"],
-  =#
-  ["nppv", "longitude"],
-  ["nppv", "latitude"],
+  ["nppv", "nppv", "nppv"],
+  ["chl", "chl", "chl"],
+  ["phyc", "phyc", "phyc"],
+  ["temp_1", "temp_1", "thetao"],
+  ["temp_2", "temp_2", "thetao"],
+  ["velo_1", "velo_1", "vo"],
+  ["velo_2", "velo_2", "vo"],
+  ["velo_3", "velo_3", "vo"],
+  ["velo_4", "velo_4", "vo"],
+  ["longitude", "nppv", "longitude"],
+  ["latitude", "nppv", "latitude"],
 ]
 
 # Create a dictionary to write to
-d = Dict()
+dct = Dict()
 
 # Read nc files
-[d[v[2]] = NetCDF.open(string("data/copernicus_", v[1], ".nc"), v[2]) for v in vars];
+[dct[v[1]] = NetCDF.open(string("data/copernicus_", v[2], ".nc"), v[3]) for v in vars];
 
 # Calculate absolute values of all cells
-[d[v[2]] = abs.(d[v[2]]) for v in vars];
+[dct[v[1]] = abs.(dct[v[1]]) for v in vars];
 
 # Calculate mean of array slices containing vars[2]
-[d[v[2]] = mean(d[v[2]], dims=4) for v in vars];
+[dct[v[1]] = mean(dct[v[1]], dims=4) for v in vars];
+
+# Concatenate temp arrays on time axis
+dct["temp"] = @pipe Base.cat(dct["temp_1"], dct["temp_2"], dims=3) |>
+                    mean(_, dims=3)
+
+# Concatenate velo arrays on time axis
+dct["velo"] = @pipe Base.cat(dct["velo_1"], dct["velo_2"], dct["velo_3"], dct["velo_4"], dims=3) |>
+                    mean(_, dims=3)
+
+# Remove no longer necessary arrays from dictionary
+[delete!(dct, k) for k in ["temp_1", "temp_2", "velo_1", "velo_2", "velo_3", "velo_4"]]
+
+# Final names for matrices
+nms = ["nppv", "chl", "phyc", "temp"]
 
 # Drop singleton dimensions of arrays
-[d[v[2]] = dropdims(d[v[2]], dims=n) for v in vars[1:3], n in [4, 3]]
+[dct[n] = dropdims(dct[n], dims=d) for n in nms, d in [4, 3]]
 
-iterlat = @pipe collect(Base.Iterators.repeated(d["latitude"], length(d["longitude"]))) |>
-                collect(Base.Iterators.flatten(_))
+dctdf = Dict{String,DataFrame}()
 
-test = @pipe DataFrame(d["nppv"], :auto) |>
-             insertcols(_, 1, :longitude => d["longitude"]) |>
-             stack(_, Not(:longitude)) |>
-             insertcols(_, 2, :latitude => iterlat)
+function expandlat(lat, long)
+  out = @pipe collect(Base.Iterators.repeated(lat, length(long))) |>
+              collect(Base.Iterators.flatten(_))
+  return out
+end
 
-# Pipeline for higher-resolution velo data will be different
-# DataFrame has different dims!
+function writecp(dct, var, long, lat)
+  iterlat = expandlat(lat, long)
+
+  out = @pipe DataFrame(dct[var], :auto) |>
+              insertcols(_, 1, :longitude => long) |>
+              stack(_, Not(:longitude)) |>
+              insertcols(_, 2, :latitude => iterlat) |>
+              select(_, Not(:variable)) |>
+              rename(_, :value => var)
+  return out
+end
+
+[dctdf[n] = writecp(dct, n, dct["longitude"], dct["latitude"]) for n in ["nppv", "chl", "phyc"]]
+
+# need to take care of velo and temp still

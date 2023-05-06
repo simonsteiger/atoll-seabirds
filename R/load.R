@@ -44,7 +44,7 @@ list_matrix$velo <- ab$abind(
   list_matrix$velo_1,
   list_matrix$velo_2,
   list_matrix$velo_3,
-  list_matrix$velo_4, 
+  list_matrix$velo_4,
   along = 3
   ) %>% 
   apply(., c(1, 2), mean, na.rm = TRUE)
