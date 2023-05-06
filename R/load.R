@@ -56,15 +56,8 @@ list_matrix <- list_matrix[-c(4:9)]
 envs <- ut$read.csv("data/seabird_atolls_envs_10Mar.csv")
 
 #' @export
-envs_cp_coord <- envs %>% 
+envs_trans_coord <- envs %>% 
   dp$mutate(
-    long = ifelse(long < 0, long + 360, long)
-  )
-
-#' @export
-envs_ji_coord <- envs %>% 
-  dp$mutate(
-    long = long - 180,
     long = ifelse(long < 0, long + 360, long)
   )
 

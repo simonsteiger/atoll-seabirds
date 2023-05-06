@@ -38,19 +38,19 @@ cp_data <-
 #' @export
 out <- 
   pr$map(
-  seq_len(nrow(load$envs_cp_coord)), # nrow load$envs_cp_coord = number of atolls
-  ~ fn$filter_copernicus(cp_data, load$envs_cp_coord[.x, ]$lat, load$envs_cp_coord[.x, ]$long),
+  seq_len(nrow(load$envs_trans_coord)), # nrow load$envs_trans_coord = number of atolls
+  ~ fn$filter_copernicus(cp_data, load$envs_trans_coord[.x, ]$lat, load$envs_trans_coord[.x, ]$long),
   .progress = "Summarising variables per atoll..."
   ) %>%
   pr$list_rbind() %>%
   dp$mutate(
-    atoll = load$envs_cp_coord$atoll,
-    lat = load$envs_cp_coord$lat,
-    long = load$envs_cp_coord$long
+    atoll = load$envs_trans_coord$atoll,
+    lat = load$envs_trans_coord$lat,
+    long = load$envs_trans_coord$long
   )
 
 #' @export
-envs <- dp$left_join(load$envs_cp_coord, out, by = "atoll", suffix = c("", ".dupl")) %>% 
+envs <- dp$left_join(load$envs_trans_coord, out, by = "atoll", suffix = c("", ".dupl")) %>% 
   dp$select(-ts$ends_with(".dupl"))
 
 # What was that for?

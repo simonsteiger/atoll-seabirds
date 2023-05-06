@@ -31,7 +31,7 @@ ji_data <- fn$convert_to_tibble(precip_anom, "precip_anom", lat = latitude, long
 out <- 
   pr$map(
     seq_len(nrow(load$envs)), # nrow load$envs = number of atolls
-    ~ fn$filter_jisao(ji_data, load$envs_ji_coord[.x, ]$lat, load$envs_ji_coord[.x, ]$long)
+    ~ fn$filter_jisao(ji_data, load$envs_trans_coord[.x, ]$lat, load$envs_trans_coord[.x, ]$long)
   ) %>%
   pr$list_rbind() %>%
   dp$mutate(
