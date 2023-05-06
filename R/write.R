@@ -2,6 +2,7 @@ box::use(
   ut = utils,
   dp = dplyr,
   ts = tidyselect,
+  magrittr[`%>%`],
 )
 
 box::use(

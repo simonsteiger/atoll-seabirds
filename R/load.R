@@ -53,7 +53,7 @@ list_matrix$velo <- ab$abind(
 list_matrix <- list_matrix[-c(4:9)]
 
 #' @export
-envs <- ut$read.csv("data/seabird_atolls_envs_10Mar.csv")
+envs <- ut$read.csv("data/seabird_atolls_envs_02May.csv")
 
 #' @export
 envs_trans_coord <- envs %>% 
