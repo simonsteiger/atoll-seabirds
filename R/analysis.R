@@ -4,7 +4,8 @@ box::use(
   tbl = tibble,
   ts = tidyselect,
   veg = vegan,
-  gg = ggplot2
+  gg = ggplot2,
+  magrittr[`%>%`],
 )
 
 pop <- read.csv("data/atoll_seabird_populations_11Mar.csv")
