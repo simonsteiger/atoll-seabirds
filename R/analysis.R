@@ -1,16 +1,23 @@
+box::use(
+  dp = dplyr,
+  tdr = tidyr,
+  ts = tidyselect,
+)
 
-pop <- read.csv("data/atoll_seabird_populations_10Mar.csv")
-envs <- read.csv("data/seabird_atolls_envs_10Mar.csv")
+pop <- read.csv("data/atoll_seabird_populations_11Mar.csv")
+envs_jicp <- read.csv("data/envs_jicp.csv")
 
 pop_recode <- pop %>% 
-  dplyr::select(-starts_with("X")) %>% 
-  dplyr::mutate(
-     across(c(where(is.character), -atoll), as.numeric)
+  dp$select(-starts_with("X")) %>% 
+  dp$mutate(
+     dp$across(c(ts$where(is.character), -atoll), as.numeric)
    ) %>% 
-  tidyr::pivot_longer(!atoll, names_to = "species", values_to = "presence") %>% 
-  dplyr::mutate(
+  tdr$pivot_longer(!atoll, names_to = "species", values_to = "presence") %>% 
+  dp$mutate(
     presence = ifelse(!is.na(presence), TRUE, FALSE),
   )
 
 #' @export
-joined <- left_join(pop_recode, envs, by = "atoll")
+joined <- dp$left_join(pop_recode, envs_jicp, by = "atoll") %>% 
+  tdr$pivot_wider(names_from = "species", values_from = "presence") %>% 
+  dp$select(-X)
