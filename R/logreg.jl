@@ -1,8 +1,8 @@
 # Import Turing and Distributions.
 using Turing, Distributions
 
-# Import CSV
-using CSV
+# Working with tabular data
+using CSV, DataFrames
 
 # Import MCMCChains, Plots, and StatsPlots for visualizations and diagnostics.
 using MCMCChains, Plots, StatsPlots
@@ -11,7 +11,7 @@ using MCMCChains, Plots, StatsPlots
 using StatsFuns: logistic
 
 # Functionality for splitting and normalizing the data
-using MLDataUtils: shuffleobs, stratifiedobs, rescale!
+using MLDataUtils: shuffleobs, stratifiedobs, oversample, rescale!
 
 # Set a seed for reproducibility.
 using Random
@@ -28,36 +28,47 @@ first(envscores, 5)
 
 # Convert "species" and "presence" to numeric values
 envscores[!, :presence] = [r.presence == true ? 1.0 : 0.0 for r in eachrow(envscores)]
-# envscores[!, :species] = indexin(envscores[!, :species], unique(envscores.species))
-# envscores[!, :species] = Float64.(envscores[!, :species])
 select!(envscores, Not(:Column1))
-subset!(envscores, :species => ByRow(x -> x .== "Hydroprogne_caspia"))
-
 
 # Check if conversion worked
 first(envscores, 5)
 
 # split data function
-function split_data(df, target; at=0.70)
-    shuffled = shuffleobs(df)
+function split_data(df, target, species; at=0.70)
+    speciesdf = subset(df, :species => ByRow(x -> x .== species))
+    shuffled = shuffleobs(speciesdf)
     return trainset, testset = stratifiedobs(row -> row[target], shuffled; p = at)
+    # Below code upsamples PC1, but we want to upsample 1-6 simultaneously. Concatenate vectors to array - how?
+    # return trainset, testset = oversample(speciesdf.PC1, speciesdf.presence))
 end
 
 features = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]
 numerics = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]
 target = :presence
 
-trainset, testset = split_data(envscores, target; at=0.5)
+# Dicts for trainset, testset
+trainset = Dict{String, DataFrame}()
+testset = Dict{String, DataFrame}()
 
-for f in numerics
-    μ, σ = rescale!(trainset[!, f]; obsdim=1)
-    rescale!(testset[!, f], μ, σ; obsdim=1)
+[(trainset[s], testset[s]) = split_data(envscores, target, s; at=0.5) for s in unique(envscores.species)]
+
+for f in numerics, k in keys(trainset)
+    μ, σ = rescale!(trainset[k][!, f]; obsdim=1)
+    rescale!(testset[k][!, f], μ, σ; obsdim=1)
 end
 
-train = Matrix(trainset[:, features])
-test = Matrix(testset[:, features])
-train_label = trainset[:, target]
-test_label = testset[:, target];
+# Dicts for train, test, train_label, test_label
+train = Dict{String,Matrix}()
+test = Dict{String,Matrix}()
+train_label = Dict{String,Vector}()
+test_label = Dict{String,Vector}()
+
+for k in keys(trainset)
+    train[k] = Matrix(trainset[k][:, features])
+    test[k] = Matrix(testset[k][:, features])
+    train_label[k] = trainset[k][:, target]
+    test_label[k] = testset[k][:, target];
+end
 
 # Bayesian logistic regression
 @model function logistic_regression(x, y, n, σ)
@@ -76,11 +87,14 @@ test_label = testset[:, target];
     end
 end;
 
+# As long as pipeline is only partially looped, specify species name here
+species = "Anous_stolidus"
+
 # Retrieve the number of observations
-n, _ = size(train)
+n, _ = size(train[species])
 
 # Sample using HMC
-m = logistic_regression(train, train_label, n, 1)
+m = logistic_regression(train[species], train_label[species], n, 1)
 chain = sample(m, HMC(0.05, 10), MCMCThreads(), 10_000, 3)
 
 # Plot
@@ -126,16 +140,16 @@ end;
 threshold = 0.225
 
 # Make the predictions
-predictions = prediction(test, chain, threshold)
+predictions = prediction(test[species], chain, threshold)
 
 # Calculate MSE for our test set
-loss = sum((predictions - test_label) .^ 2) / length(test_label)
+loss = sum((predictions - test_label[species]) .^ 2) / length(test_label[species])
 
-present = sum(test_label)
-absent = length(test_label) - present
+present = sum(test_label[species])
+absent = length(test_label[species]) - present
 
-predicted_present = sum(test_label .== predictions .== 1)
-predicted_absent = sum(test_label .== predictions .== 0)
+predicted_present = sum(test_label[species] .== predictions .== 1)
+predicted_absent = sum(test_label[species] .== predictions .== 0)
 
 println("Predicted absent: $predicted_absent
 Observed absent: $absent
