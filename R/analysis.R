@@ -56,3 +56,36 @@ gg$ggplot(na.omit(env.scores), gg$aes(x = PC1, y = PC3)) +
   gg$theme_classic() +
   gg$facet_wrap(gg$vars(species))
 
+testspecies <- env.scores %>% 
+  dp$filter(species == "Puffinus_bailloni") %>% 
+  dp$rename(text = atoll)
+
+plot_ly(data = testspecies, hoverinfo = "text") %>% 
+  add_trace(
+    type = "scatter3d",
+    mode = "markers",
+    x = ~PC1,
+    y = ~PC2,
+    z = ~PC3,
+    text = ~text,
+    color = ~presence,
+    colors = c("blue", "red"),
+    alpha_stroke = 0.5,
+    alpha = 0.5,
+    size = 0.8
+  )
+
+plot_ly(
+  data = testspecies, 
+  x = testspecies$PC1, 
+  y = testspecies$PC2, 
+  z = testspecies$PC3, 
+  type = "scatter3d",
+  mode = "markers", 
+  color = testspecies$presence,
+  colors = c("blue", "red"),
+  alpha_stroke = 0.5,
+  alpha = 0.5,
+  size = 0.8
+)
+
