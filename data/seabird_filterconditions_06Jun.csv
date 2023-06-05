@@ -1,0 +1,38 @@
+﻿species,filtercondition
+Anous_stolidus,none
+Anous_minutus,"Melanesia, Micronesia, Polynesia"
+Anous_tenuirostris,Indian_Ocean
+Anous_ceruleus,"Melanesia, Micronesia, Polynesia"
+Gygis_alba,none
+Onychoprion_fuscatus,none
+Onychoprion_lunatus,"Melanesia, Micronesia, Polynesia"
+Onychoprion_anaethetus,"Indian_Ocean, Melanesia"
+Sternula_nereis,Melanesia
+Sternula_saundersi,Indian_Ocean
+Hydroprogne_caspia,"Indian_Ocean, Melanesia"
+Sterna_dougallii,"Indian_Ocean, Melanesia"
+Sterna_sumatrana,"Indian_Ocean, Melanesia, Micronesia"
+Thalasseus_bergii,none
+Thalasseus_bengalensis,Indian_Ocean
+Phaethon_lepturus,none
+Phaethon_rubricauda,none
+Phoebastria_immutabilis,EXCLUDE
+Phoebastria_nigripes,EXCLUDE
+Phoebastria_albatrus,EXCLUDE
+Nesofregetta_fuliginosa,EXCLUDE
+Hydrobates_tristrami,EXCLUDE
+Pterodroma_neglecta,EXCLUDE
+Pterodroma_heraldica,"Polynesia, Melanesia"
+Pterodroma_ultima,EXCLUDE
+Pterodroma_hypoleuca,EXCLUDE
+Pterodroma_alba,EXCLUDE
+Bulweria_bulwerii,EXCLUDE
+Ardenna_pacifica,none
+Puffinus_nativitatis,"Polynesia, Micronesia"
+Puffinus_bailloni,none
+Fregata_ariel,none
+Fregata_minor,none
+Sula_dactylatra,none
+Sula_granti,EXCLUDE
+Sula_leucogaster,none
+Sula_sula,none
