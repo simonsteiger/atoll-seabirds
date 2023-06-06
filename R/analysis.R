@@ -7,10 +7,12 @@ box::use(
   gg = ggplot2,
   magrittr[`%>%`],
   ggd = ggdensity,
+  str = stringr,
 )
 
 pop <- read.csv("data/atoll_seabird_populations_11Mar.csv")
 envs_jicp <- read.csv("data/envs_jicp.csv")
+conds <- read.csv("data/seabird_filterconditions_06Jun.csv")
 
 pop_recode <- pop %>% 
   dp$select(-starts_with("X")) %>% 
@@ -31,16 +33,26 @@ rda.env <- veg$rda(joined[,c(7:12,15,17:25)], weight = FALSE, scale = TRUE)
 
 env.scores <- summary(rda.env)[2]$sites %>% as.data.frame()
 env.scores$atoll <- joined$atoll
+env.scores$region <- joined$region
 
 species_only <- joined %>% 
-  dp$mutate(
-    Anous_tenuirostris = ifelse(region == "Indian_Ocean", as.character(Anous_tenuirostris), NA),
-    Anous_minutus = ifelse(region != "Indian_Ocean", as.character(Anous_minutus), NA)
-  ) %>% 
   dp$select(ts$where(is.logical), atoll)
 
 env.scores <- dp$left_join(tbl$as_tibble(env.scores), species_only, by = "atoll") %>% 
-  tdr$pivot_longer(!c(PC1:PC6, atoll), names_to = "species", values_to = "presence")
+  tdr$pivot_longer(!c(PC1:PC6, atoll, region), names_to = "species", values_to = "presence") %>% 
+  dp$left_join(conds, by = "species") %>% 
+  dp$mutate(
+    cond = dp$case_match(
+      filtercondition,
+      "EXCLUDE" ~ "\\d",
+      "none" ~ "\\w+",
+      .default = filtercondition
+    ),
+    cond = str$str_replace_all(cond, ",\\s", "|")
+  ) %>% 
+  dp$select(-filtercondition)
+
+write.csv(env.scores, "data/envscores.csv")
 
 env.loadings <- veg$scores(rda.env)$species %>% as.data.frame()
 

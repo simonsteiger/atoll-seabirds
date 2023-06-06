@@ -2,7 +2,7 @@
 using Turing, Distributions
 
 # Working with tabular data
-using CSV, DataFrames
+using CSV, DataFrames, Chain
 
 # Import MCMCChains, Plots, and StatsPlots for visualizations and diagnostics.
 using MCMCChains, Plots, StatsPlots
@@ -33,9 +33,14 @@ select!(envscores, Not(:Column1))
 # Check if conversion worked
 first(envscores, 5)
 
+# Delete all species with known population from data
+envscores = subset(envscores, [:cond, :region] => ByRow((x, y) -> occursin(Regex(x), y)))
+
 # split data function
 function split_data(df, target, species; at=0.70)
-    speciesdf = subset(df, :species => ByRow(x -> x .== species))
+    speciesdf = @chain df begin 
+        subset(_, :species => ByRow(x -> x .== species))
+    end
     shuffled = shuffleobs(speciesdf)
     return trainset, testset = stratifiedobs(row -> row[target], shuffled; p = at)
     # Below code upsamples PC1, but we want to upsample 1-6 simultaneously. Concatenate vectors to array - how?
