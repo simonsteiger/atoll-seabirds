@@ -28,13 +28,15 @@ first(envscores, 5)
 
 # Convert "species" and "presence" to numeric values
 envscores[!, :presence] = [r.presence == true ? 1.0 : 0.0 for r in eachrow(envscores)]
-select!(envscores, Not(:Column1))
 
 # Check if conversion worked
 first(envscores, 5)
 
 # Delete all species with known population from data
 envscores = subset(envscores, [:cond, :region] => ByRow((x, y) -> occursin(Regex(x), y)))
+
+# Discard unused columns
+select!(envscores, Not([:Column1, :region, :cond]))
 
 # split data function
 function split_data(df, target, species; at=0.70)
