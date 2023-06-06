@@ -7,9 +7,9 @@ Gygis_alba,none
 Onychoprion_fuscatus,none
 Onychoprion_lunatus,"Melanesia, Micronesia, Polynesia"
 Onychoprion_anaethetus,"Indian_Ocean, Melanesia"
-Sternula_nereis,Melanesia
+Sternula_nereis,EXCLUDE
 Sternula_saundersi,Indian_Ocean
-Hydroprogne_caspia,"Indian_Ocean, Melanesia"
+Hydroprogne_caspia,EXCLUDE
 Sterna_dougallii,"Indian_Ocean, Melanesia"
 Sterna_sumatrana,"Indian_Ocean, Melanesia, Micronesia"
 Thalasseus_bergii,none
@@ -22,7 +22,7 @@ Phoebastria_albatrus,EXCLUDE
 Nesofregetta_fuliginosa,EXCLUDE
 Hydrobates_tristrami,EXCLUDE
 Pterodroma_neglecta,EXCLUDE
-Pterodroma_heraldica,"Polynesia, Melanesia"
+Pterodroma_heraldica,EXCLUDE
 Pterodroma_ultima,EXCLUDE
 Pterodroma_hypoleuca,EXCLUDE
 Pterodroma_alba,EXCLUDE
