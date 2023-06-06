@@ -49,6 +49,12 @@ function split_data(df, target, species; at=0.70)
     # return trainset, testset = oversample(speciesdf.PC1, speciesdf.presence))
 end
 
+# thoughts on resampling
+# - split data first (50/50 stratified)
+# - determine imbalance ratio in data, e.g. (20/80)
+# - draw N times with reverse imbalance ratio, e.g. (80/20), to achieve 50/50
+# - all training atolls must occur at least once in the resulting data (draw with replacement first)
+
 features = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]
 numerics = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]
 target = :presence
