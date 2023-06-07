@@ -3,7 +3,7 @@ library(tibble)
 library(purrr)
 library(tidyr)
 
-data <- tibble(read.csv("/Users/simonsteiger/Desktop/other/atoll-seabirds/data/envscores.csv"))
+data <- envscores
 
 data_as <- data %>% 
   filter(species == "Anous_stolidus")
@@ -32,3 +32,32 @@ bootstrap <- function(df, N, target, r_out = 1) {
 }
 
 x <- bootstrap(data_as, N, "presence")
+
+table(x$presence)
+
+
+a <- as.numeric(summary(data_as$presence)[[2]])
+n <- nrow(data_as)
+N <- 1000
+
+a/(n-a)
+
+
+N_a <- (N/2)-a # this is how many additional (resampled) absence we need
+N_p <- (N/2)-(n-a) # this is how many additional (resampled) presence we need
+
+out <- c(
+          row_number(data_as),
+          sample(which(data_as$presence == 0), size = N_a, replace = TRUE),
+          sample(which(data_as$presence == 1), size = N_p, replace = TRUE)
+)
+
+res <- tibble()
+
+for (i in seq_along(out)) {
+  temp <- data_as[out[i] ]
+  res <- rbind(res, temp)
+}
+
+table(res$presence)
+
