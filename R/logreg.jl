@@ -10,11 +10,17 @@ using MCMCChains, Plots, StatsPlots
 # We need a logistic function, which is provided by StatsFuns.
 using StatsFuns: logistic
 
+using StatsBase
+
 # Functionality for splitting and normalizing the data
 using MLDataUtils: shuffleobs, stratifiedobs, oversample, rescale!
 
 # Set a seed for reproducibility.
 using Random
+
+include("/Users/simonsteiger/Desktop/other/atoll-seabirds/R/upsample.jl")
+include("/Users/simonsteiger/Desktop/other/atoll-seabirds/R/tune.jl")
+
 Random.seed!(0);
 
 # Turn off progress monitor.
@@ -49,12 +55,6 @@ function split_data(df, target, species; at=0.70)
     # return trainset, testset = oversample(speciesdf.PC1, speciesdf.presence))
 end
 
-# thoughts on resampling
-# - split data first (50/50 stratified)
-# - determine imbalance ratio in data, e.g. (20/80)
-# - draw N times with reverse imbalance ratio, e.g. (80/20), to achieve 50/50
-# - all training atolls must occur at least once in the resulting data (draw with replacement first)
-
 features = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]
 numerics = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]
 target = :presence
@@ -70,6 +70,10 @@ for f in numerics, k in keys(trainset)
     rescale!(testset[k][!, f], μ, σ; obsdim=1)
 end
 
+trainset_up = Dict{String, DataFrame}()
+
+[trainset_up[k] = upsample(trainset[k], 250) for k in keys(trainset)];
+
 # Dicts for train, test, train_label, test_label
 train = Dict{String,Matrix}()
 test = Dict{String,Matrix}()
@@ -77,9 +81,9 @@ train_label = Dict{String,Vector}()
 test_label = Dict{String,Vector}()
 
 for k in keys(trainset)
-    train[k] = Matrix(trainset[k][:, features])
+    train[k] = Matrix(trainset_up[k][:, features])
     test[k] = Matrix(testset[k][:, features])
-    train_label[k] = trainset[k][:, target]
+    train_label[k] = trainset_up[k][:, target]
     test_label[k] = testset[k][:, target];
 end
 
@@ -108,7 +112,7 @@ n, _ = size(train[species])
 
 # Sample using HMC
 m = logistic_regression(train[species], train_label[species], n, 1)
-chain = sample(m, HMC(0.05, 10), MCMCThreads(), 10_000, 3)
+chain = sample(m, HMC(0.05, 10), MCMCThreads(), 10_000, 3, discard_initial = 5000)
 
 # Plot
 plot(chain)
@@ -149,8 +153,22 @@ function prediction(x::Matrix, chain, threshold)
     return v
 end;
 
+tuning_params = tune(chain, test, test_label)
+
+tuning_params_sub = @chain tuning_params begin
+    subset(_, :species => x -> x .== species)
+end
+
+plot(tuning_params_sub.threshold, tuning_params_sub.criterion)
+plot!(tuning_params_sub.threshold, tuning_params_sub.predicted_absent)
+plot!(tuning_params_sub.threshold, tuning_params_sub.predicted_present)
+
+optimal = tuning_params_sub.threshold[maximum(tuning_params_sub.criterion) .== tuning_params_sub.criterion][1]
+
+scatter!([optimal], [maximum(tuning_params_sub.criterion)])
+
 # Set predictions threshold
-threshold = 0.225
+threshold = optimal
 
 # Make the predictions
 predictions = prediction(test[species], chain, threshold)
