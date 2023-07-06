@@ -55,9 +55,8 @@ out <- c(
 res <- tibble()
 
 for (i in seq_along(out)) {
-  temp <- data_as[out[i] ]
+  temp <- data_as[out[i]]
   res <- rbind(res, temp)
 }
 
 table(res$presence)
-

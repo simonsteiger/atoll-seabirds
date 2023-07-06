@@ -47,11 +47,11 @@ select!(envscores, Not([:Column1, :region, :cond]))
 
 # split data function
 function split_data(df, target, species; at=0.70)
-    speciesdf = @chain df begin 
+    speciesdf = @chain df begin
         subset(_, :species => ByRow(x -> x .== species))
     end
     shuffled = shuffleobs(speciesdf)
-    return trainset, testset = stratifiedobs(row -> row[target], shuffled; p = at)
+    return trainset, testset = stratifiedobs(row -> row[target], shuffled; p=at)
     # Below code upsamples PC1, but we want to upsample 1-6 simultaneously. Concatenate vectors to array - how?
     # return trainset, testset = oversample(speciesdf.PC1, speciesdf.presence))
 end
@@ -61,8 +61,8 @@ numerics = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]
 target = :presence
 
 # Dicts for trainset, testset
-trainset = Dict{String, DataFrame}()
-testset = Dict{String, DataFrame}()
+trainset = Dict{String,DataFrame}()
+testset = Dict{String,DataFrame}()
 
 [(trainset[s], testset[s]) = split_data(envscores, target, s; at=0.5) for s in unique(envscores.species)]
 
@@ -71,7 +71,7 @@ for f in numerics, k in keys(trainset)
     rescale!(testset[k][!, f], μ, σ; obsdim=1)
 end
 
-trainset_up = Dict{String, DataFrame}()
+trainset_up = Dict{String,DataFrame}()
 
 rng = StableRNG(1)
 
@@ -87,7 +87,7 @@ for k in keys(trainset)
     train[k] = Matrix(trainset_up[k][:, features])
     test[k] = Matrix(testset[k][:, features])
     train_label[k] = trainset_up[k][:, target]
-    test_label[k] = testset[k][:, target];
+    test_label[k] = testset[k][:, target]
 end
 
 # Bayesian logistic regression
@@ -106,25 +106,6 @@ end
         y[i] ~ Bernoulli(v)
     end
 end;
-
-# As long as pipeline is only partially looped, specify species name here
-species = "Anous_stolidus"
-
-# Retrieve the number of observations
-n, _ = size(train[species])
-
-# Sample using HMC
-m = logistic_regression(train[species], train_label[species], n, 1)
-chain = sample(m, HMC(0.05, 10), MCMCThreads(), 10_000, 3, discard_initial = 5000)
-
-# Plot
-plot(chain)
-
-# Labels
-l = [:pc1, :pc2, :pc3, :pc4, :pc5, :pc6]
-
-# Corner plot
-corner(chain, l)
 
 function prediction(x::Matrix, chain, threshold)
     # Pull the means from each parameter's sampled values in the chain
@@ -154,41 +135,80 @@ function prediction(x::Matrix, chain, threshold)
         end
     end
     return v
-end;
-
-tuning_params = tune(chain, test, test_label)
-
-tuning_params_sub = @chain tuning_params begin
-    subset(_, :species => x -> x .== species)
 end
 
-# plot(tuning_params_sub.threshold, tuning_params_sub.criterion)
-# plot!(tuning_params_sub.threshold, tuning_params_sub.predicted_absent)
-# plot!(tuning_params_sub.threshold, tuning_params_sub.predicted_present)
+mutable struct result
+    chain
+    threshold
+    diagnostics
+end
 
-optimal = tuning_params_sub.threshold[maximum(tuning_params_sub.criterion) .== tuning_params_sub.criterion][1]
+function wrap_model(species)
+    # Retrieve the number of observations
+    n, _ = size(train[species])
 
-# scatter!([optimal], [maximum(tuning_params_sub.criterion)])
+    # Sample using HMC
+    m = logistic_regression(train[species], train_label[species], n, 1)
+    chain = sample(m, HMC(0.05, 10), MCMCThreads(), 10_000, 3, discard_initial=5000)
 
-# Set predictions threshold
-threshold = optimal
+    # Plot
+    plot(chain)
 
-# Make the predictions
-predictions = prediction(test[species], chain, threshold)
+    # Labels
+    l = [:pc1, :pc2, :pc3, :pc4, :pc5, :pc6]
 
-# Calculate MSE for our test set
-loss = sum((predictions - test_label[species]) .^ 2) / length(test_label[species])
+    # Corner plot
+    corner(chain, l)
 
-present = sum(test_label[species])
-absent = length(test_label[species]) - present
+    tuning_params = tune(chain, test, test_label)
 
-predicted_present = sum(test_label[species] .== predictions .== 1)
-predicted_absent = sum(test_label[species] .== predictions .== 0)
+    tuning_params_sub = @chain tuning_params begin
+        subset(_, :species => x -> x .== species)
+    end
 
-println("Predicted absent: $predicted_absent
-Observed absent: $absent
-Percentage absent correct $(predicted_absent/absent)
----
-Predicted present: $predicted_present
-Observed present: $present
-Percentage present correct $(predicted_present/present)")
+    # plot(tuning_params_sub.threshold, tuning_params_sub.criterion)
+    # plot!(tuning_params_sub.threshold, tuning_params_sub.predicted_absent)
+    # plot!(tuning_params_sub.threshold, tuning_params_sub.predicted_present)
+
+    optimal = tuning_params_sub.threshold[maximum(tuning_params_sub.criterion).==tuning_params_sub.criterion][1]
+
+    # scatter!([optimal], [maximum(tuning_params_sub.criterion)])
+
+    # Set predictions threshold
+    threshold = optimal
+
+    # Make the predictions
+    predictions = prediction(test[species], chain, threshold)
+
+    # Calculate MSE for our test set
+    loss = sum((predictions - test_label[species]) .^ 2) / length(test_label[species])
+
+    present = sum(test_label[species])
+    absent = length(test_label[species]) - present
+
+    predicted_present = sum(test_label[species] .== predictions .== 1)
+    predicted_absent = sum(test_label[species] .== predictions .== 0)
+
+    diagnostics = Dict(
+        "present" => present,
+        "absent" => absent,
+        "predicted_present" => predicted_present,
+        "predicted_absent" => predicted_absent
+    )
+
+    println("Predicted absent: $predicted_absent
+    Observed absent: $absent
+    Percentage absent correct $(predicted_absent/absent)
+    ---
+    Predicted present: $predicted_present
+    Observed present: $present
+    Percentage present correct $(predicted_present/present)")
+
+    return result(chain, threshold, diagnostics)
+end
+
+all_results = Dict{String, result}()
+
+[all_results[k] = wrap_model(k) for k in collect(keys(trainset))]
+
+# xx = result(2.5, chain)

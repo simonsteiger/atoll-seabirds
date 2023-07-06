@@ -12,7 +12,7 @@ box::use(
 
 pop <- read.csv("data/atoll_seabird_populations_11Mar.csv")
 envs_jicp <- read.csv("data/envs_jicp.csv")
-conds <- read.csv("data/seabird_filterconditions_06Jun.csv")
+conds <- read.csv("data/seabird_filterconditions_03Jul.csv", sep = ";")
 
 pop_recode <- pop %>% 
   dp$select(-starts_with("X")) %>% 
