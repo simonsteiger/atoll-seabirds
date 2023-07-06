@@ -14,9 +14,10 @@ using StatsBase
 
 # Functionality for splitting and normalizing the data
 using MLDataUtils: shuffleobs, stratifiedobs, oversample, rescale!
+using Resample
 
 # Set a seed for reproducibility.
-using Random
+using Random, StableRNGs
 
 include("/Users/simonsteiger/Desktop/other/atoll-seabirds/R/upsample.jl")
 include("/Users/simonsteiger/Desktop/other/atoll-seabirds/R/tune.jl")
@@ -72,7 +73,9 @@ end
 
 trainset_up = Dict{String, DataFrame}()
 
-[trainset_up[k] = upsample(trainset[k], 250) for k in keys(trainset)];
+rng = StableRNG(1)
+
+[trainset_up[k] = our_smote(rng, trainset[k]) for k in keys(trainset)];
 
 # Dicts for train, test, train_label, test_label
 train = Dict{String,Matrix}()
@@ -159,13 +162,13 @@ tuning_params_sub = @chain tuning_params begin
     subset(_, :species => x -> x .== species)
 end
 
-plot(tuning_params_sub.threshold, tuning_params_sub.criterion)
-plot!(tuning_params_sub.threshold, tuning_params_sub.predicted_absent)
-plot!(tuning_params_sub.threshold, tuning_params_sub.predicted_present)
+# plot(tuning_params_sub.threshold, tuning_params_sub.criterion)
+# plot!(tuning_params_sub.threshold, tuning_params_sub.predicted_absent)
+# plot!(tuning_params_sub.threshold, tuning_params_sub.predicted_present)
 
 optimal = tuning_params_sub.threshold[maximum(tuning_params_sub.criterion) .== tuning_params_sub.criterion][1]
 
-scatter!([optimal], [maximum(tuning_params_sub.criterion)])
+# scatter!([optimal], [maximum(tuning_params_sub.criterion)])
 
 # Set predictions threshold
 threshold = optimal

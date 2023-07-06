@@ -32,3 +32,44 @@ function upsample(data, N)
 
     return append!(p_df, a_df)
 end
+
+function our_smote(rng, data)
+    p = sum(data.presence)
+    a = nrow(data) - p
+    minority = a > p ? 1.0 : 0.0
+    majority = a < p ? p : a
+
+    df_origin = select(data, Not([:atoll, :species]))
+
+    df_min = @chain data begin
+        subset(_, :presence => x -> x .== minority)
+        select(_, Not([:atoll, :species, :presence]))
+    end
+
+    df_smote = @chain df_min begin
+        smote(rng, _, Int64(round(majority * 0.4, digits=0)))
+        DataFrame(_)
+    end
+
+    df_smote.presence .= minority
+    return append!(df_smote, df_origin)
+end
+
+rng = StableRNG(1)
+
+x = our_smote(rng, df_anst)
+
+# Would "let" be smart?
+
+# let 
+#     p = sum(data.presence)
+#     a = nrow(data) - p
+#     minority = a > p ? 1.0 : 0.0
+#     majority = a < p ? p : a
+# 
+#     @chain data begin
+#         subset(_, :presence => x -> x .== minority)
+#         select(_, Not([:atoll, :species, :presence]))
+#         smote(rng, _, Int64(round(majority * 0.4, digits=0)))
+#     end
+# end
