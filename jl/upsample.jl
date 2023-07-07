@@ -11,7 +11,7 @@ function balance!(data, draws)
     end
 end
 
-function upsample(data, N)
+function upsample_naive(data, N)
     p = sum(data.presence)
     a = nrow(data) - p
     a_N = Int64(N - a)
@@ -33,7 +33,7 @@ function upsample(data, N)
     return append!(p_df, a_df)
 end
 
-function our_smote(rng, data)
+function upsample_smote(rng, data)
     p = sum(data.presence)
     a = nrow(data) - p
     minority = a > p ? 1.0 : 0.0
@@ -54,10 +54,6 @@ function our_smote(rng, data)
     df_smote.presence .= minority
     return append!(df_smote, df_origin)
 end
-
-rng = StableRNG(1)
-
-x = our_smote(rng, df_anst)
 
 # Would "let" be smart?
 

@@ -75,7 +75,7 @@ trainset_up = Dict{String,DataFrame}()
 
 rng = StableRNG(1)
 
-[trainset_up[k] = our_smote(rng, trainset[k]) for k in keys(trainset)];
+[trainset_up[k] = upsample_smote(rng, trainset[k]) for k in keys(trainset)];
 
 # Dicts for train, test, train_label, test_label
 train = Dict{String,Matrix}()

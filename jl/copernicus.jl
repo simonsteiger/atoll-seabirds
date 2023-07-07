@@ -4,6 +4,7 @@ using Statistics, DataFrames, Compat, Chain # wrangling
 # First element is key in dictionary
 # Second entry is csv file name
 # Third entry is variable name in nc file
+
 vars = [
   ["nppv", "nppv", "nppv"],
   ["chl", "chl", "chl"],
@@ -80,3 +81,8 @@ end
 [dctdf[n] = writecp(dct, n, dct["longitude"], dct["latitude"]) for n in ["nppv", "chl", "phyc"]]
 
 [dctdf[n] = writecp(dct, n, dct[string("longitude_", n)], dct[string("latitude_", n)]) for n in ["velo", "temp"]]
+
+cp_data = reduce(
+  (x, y) -> innerjoin(x, y, on=[:latitude, :longitude]),
+  [dctdf["nppv"], dctdf["phyc"], dctdf["chl"], dctdf["velo"], dctdf["temp"]]
+)
