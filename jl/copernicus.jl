@@ -82,7 +82,19 @@ end
 
 [dctdf[n] = writecp(dct, n, dct[string("longitude_", n)], dct[string("latitude_", n)]) for n in ["velo", "temp"]]
 
-cp_data = reduce(
-  (x, y) -> innerjoin(x, y, on=[:latitude, :longitude]),
-  [dctdf["nppv"], dctdf["phyc"], dctdf["chl"], dctdf["velo"], dctdf["temp"]]
-)
+cp_data =
+  let v = collect(dctdf)
+    @chain [v[i][2] for i in eachindex(v)] begin
+      reduce((x, y) -> innerjoin(x, y, on=[:latitude, :longitude]), _)
+    end
+  end
+
+function filter_copernicus(data, lat, long)
+  out = @chain data begin
+    subset(_, (:latitude, :longitude) => ByRow((x, y) -> x >= lat - 1 & x <= lat + 1 & y >= long - 1 & y <= long + 1))
+    # also mean per variable
+  end
+
+  return out
+end
+
