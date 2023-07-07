@@ -1,5 +1,5 @@
 using NetCDF # read
-using Statistics, DataFrames, Compat, Pipe # wrangling
+using Statistics, DataFrames, Compat, Chain # wrangling
 
 # First element is key in dictionary
 # Second entry is csv file name
@@ -16,6 +16,10 @@ vars = [
   ["velo_4", "velo_4", "vo"],
   ["longitude", "nppv", "longitude"],
   ["latitude", "nppv", "latitude"],
+  ["longitude_velo", "velo_1", "longitude"],
+  ["latitude_velo", "velo_1", "latitude"],
+  ["longitude_temp", "temp_1", "longitude"],
+  ["latitude_temp", "temp_1", "latitude"],
 ]
 
 # Create a dictionary to write to
@@ -31,18 +35,20 @@ dct = Dict()
 [dct[v[1]] = mean(dct[v[1]], dims=4) for v in vars];
 
 # Concatenate temp arrays on time axis
-dct["temp"] = @pipe Base.cat(dct["temp_1"], dct["temp_2"], dims=3) |>
-                    mean(_, dims=3)
+dct["temp"] = @chain Base.cat(dct["temp_1"], dct["temp_2"], dims=3) begin
+  mean(_, dims=3)
+end
 
 # Concatenate velo arrays on time axis
-dct["velo"] = @pipe Base.cat(dct["velo_1"], dct["velo_2"], dct["velo_3"], dct["velo_4"], dims=3) |>
-                    mean(_, dims=3)
+dct["velo"] = @chain Base.cat(dct["velo_1"], dct["velo_2"], dct["velo_3"], dct["velo_4"], dims=3) begin
+  mean(_, dims=3)
+end
 
 # Remove no longer necessary arrays from dictionary
 [delete!(dct, k) for k in ["temp_1", "temp_2", "velo_1", "velo_2", "velo_3", "velo_4"]]
 
 # Final names for matrices
-nms = ["nppv", "chl", "phyc", "temp"]
+nms = ["nppv", "chl", "phyc", "temp", "velo"]
 
 # Drop singleton dimensions of arrays
 [dct[n] = dropdims(dct[n], dims=d) for n in nms, d in [4, 3]]
@@ -50,23 +56,27 @@ nms = ["nppv", "chl", "phyc", "temp"]
 dctdf = Dict{String,DataFrame}()
 
 function expandlat(lat, long)
-  out = @pipe collect(Base.Iterators.repeated(lat, length(long))) |>
-              collect(Base.Iterators.flatten(_))
+  out = @chain collect(Base.Iterators.repeated(lat, length(long))) begin
+    collect(Base.Iterators.flatten(_))
+  end
+
   return out
 end
 
 function writecp(dct, var, long, lat)
   iterlat = expandlat(lat, long)
 
-  out = @pipe DataFrame(dct[var], :auto) |>
-              insertcols(_, 1, :longitude => long) |>
-              stack(_, Not(:longitude)) |>
-              insertcols(_, 2, :latitude => iterlat) |>
-              select(_, Not(:variable)) |>
-              rename(_, :value => var)
+  out = @chain DataFrame(dct[var], :auto) begin
+    insertcols(_, 1, :longitude => long)
+    stack(_, Not(:longitude))
+    insertcols(_, 2, :latitude => iterlat)
+    select(_, Not(:variable))
+    rename(_, :value => var)
+  end
+
   return out
 end
 
 [dctdf[n] = writecp(dct, n, dct["longitude"], dct["latitude"]) for n in ["nppv", "chl", "phyc"]]
 
-# need to take care of velo and temp still
+[dctdf[n] = writecp(dct, n, dct[string("longitude_", n)], dct[string("latitude_", n)]) for n in ["velo", "temp"]]
