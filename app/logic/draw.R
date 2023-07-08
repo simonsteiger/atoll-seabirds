@@ -9,8 +9,8 @@ box::use(
 )
 
 box::use(
-  app/logic/disk,
-  col = app/logic/colors,
+  app / logic / disk,
+  col = app / logic / colors,
 )
 
 css_default_hover <- gir$girafe_css_bicolor(primary = "#1bf702", secondary = "#1bf702")
@@ -26,7 +26,6 @@ gir$set_girafe_defaults(
 
 #' @export
 atoll_map <- function(atoll_data, fill) {
-  
   pal_name <- switch(fill,
     "nppv" = "mako",
     "chl" = "vangogh3",
@@ -34,18 +33,18 @@ atoll_map <- function(atoll_data, fill) {
     "temp" = "mako",
     "velo" = "mako"
   )
-  
+
   p <- sh$reactive(
     gg$ggplot() +
       gg$geom_raster(data = disk$cp_data, gg$aes(longitude, latitude, fill = .data[[fill]])) +
       gir$geom_point_interactive(
         data = atoll_data,
         gg$aes(
-          x = long, 
+          x = long,
           y = lat,
           color = .data[[fill]],
           tooltip = paste0(
-            "<b>Atoll</b> ", atoll, "\n<b>", toupper(fill),"</b> ", round(.data[[fill]], 2)
+            "<b>Atoll</b> ", atoll, "\n<b>", toupper(fill), "</b> ", round(.data[[fill]], 2)
           ),
           data_id = atoll
         ),
@@ -67,23 +66,23 @@ atoll_map <- function(atoll_data, fill) {
           title.position = "bottom",
           title.hjust = 0.5,
           label.position = "top"
-          ),
+        ),
         fill = gg$guide_colorbar(
           title = paste0("Oceanic ", fill),
-          title.position = "bottom", 
-          title.hjust = 0.5, 
+          title.position = "bottom",
+          title.hjust = 0.5,
           label.position = "top"
-          )
+        )
       )
   )
-  
+
   gir$girafe(ggobj = p())
 }
 
 #' @export
 atoll_hist <- function(df, var) {
-  df %>% 
-    e4r$e_charts() %>% 
-    e4r$e_histogram_(var) %>% 
+  df %>%
+    e4r$e_charts() %>%
+    e4r$e_histogram_(var) %>%
     e4r$e_tooltip()
 }

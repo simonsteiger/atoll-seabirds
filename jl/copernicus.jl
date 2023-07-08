@@ -82,19 +82,26 @@ end
 
 [dctdf[n] = writecp(dct, n, dct[string("longitude_", n)], dct[string("latitude_", n)]) for n in ["velo", "temp"]]
 
-cp_data =
+# Join all dfs stored in dict to single df
+cp_df =
   let v = collect(dctdf)
     @chain [v[i][2] for i in eachindex(v)] begin
       reduce((x, y) -> innerjoin(x, y, on=[:latitude, :longitude]), _)
     end
   end
 
-function filter_copernicus(data, lat, long)
-  out = @chain data begin
-    subset(_, (:latitude, :longitude) => ByRow((x, y) -> x >= lat - 1 & x <= lat + 1 & y >= long - 1 & y <= long + 1))
-    # also mean per variable
+# Calculate outcome means for ± 1 long/lat around each atoll
+function filter_cp(df, env_lat, env_long; tol=1)
+  cp_ll = [:latitude, :longitude]
+
+  out = @chain df begin
+    subset(_, cp_ll => ByRow((x, y) -> ≈(x, env_lat; atol=tol) && ≈(y, env_long; atol=tol)))
+    transform(_, Not(cp_ll) .=> ByRow(x -> isinf(x) ? missing : x) .=> identity) # Inf represents land, recode to missing
+    combine(_, Not(cp_ll) .=> (x -> mean(skipmissing(x))) .=> identity)
+    # Add all the env data
   end
 
   return out
 end
 
+cp_summary = reduce(vcat, [filter_cp(cp_df, i[1], i[2]) for i in [[30, 250], [31, 251]]])

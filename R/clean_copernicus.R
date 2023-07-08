@@ -39,6 +39,8 @@ cp_data <-
 
 end <- Sys.time()
 
+end-start
+
 #' @export
 out <-
   pr$map(
