@@ -19,8 +19,8 @@ using Resample
 # Set a seed for reproducibility.
 using Random, StableRNGs
 
-include("/Users/simonsteiger/Desktop/other/atoll-seabirds/R/upsample.jl")
-include("/Users/simonsteiger/Desktop/other/atoll-seabirds/R/tune.jl")
+include("/Users/simonsteiger/Desktop/other/atoll-seabirds/jl/upsample.jl")
+include("/Users/simonsteiger/Desktop/other/atoll-seabirds/jl/tune.jl")
 
 Random.seed!(0);
 
@@ -28,22 +28,19 @@ Random.seed!(0);
 # Turing.setprogress!(false)
 
 # Import the data
-envscores = CSV.read("data/envscores.csv", DataFrame)
+envscores = CSV.read("data/jl_envscores.csv", DataFrame)
 
-# Show first few rows
-first(envscores, 5)
+# Convert "presence" to numeric values
+# envscores[!, :presence] = [r.presence == true ? 1.0 : 0.0 for r in eachrow(envscores)]
 
-# Convert "species" and "presence" to numeric values
-envscores[!, :presence] = [r.presence == true ? 1.0 : 0.0 for r in eachrow(envscores)]
-
-# Check if conversion worked
-first(envscores, 5)
+envs_known = subset(envscores, :presence => ByRow(x -> !ismissing(x)))
+envs_unknown = subset(envscores, :presence => ByRow(x -> ismissing(x)))
 
 # Delete all species with known population from data
-envscores = subset(envscores, [:cond, :region] => ByRow((x, y) -> occursin(Regex(x), y)))
+envs_known = subset(envs_known, [:filtercondition, :region] => ByRow((x, y) -> occursin(Regex(x), y)))
 
 # Discard unused columns
-select!(envscores, Not([:Column1, :region, :cond]))
+select!(envs_known, Not([:region, :filtercondition]))
 
 # split data function
 function split_data(df, target, species; at=0.70)
@@ -64,7 +61,7 @@ target = :presence
 trainset = Dict{String,DataFrame}()
 testset = Dict{String,DataFrame}()
 
-[(trainset[s], testset[s]) = split_data(envscores, target, s; at=0.5) for s in unique(envscores.species)]
+[(trainset[s], testset[s]) = split_data(envs_known, target, s; at=0.5) for s in unique(envs_known.species)]
 
 for f in numerics, k in keys(trainset)
     μ, σ = rescale!(trainset[k][!, f]; obsdim=1)
@@ -196,13 +193,17 @@ function wrap_model(species)
         "predicted_absent" => predicted_absent
     )
 
-    println("Predicted absent: $predicted_absent
+    println("
+    Species: $species
+    ----
+    Predicted absent: $predicted_absent
     Observed absent: $absent
     Percentage absent correct $(predicted_absent/absent)
-    ---
+    ----
     Predicted present: $predicted_present
     Observed present: $present
-    Percentage present correct $(predicted_present/present)")
+    Percentage present correct $(predicted_present/present)
+    ")
 
     return result(chain, threshold, diagnostics)
 end
@@ -211,4 +212,18 @@ all_results = Dict{String, result}()
 
 [all_results[k] = wrap_model(k) for k in collect(keys(trainset))]
 
-# xx = result(2.5, chain)
+missing_atolls = @chain envs_known begin
+    subset(_, :presence => ByRow(x -> ismissing(x)))
+end
+
+# Check if there is a correlation between low majority class N and prediction performance
+
+some_dict = Dict()
+X_envs_unknown = Matrix(envs_unknown[!, begin:6])
+
+[some_dict[k] = prediction(X_envs_unknown, all_results[k].chain, all_results[k].threshold) for k in keys(all_results)]
+
+@chain DataFrame(some_dict) begin
+    insertcols(_, :atoll => envs_unknown.atoll)
+    stack(_, Not(:atoll), variable_name=:species, value_name=:presence)
+end
