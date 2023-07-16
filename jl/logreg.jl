@@ -216,14 +216,18 @@ missing_atolls = @chain envs_known begin
     subset(_, :presence => ByRow(x -> ismissing(x)))
 end
 
-# Check if there is a correlation between low majority class N and prediction performance
-
 some_dict = Dict()
 X_envs_unknown = Matrix(envs_unknown[!, begin:6])
 
 [some_dict[k] = prediction(X_envs_unknown, all_results[k].chain, all_results[k].threshold) for k in keys(all_results)]
 
-@chain DataFrame(some_dict) begin
+temp = @chain DataFrame(some_dict) begin
     insertcols(_, :atoll => envs_unknown.atoll)
     stack(_, Not(:atoll), variable_name=:species, value_name=:presence)
 end
+
+CSV.write("data/first_preds.csv", temp)
+
+# TODO
+# Check if there is a correlation between low majority class N and prediction performance
+# Can we fit a single model with indices for each species?
