@@ -208,7 +208,7 @@ function wrap_model(species)
     return result(chain, threshold, diagnostics)
 end
 
-all_results = Dict{String, result}()
+all_results = Dict{String,result}()
 
 [all_results[k] = wrap_model(k) for k in collect(keys(trainset))]
 
@@ -226,8 +226,57 @@ temp = @chain DataFrame(some_dict) begin
     stack(_, Not(:atoll), variable_name=:species, value_name=:presence)
 end
 
-CSV.write("data/first_preds.csv", temp)
+# CSV.write("data/first_preds.csv", temp)
 
 # TODO
 # Check if there is a correlation between low majority class N and prediction performance
 # Can we fit a single model with indices for each species?
+
+function squash(x::AbstractArray)
+    return reduce(hcat, x)'
+end
+
+function prediction_full(x::Matrix, chain, threshold)
+    # Pull the means from each parameter's sampled values in the chain
+    intercept = squash(chain[:intercept])
+    pc1 = squash(chain[:pc1])
+    pc2 = squash(chain[:pc2])
+    pc3 = squash(chain[:pc3])
+    pc4 = squash(chain[:pc4])
+    pc5 = squash(chain[:pc5])
+    pc6 = squash(chain[:pc6])
+
+    # Retrieve number of rows
+    n, _ = size(x)
+
+    # Generate a vector to store out predictions
+    v = Matrix{Float64}(undef, n, length(intercept))
+    # num = Vector{Float64}(undef, n)
+
+    # Calculate the logistic function for each element in the test set
+
+    for i in 1:n, j in 1:30_000
+        num = logistic(
+            intercept[j] + pc1[j] * x[i, 1] + pc2[j] * x[i, 2] + pc3[j] * x[i, 3] + pc4[j] * x[i, 4] + pc5[j] * x[i, 5] + pc6[j] * x[i, 6]
+        )
+        if num .>= threshold
+            v[i, j] = 1
+        else
+            v[i, j] = 0
+        end
+    end
+
+    return v
+end
+
+pred_pufbai = prediction_full(test["Phaethon_rubricauda"], all_results["Phaethon_rubricauda"].chain, all_results["Phaethon_rubricauda"].threshold)'
+
+mean_pred_pufbai = @chain DataFrame(pred_pufbai, :auto) begin
+    combine(_, Cols(startswith("x")) .=> (x -> abs(mean(x) - 0.5)*200))
+    stack(_)
+    DataFrames.transform(_, :value => ByRow(x -> ≈(x, 100, atol=5)) => :conf)
+end
+
+histogram(mean_pred_pufbai.value, bins=10)
+
+sum(mean_pred_pufbai.conf)

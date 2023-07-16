@@ -1,12 +1,11 @@
-using CSV, DataFrames, Statistics
+using CSV, DataFrames, Statistics, Turing, Chain
 import MultivariateStats as MS
 import StatsBase as SB
 using Match
 # using MLDataUtils
 
-envs = @chain CSV.read("data/envs_jicp.csv", DataFrame, missingstring="NA") begin
-    DataFrames.transform(_, :human_population => ByRow(x -> ifelse(ismissing(x), round(median(skipmissing(envs.human_population)), digits=0), x)) => identity)
-end
+envs = CSV.read("data/envs_jicp.csv", DataFrame, missingstring="NA")
+DataFrames.transform!(envs, :human_population => ByRow(x -> ifelse(ismissing(x), round(median(skipmissing(envs.human_population)), digits=0), x)) => identity)
 
 seabirds = @chain CSV.read("data/atoll_seabird_populations_11Mar.csv", DataFrame) begin
     stack(_, Not(:atoll), variable_name=:species, value_name=:presence)
@@ -42,4 +41,4 @@ envscores = @chain predict(M, X_envs)' begin
     outerjoin(_, cond, on=:species, matchmissing=:equal)
 end
 
-CSV.write("data/jl_envscores.csv", envscores)
+# CSV.write("data/jl_envscores.csv", envscores)
