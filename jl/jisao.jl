@@ -1,3 +1,5 @@
+module JISAO
+
 using NetCDF
 using Statistics
 
@@ -20,3 +22,5 @@ ifelse.(dct["precip_anom"][:, :, 2] .== 32767, missing, dct["precip_anom"][:, :,
 [dct[v[2]] = abs.(dct[v[2]]) for v in vars];
 
 [dct[v[2]] = mean(dct[v[2]], dims=4) for v in vars];
+
+end

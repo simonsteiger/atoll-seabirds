@@ -1,3 +1,6 @@
+module Upsample
+export smote, naive
+
 using CSV, DataFrames, Chain, StatsBase
 
 df_anst = @chain CSV.read("data/envscores.csv", DataFrame) begin
@@ -11,7 +14,7 @@ function balance!(data, draws)
     end
 end
 
-function upsample_naive(data, N)
+function naive(data, N)
     p = sum(data.presence)
     a = nrow(data) - p
     a_N = Int64(N - a)
@@ -33,7 +36,7 @@ function upsample_naive(data, N)
     return append!(p_df, a_df)
 end
 
-function upsample_smote(rng, data)
+function smote(rng, data)
     p = sum(data.presence)
     a = nrow(data) - p
     minority = a > p ? 1.0 : 0.0
@@ -55,17 +58,4 @@ function upsample_smote(rng, data)
     return append!(df_smote, df_origin)
 end
 
-# Would "let" be smart?
-
-# let 
-#     p = sum(data.presence)
-#     a = nrow(data) - p
-#     minority = a > p ? 1.0 : 0.0
-#     majority = a < p ? p : a
-# 
-#     @chain data begin
-#         subset(_, :presence => x -> x .== minority)
-#         select(_, Not([:atoll, :species, :presence]))
-#         smote(rng, _, Int64(round(majority * 0.4, digits=0)))
-#     end
-# end
+end
