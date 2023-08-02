@@ -32,10 +32,10 @@ dct = Dict()
 [dct[v[1]] = NetCDF.open(string("data/copernicus_", v[2], ".nc"), v[3]) for v in vars];
 
 # Calculate absolute values of all cells
-[dct[v[1]] = abs.(dct[v[1]]) for v in vars]; # only nppv, chl, phyc #[collect(1:3)]
+[dct[v[1]] = abs.(dct[v[1]]) for v in vars[collect(1:9)]]; # only nppv, chl, phyc
 
 # Calculate mean of array slices containing vars[2]
-[dct[v[1]] = mean.(dct[v[1]], dims=4) for v in vars];#[collect(1:3)]
+[dct[v[1]] = mean(log1p.(dct[v[1]]), dims=4) for v in vars[collect(1:9)]];
 
 # Concatenate temp arrays on time axis
 dct["temp"] = @chain Base.cat(dct["temp_1"], dct["temp_2"], dims=3) begin
@@ -100,7 +100,6 @@ function filtercp(df, env_lat, env_long; tol=1)
     subset(_, cp_ll => ByRow((x, y) -> ≈(x, env_lat; atol=tol) && ≈(y, env_long; atol=tol)))
     transform(_, Not(cp_ll) .=> ByRow(x -> isinf(x) ? missing : x) .=> identity) # Inf represents land, recode to missing
     combine(_, Not(cp_ll) .=> (x -> mean(skipmissing(x))) .=> identity)
-    # Add all the env data
   end
 
   return out
@@ -113,5 +112,7 @@ end
 
 cp_summary = reduce(vcat, [filtercp(cp_df, i...) for i in eachrow(envs[!, [:lat, :long]])])
 cp_summary.atoll = envs.atoll
+
+# Join by atoll
 
 end
