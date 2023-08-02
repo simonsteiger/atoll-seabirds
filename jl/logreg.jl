@@ -19,6 +19,8 @@ using Resample
 # Set a seed for reproducibility.
 using Random, StableRNGs
 
+import .Upsample
+
 include("/Users/simonsteiger/Desktop/other/atoll-seabirds/jl/upsample.jl")
 include("/Users/simonsteiger/Desktop/other/atoll-seabirds/jl/tune.jl")
 
@@ -72,7 +74,7 @@ trainset_up = Dict{String,DataFrame}()
 
 rng = StableRNG(1)
 
-[trainset_up[k] = upsample_smote(rng, trainset[k]) for k in keys(trainset)];
+[trainset_up[k] = Upsample.smote(rng, trainset[k]) for k in keys(trainset)];
 
 # Dicts for train, test, train_label, test_label
 train = Dict{String,Matrix}()
@@ -134,7 +136,7 @@ function prediction(x::Matrix, chain, threshold)
     return v
 end
 
-mutable struct result
+struct result
     chain
     threshold
     diagnostics

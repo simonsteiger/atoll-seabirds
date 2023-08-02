@@ -52,12 +52,12 @@ env.scores <- dp$left_join(tbl$as_tibble(env.scores), species_only, by = "atoll"
   ) %>% 
   dp$select(-filtercondition)
 
-write.csv(env.scores, "data/envscores.csv")
+#write.csv(env.scores, "data/envscores.csv")
 
 env.loadings <- veg$scores(rda.env)$species %>% as.data.frame()
 
 gg$ggplot(na.omit(env.scores), gg$aes(x = PC1, y = PC3)) +
-  ggd$geom_hdr(aes(fill = presence, colour = presence)) +
+  ggd$geom_hdr(gg$aes(fill = presence, colour = presence)) +
   gg$geom_point(gg$aes(colour = presence), alpha = 0.5, size = 0.8) +
   gg$scale_color_manual(values = c("red", "blue", "white")) +
   gg$geom_segment(data = env.loadings, gg$aes(x = 0, xend = PC1, y=0, yend = PC2), 

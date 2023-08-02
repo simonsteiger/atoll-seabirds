@@ -1,5 +1,7 @@
-using NetCDF # read
-using Statistics, DataFrames, Compat, Chain # wrangling
+module Copernicus
+
+using NetCDF, CSV # read
+using Statistics, DataFrames, Compat, Chain, StatsFuns # wrangling
 
 # First element is key in dictionary
 # Second entry is csv file name
@@ -30,10 +32,10 @@ dct = Dict()
 [dct[v[1]] = NetCDF.open(string("data/copernicus_", v[2], ".nc"), v[3]) for v in vars];
 
 # Calculate absolute values of all cells
-[dct[v[1]] = abs.(dct[v[1]]) for v in vars];
+[dct[v[1]] = abs.(dct[v[1]]) for v in vars[collect(1:9)]]; # only nppv, chl, phyc
 
 # Calculate mean of array slices containing vars[2]
-[dct[v[1]] = mean(dct[v[1]], dims=4) for v in vars];
+[dct[v[1]] = mean(log1p.(dct[v[1]]), dims=4) for v in vars[collect(1:9)]];
 
 # Concatenate temp arrays on time axis
 dct["temp"] = @chain Base.cat(dct["temp_1"], dct["temp_2"], dims=3) begin
@@ -91,17 +93,26 @@ cp_df =
   end
 
 # Calculate outcome means for ± 1 long/lat around each atoll
-function filter_cp(df, env_lat, env_long; tol=1)
+function filtercp(df, env_lat, env_long; tol=1)
   cp_ll = [:latitude, :longitude]
 
   out = @chain df begin
     subset(_, cp_ll => ByRow((x, y) -> ≈(x, env_lat; atol=tol) && ≈(y, env_long; atol=tol)))
     transform(_, Not(cp_ll) .=> ByRow(x -> isinf(x) ? missing : x) .=> identity) # Inf represents land, recode to missing
     combine(_, Not(cp_ll) .=> (x -> mean(skipmissing(x))) .=> identity)
-    # Add all the env data
   end
 
   return out
 end
 
-cp_summary = reduce(vcat, [filter_cp(cp_df, i[1], i[2]) for i in [[30, 250], [31, 251]]])
+envs = @chain begin
+  CSV.read("data/seabird_atolls_envs_02May.csv", DataFrame)
+  transform(:long => (x -> ifelse.(x .< 0, x .+ 360, x)) => identity)
+end
+
+cp_summary = reduce(vcat, [filtercp(cp_df, i...) for i in eachrow(envs[!, [:lat, :long]])])
+cp_summary.atoll = envs.atoll
+
+# Join by atoll
+
+end
