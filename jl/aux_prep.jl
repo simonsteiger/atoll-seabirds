@@ -1,6 +1,3 @@
-#module Upsample
-#export smote, naive
-
 using CSV, DataFrames, Chain, StatsBase
 
 df_anst = @chain CSV.read("data/envscores.csv", DataFrame) begin
@@ -58,4 +55,38 @@ function our_smote(rng, data)
     return append!(df_smote, df_origin)
 end
 
-#end
+function tune(chain, test, test_label)
+    df = DataFrame()
+
+    for k in keys(test), i in 0:0.01:1
+        predictions = prediction(test[k], chain, i)
+
+        loss = sum((predictions - test_label[k]) .^ 2) / length(test_label[k])
+
+        present = sum(test_label[k])
+        absent = length(test_label[k]) - present
+
+        predicted_present = sum(test_label[k] .== predictions .== 1)
+        predicted_absent = sum(test_label[k] .== predictions .== 0)
+
+        df = append!(
+            df, DataFrame(
+                "threshold" => i,
+                "species" => k,
+                "predicted_absent" => predicted_absent/absent,
+                "predicted_present" => predicted_present/present,
+                "criterion" => (predicted_absent/absent) * (predicted_present/present)
+            ))
+    end
+
+    return df
+end
+
+# split data function
+function split_data(df, target, species; at=0.70)
+    speciesdf = @chain df begin
+        subset(_, :species => ByRow(x -> x .== species))
+    end
+    shuffled = shuffleobs(speciesdf)
+    return trainset, testset = stratifiedobs(row -> row[target], shuffled; p=at)
+end
