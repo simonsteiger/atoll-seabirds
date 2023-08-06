@@ -1,5 +1,5 @@
-module Upsample
-export smote, naive
+#module Upsample
+#export smote, naive
 
 using CSV, DataFrames, Chain, StatsBase
 
@@ -36,7 +36,7 @@ function naive(data, N)
     return append!(p_df, a_df)
 end
 
-function smote(rng, data)
+function our_smote(rng, data)
     p = sum(data.presence)
     a = nrow(data) - p
     minority = a > p ? 1.0 : 0.0
@@ -58,4 +58,4 @@ function smote(rng, data)
     return append!(df_smote, df_origin)
 end
 
-end
+#end

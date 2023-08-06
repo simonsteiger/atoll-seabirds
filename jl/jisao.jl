@@ -23,4 +23,11 @@ ifelse.(dct["precip_anom"][:, :, 2] .== 32767, missing, dct["precip_anom"][:, :,
 
 [dct[v[2]] = mean(dct[v[2]], dims=4) for v in vars];
 
+function extract(df, env_lat, env_long)
+    @chain df begin
+        transform(_, [:latitude, :longitude] .=> ByRow((x, y) -> (dif_lat = x - env_lat, dif_long = y - env_long)) => AsTable)
+        subset(_, [:latitude, :longitude] => (x, y) -> x .== minimum(x) .&& y .== minimum(y))
+    end
+end
+
 end
