@@ -157,9 +157,9 @@ function prediction(x::Matrix, chain, threshold)
 end
 
 struct result
-    chain
-    threshold
-    diagnostics
+    chain::Chains
+    threshold::Float64
+    diagnostics::Dict{String,Integer}
 end
 
 function wrap_model(species, model_fun, dispersion)
@@ -177,7 +177,7 @@ function wrap_model(species, model_fun, dispersion)
     l = [:pc1, :pc2, :pc3, :pc4, :pc5, :pc6]
 
     # Corner plot
-    corner(chain, l)
+    # corner(chain, l)
 
     tuning_params = tune(chain, test, test_label)
 
@@ -200,8 +200,9 @@ function wrap_model(species, model_fun, dispersion)
     predictions = prediction(test[species], chain, threshold)
 
     # Calculate MSE for our test set
-    loss = sum((predictions - test_label[species]) .^ 2) / length(test_label[species])
+    # loss = sum((predictions - test_label[species]) .^ 2) / length(test_label[species])
 
+    # Creating this dictionary could be a function
     present = sum(test_label[species])
     absent = length(test_label[species]) - present
 
