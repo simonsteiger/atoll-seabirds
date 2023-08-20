@@ -1,6 +1,10 @@
 using CSV, DataFrames, Chain, Turing, StatsPlots
 using MLUtils
 
+# Where do we get rescale! from?
+# Not from MLUtils anyway...
+using MLDataUtils: shuffleobs, stratifiedobs, oversample, rescale!
+
 const PC_NAMES = ["PC1", "PC2", "PC3", "PC4", "PC5", "PC6"]
 
 envscores = @chain begin
@@ -76,14 +80,15 @@ end
     pc4 ~ Normal(μ_slope, σ_slope)
     pc5 ~ Normal(μ_slope, σ_slope)
     pc6 ~ Normal(μ_slope, σ_slope)
+    p ~ Beta(2, 2)
 
     for i in 1:n
         λ = exp(intercept + pc1 * x[i, 1] + pc2 * x[i, 2] + pc3 * x[i, 3] + pc4 * x[i, 4] + pc5 * x[i, 5] + pc6 * x[i, 6])
-        nbirds[i] ~ Poisson(λ)
+        nbirds[i] ~ NegativeBinomial(λ+1e-5, p)
     end
 end;
 
-species = "Anous_stolidus"
+species = "Gygis_alba"
 
 n, _ = size(train[species])
 
@@ -120,9 +125,9 @@ out = prediction(test[species], chain)
 
 out_mean = [mean(x) for x in eachslice(out, dims=1)]
 
-median(out_mean)
-median(test_label[species])
+mean(out_mean)
+mean(test_label[species])
 
 scatter(out_mean, label = "predicted")
 scatter!(test_label[species], label = "observed")
-ylims!((-10, 1e4))
+#ylims!((-10, 1e4))
