@@ -23,12 +23,6 @@ pop = @chain begin
     leftjoin(_, envscores, on=:atoll)
 end
 
-let v = pop.PC1
-    μ = mean(v)
-    σ = std(v)
-    histogram((v .- μ) / σ)
-end
-
 # split data function
 function split_data(df, species; p=0.50)
     speciesdf = @chain df begin
@@ -84,7 +78,14 @@ end
 
     for i in 1:n
         λ = exp(intercept + pc1 * x[i, 1] + pc2 * x[i, 2] + pc3 * x[i, 3] + pc4 * x[i, 4] + pc5 * x[i, 5] + pc6 * x[i, 6])
-        nbirds[i] ~ NegativeBinomial(λ+1e-5, p)
+
+        # NegativeBinomial is only defined for strictly positive λ
+        # so λ == 0 corresponds to the trivial distribution with all mass at point 0
+        if λ > 0    # Sample normally
+            nbirds[i] ~ NegativeBinomial(λ, p)
+        else        # Trivial distribution is always 0
+            nbirds[i] = 0
+        end
     end
 end;
 
@@ -92,8 +93,8 @@ species = "Gygis_alba"
 
 n, _ = size(train[species])
 
-m = poisson_regression(train[species], train_label[species], n)
-chain = sample(m, NUTS(), MCMCThreads(), 10_000, 3)
+m = poisson_regression(train[species], train_label[species], n) # log train label
+chain = sample(m, NUTS(), MCMCThreads(), 30_000, 3)
 
 params = select(DataFrame(chain), r"intercept|pc")
 
