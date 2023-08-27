@@ -66,7 +66,7 @@ for k in keys(trainset)
     test_label[k] = testset[k][:, target]
 end
 
-@model function linear_regression(x, nbirds, n; μ_intercept=0, σ_intercept=1, μ_slope=0, σ_slope=0.5)
+@model function linear_regression(x, nbirds, n; μ_intercept=0, σ_intercept=1, μ_slope=0, σ_slope=1)
     intercept ~ Normal(μ_intercept, σ_intercept)
 
     pc1 ~ Normal(μ_slope, σ_slope)
@@ -83,16 +83,18 @@ end
     end
 end;
 
-species = "Onychoprion_fuscatus"
+species = "Anous_minutus"
 
 n, _ = size(train[species])
 
-function ztrans(x)
+function standardise(x::AbstractArray)
     x̄, σ = mean(x), std(x)
     [(x - x̄) / σ for x in x]
 end
 
-m = linear_regression(train[species], ztrans(log.(train_label[species])), n) # log train label
+unstandardise(x::AbstractArray, x̄::Real, σ::Real) = x * σ .+ x̄
+
+m = linear_regression(train[species], standardise(log.(train_label[species])), n) # log train label
 chain = sample(m, NUTS(), MCMCThreads(), 30_000, 3)
 
 params = select(DataFrame(chain), r"intercept|pc")
@@ -123,25 +125,23 @@ end
 
 out = prediction(test[species], chain)
 
-Q = [quantile(slice, limits) for limits in [0.025, 0.975], slice in eachslice(out, dims=1)]
-
-out_mean = [mean(x) for x in eachslice(out, dims=1)]
-
-zreverse(x, x̄, σ) = x * σ .+ x̄
-
 x̄ = mean(log.(test_label[species]))
 σ = std(log.(test_label[species]))
 
-mean(exp.(zreverse(out_mean, x̄, σ)))
-std(exp.(zreverse(out_mean, x̄, σ)))
+natural = unstandardise(out, x̄, σ)
+
+Q = [quantile(slice, limits) for limits in [0.025, 0.975], slice in eachslice(natural, dims=1)]
+
+μ_natural = [mean(x) for x in eachslice(natural, dims=1)]
+
+mean(exp.(μ_natural))
+std(exp.(μ_natural))
 mean(test_label[species])
 std(test_label[species])
 
-sum(exp.(zreverse(out_mean, x̄, σ)))
+sum(exp.(μ_natural))
 sum(test_label[species])
 
-rev = exp.(zreverse(out_mean, x̄, σ))
-
-scatter(log.(rev), label="predicted", alpha=0.5) # yerror=Q
+scatter(μ_natural, label="predicted", yerror=Q, alpha=0.5)
 scatter!(log.(test_label[species]), label="observed", alpha=0.5)
 #ylims!((-10, 1e4))
