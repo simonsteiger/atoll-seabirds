@@ -1,5 +1,6 @@
 using CSV, DataFrames, Chain, Turing, StatsPlots
 using MLUtils
+using LinearAlgebra
 
 # Where do we get rescale! from?
 # Not from MLUtils anyway...
@@ -65,7 +66,7 @@ for k in keys(trainset)
     test_label[k] = testset[k][:, target]
 end
 
-@model function poisson_regression(x, nbirds, n; μ_intercept=3, σ_intercept=0.5, μ_slope=0, σ_slope=0.1)
+@model function linear_regression(x, nbirds, n; μ_intercept=0, σ_intercept=1, μ_slope=0, σ_slope=0.5)
     intercept ~ Normal(μ_intercept, σ_intercept)
 
     pc1 ~ Normal(μ_slope, σ_slope)
@@ -74,26 +75,24 @@ end
     pc4 ~ Normal(μ_slope, σ_slope)
     pc5 ~ Normal(μ_slope, σ_slope)
     pc6 ~ Normal(μ_slope, σ_slope)
-    p ~ Beta(2, 2)
+    σ ~ Exponential(1)
 
     for i in 1:n
-        λ = exp(intercept + pc1 * x[i, 1] + pc2 * x[i, 2] + pc3 * x[i, 3] + pc4 * x[i, 4] + pc5 * x[i, 5] + pc6 * x[i, 6])
-
-        # NegativeBinomial is only defined for strictly positive λ
-        # so λ == 0 corresponds to the trivial distribution with all mass at point 0
-        if λ > 0    # Sample normally
-            nbirds[i] ~ NegativeBinomial(λ, p)
-        else        # Trivial distribution is always 0
-            nbirds[i] = 0
-        end
+        μ = intercept + pc1 * x[i, 1] + pc2 * x[i, 2] + pc3 * x[i, 3] + pc4 * x[i, 4] + pc5 * x[i, 5] + pc6 * x[i, 6]
+        nbirds[i] ~ Normal(μ, σ)
     end
 end;
 
-species = "Gygis_alba"
+species = "Onychoprion_fuscatus"
 
 n, _ = size(train[species])
 
-m = poisson_regression(train[species], train_label[species], n) # log train label
+function ztrans(x)
+    x̄, σ = mean(x), std(x)
+    [(x - x̄) / σ for x in x]
+end
+
+m = linear_regression(train[species], ztrans(log.(train_label[species])), n) # log train label
 chain = sample(m, NUTS(), MCMCThreads(), 30_000, 3)
 
 params = select(DataFrame(chain), r"intercept|pc")
@@ -116,7 +115,7 @@ function prediction(x, chain)
     nbirds = zeros(n, chainlength)
 
     for i in 1:n, j in 1:chainlength
-        nbirds[i, j] = exp(intercept[j] + pc1[j] * x[i, 1] + pc2[j] * x[i, 2] + pc3[j] * x[i, 3] + pc4[j] * x[i, 4] + pc5[j] * x[i, 5] + pc6[j] * x[i, 6])
+        nbirds[i, j] = intercept[j] + pc1[j] * x[i, 1] + pc2[j] * x[i, 2] + pc3[j] * x[i, 3] + pc4[j] * x[i, 4] + pc5[j] * x[i, 5] + pc6[j] * x[i, 6]
     end
 
     return nbirds
@@ -124,11 +123,25 @@ end
 
 out = prediction(test[species], chain)
 
+Q = [quantile(slice, limits) for limits in [0.025, 0.975], slice in eachslice(out, dims=1)]
+
 out_mean = [mean(x) for x in eachslice(out, dims=1)]
 
-mean(out_mean)
-mean(test_label[species])
+zreverse(x, x̄, σ) = x * σ .+ x̄
 
-scatter(out_mean, label = "predicted")
-scatter!(test_label[species], label = "observed")
+x̄ = mean(log.(test_label[species]))
+σ = std(log.(test_label[species]))
+
+mean(exp.(zreverse(out_mean, x̄, σ)))
+std(exp.(zreverse(out_mean, x̄, σ)))
+mean(test_label[species])
+std(test_label[species])
+
+sum(exp.(zreverse(out_mean, x̄, σ)))
+sum(test_label[species])
+
+rev = exp.(zreverse(out_mean, x̄, σ))
+
+scatter(log.(rev), label="predicted", alpha=0.5) # yerror=Q
+scatter!(log.(test_label[species]), label="observed", alpha=0.5)
 #ylims!((-10, 1e4))
