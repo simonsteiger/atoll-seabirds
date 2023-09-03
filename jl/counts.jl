@@ -102,7 +102,25 @@ end;
 # FIX 
 # Take away species with insufficient data
 # [wrap_model(spfeatures, sptarget, s) for s in keys(spfeatures)]
-    
+
+species = "Anous_stolidus"
+
+out = wrap_model(spfeatures, sptarget, species)
+
+x̄ = mean(log10.(sptarget[species]))
+σ = std(log10.(sptarget[species]))
+
+natural = unstandardise(out.df, x̄, σ)
+
+Q = [quantile(row, limits) for limits in [0.005, 0.995], row in eachslice(natural, dims=1)]
+
+μ_natural = [mean(x) for x in eachslice(natural, dims=1)]
+
+scatter(log10.(sptarget[species]), label="observed", color="black")
+scatter!(μ_natural, label="predicted", marker=:d, color="red", yerror=(abs.(μ_natural.-Q[1, :]), abs.(μ_natural.-Q[2, :])))
+title!(replace(species, Pair("_", " ")))
+ylims!((0, Inf))
+
 end
 
 species = "Anous_stolidus"
