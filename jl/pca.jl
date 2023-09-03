@@ -3,6 +3,8 @@ import MultivariateStats as MS
 import StatsBase as SB
 using Match
 
+include("standardise.jl")
+
 const PC_NAMES = ["PC1", "PC2", "PC3", "PC4", "PC5", "PC6"]
 
 envs = CSV.read("data/envs_jicp.csv", DataFrame, missingstring="NA")
@@ -37,6 +39,7 @@ end
 cond.filtercondition = replace.(v_cond, r",\s" => "|")
 
 envscores = @chain predict(M, X_features)' begin
+    [standardise(col) for col in eachslice(_, dims=2)]
     DataFrame(_, PC_NAMES)
     insertcols(_, :atoll => envs.atoll)
     insertcols(_, :region => envs.region)

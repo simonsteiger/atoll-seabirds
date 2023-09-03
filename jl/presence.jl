@@ -1,3 +1,5 @@
+module Presence
+
 # Import Turing and Distributions.
 using Turing, Distributions
 
@@ -264,7 +266,6 @@ end
 
 # TODO
 # Check if there is a correlation between low majority class N and prediction performance
-# Can we fit a single model with indices for each species?
 
 function squash(x::AbstractArray)
     return reduce(hcat, x)'
@@ -317,15 +318,12 @@ map(collect(keys(some_dict_T))) do k
         end
 end
 
-function mini_summary(k; cutoff=0.9)
-    pct = sum(pred_conf[k].percent_present .> cutoff) / nrow(pred_conf[k])
-    println("""
-    $k: $(round(100*pct, digits=1))
-    """
-    )
+function mini_summary(dict, k; cutoff=0.9)
+    pct = sum(dict[k].percent_present .> cutoff) / nrow(dict[k])
+    "$k: $(round(100*pct, digits=1))"
 end
 
-[mini_summary(k, cutoff=0.8) for k in keys(pred_conf)]
+[mini_summary(pred_conf, k) for k in keys(pred_conf)]
 
 N_pred, T_pred = Dict(), Dict()
 
@@ -393,4 +391,7 @@ pN = sample(sample_priorN(missing, missing, 10), Prior(), 100_000)
 
 density(logistic.(pT[:intercept] .+ pT[:pc1] .+ pT[:pc2] .+ pT[:pc3] .+ pT[:pc4] .+ pT[:pc5] .+ pT[:pc6]))
 
-density(logistic.(pN[:intercept] .+ pN[:pc1] .+ pN[:pc2] .+ pN[:pc3] .+ pN[:pc4] .+ pN[:pc5] .+ pN[:pc6]))
+density(logistic.(pN[:intercept] .+ pN[:pc1] .+ pN[:pc2] .+ pN[:pc3] .+ pN[:pc4] .+ pN[:pc5] .+ pN[:pc6]))    
+
+end
+

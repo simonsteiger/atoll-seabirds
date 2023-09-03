@@ -1,3 +1,5 @@
+module Counts
+
 using CSV, DataFrames, Chain, Turing, StatsPlots
 using MLUtils
 using LinearAlgebra
@@ -5,6 +7,8 @@ using LinearAlgebra
 # Where do we get rescale! from?
 # Not from MLUtils anyway...
 using MLDataUtils: shuffleobs, stratifiedobs, oversample, rescale!
+
+include("standardise.jl")
 
 const PC_NAMES = ["PC1", "PC2", "PC3", "PC4", "PC5", "PC6"]
 
@@ -19,62 +23,39 @@ pop = @chain begin
     DataFrames.transform(_, All() .=> ByRow(x -> ismissing(x) ? 0 : x) => identity)
     subset(_, All() .=> ByRow(x -> x != -1))
     stack(_, Not(:atoll), variable_name=:species, value_name=:nbirds)
-    #DataFrames.transform(:nbirds => ByRow(log1p) => :lognbirds)
     subset(_, :nbirds => ByRow(x -> x != 0))
     leftjoin(_, envscores, on=:atoll)
 end
-
-# split data function
-function split_data(df, species; p=0.50)
-    speciesdf = @chain df begin
-        subset(_, :species => ByRow(x -> x .== species))
-    end
-    #shuffled = shuffleobs(speciesdf)
-    train, test = splitobs(speciesdf; at=p, shuffle=true) .|> getobs
-    # Below code upsamples PC1, but we want to upsample 1-6 simultaneously. Concatenate vectors to array - how?
-    # return trainset, testset = oversample(speciesdf.PC1, speciesdf.presence))
-end
-
-# Dicts for trainset, testset
-trainset = Dict()
-testset = Dict()
-
-# Probably fails because some species can't be split without filter conditions
-[(trainset[s], testset[s]) = split_data(pop, s) for s in unique(pop.species)];
 
 numerics = Symbol.(PC_NAMES)
 features = numerics
 target = :nbirds
 
-for f in numerics, k in keys(trainset)
-    μ, σ = rescale!(trainset[k][!, f])
-    rescale!(testset[k][!, f], μ, σ)
+spdict = Dict()
+
+for species in unique(pop.species)
+    spdict[species] = @chain pop begin
+        subset(_, :species => ByRow(x -> x .== species))
+    end
 end
 
-# Throw out atolls with mostly 0 counts
+spfeatures = Dict()
+sptarget = Dict()
 
-# Dicts for train, test, train_label, test_label
-train = Dict{String,Matrix}()
-test = Dict{String,Matrix}()
-train_label = Dict{String,Vector}()
-test_label = Dict{String,Vector}()
-
-for k in keys(trainset)
-    train[k] = Matrix(trainset[k][:, features])
-    test[k] = Matrix(testset[k][:, features])
-    train_label[k] = trainset[k][:, target]
-    test_label[k] = testset[k][:, target]
+for k in keys(spdict)
+    spfeatures[k] = Matrix(spdict[k][:, features])
+    sptarget[k] = spdict[k][:, target]
 end
 
-@model function linear_regression(x, nbirds, n; μ_intercept=0, σ_intercept=1, μ_slope=0, σ_slope=1)
-    intercept ~ Normal(μ_intercept, σ_intercept)
+@model function linear_regression(x, nbirds, n; df=3)
+    intercept ~ TDist(df)
 
-    pc1 ~ Normal(μ_slope, σ_slope)
-    pc2 ~ Normal(μ_slope, σ_slope)
-    pc3 ~ Normal(μ_slope, σ_slope)
-    pc4 ~ Normal(μ_slope, σ_slope)
-    pc5 ~ Normal(μ_slope, σ_slope)
-    pc6 ~ Normal(μ_slope, σ_slope)
+    pc1 ~ TDist(df)
+    pc2 ~ TDist(df)
+    pc3 ~ TDist(df)
+    pc4 ~ TDist(df)
+    pc5 ~ TDist(df)
+    pc6 ~ TDist(df)
     σ ~ Exponential(1)
 
     for i in 1:n
@@ -82,24 +63,6 @@ end
         nbirds[i] ~ Normal(μ, σ)
     end
 end;
-
-species = "Anous_minutus"
-
-n, _ = size(train[species])
-
-function standardise(x::AbstractArray)
-    x̄, σ = mean(x), std(x)
-    [(x - x̄) / σ for x in x]
-end
-
-unstandardise(x::AbstractArray, x̄::Real, σ::Real) = x * σ .+ x̄
-
-m = linear_regression(train[species], standardise(log.(train_label[species])), n) # log train label
-chain = sample(m, NUTS(), MCMCThreads(), 30_000, 3)
-
-params = select(DataFrame(chain), r"intercept|pc")
-
-plot(chain)
 
 function prediction(x, chain)
     n, _ = size(x)
@@ -121,27 +84,59 @@ function prediction(x, chain)
     end
 
     return nbirds
+end;
+
+struct result
+    chain::Chains
+    df::Matrix
 end
 
-out = prediction(test[species], chain)
+function wrap_model(features::Dict, target::Dict, species)
+    n, _ = size(features[species])
+    m = linear_regression(features[species], standardise(log10.(target[species])), n)
+    chain = sample(m, NUTS(), MCMCThreads(), 30_000, 3)
+    df = prediction(features[species], chain)
+    result(chain, df)
+end;
 
-x̄ = mean(log.(test_label[species]))
-σ = std(log.(test_label[species]))
+# FIX 
+# Take away species with insufficient data
+# [wrap_model(spfeatures, sptarget, s) for s in keys(spfeatures)]
+    
+end
+
+species = "Anous_stolidus"
+
+n, _ = size(spfeatures[species])
+
+m = linear_regression(spfeatures[species], standardise(log10.(sptarget[species])), n); # log train label
+chain = sample(m, NUTS(), MCMCThreads(), 30_000, 3)
+
+params = select(DataFrame(chain), r"intercept|pc")
+
+plot(chain)
+
+
+out = prediction(spfeatures[species], chain)
+
+x̄ = mean(log10.(sptarget[species]))
+σ = std(log10.(sptarget[species]))
 
 natural = unstandardise(out, x̄, σ)
 
-Q = [quantile(slice, limits) for limits in [0.025, 0.975], slice in eachslice(natural, dims=1)]
+Q = [quantile(row, limits) for limits in [0.005, 0.995], row in eachslice(natural, dims=1)]
 
 μ_natural = [mean(x) for x in eachslice(natural, dims=1)]
 
-mean(exp.(μ_natural))
-std(exp.(μ_natural))
-mean(test_label[species])
-std(test_label[species])
+mean(exp10.(μ_natural))
+std(exp10.(μ_natural))
+mean(sptarget[species])
+std(sptarget[species])
 
-sum(exp.(μ_natural))
-sum(test_label[species])
+sum(exp10.(μ_natural))
+sum(sptarget[species])
 
-scatter(μ_natural, label="predicted", yerror=Q, alpha=0.5)
-scatter!(log.(test_label[species]), label="observed", alpha=0.5)
-#ylims!((-10, 1e4))
+scatter(μ_natural, label="predicted", yerror=transpose(Q), alpha=0.5)
+scatter!(log10.(sptarget[species]), label="observed", alpha=0.5)
+title!(species)
+ylims!((0, Inf))
