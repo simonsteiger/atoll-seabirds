@@ -23,93 +23,16 @@ using Random, StableRNGs
 
 #import .Upsample
 
-include("/Users/simonsteiger/Desktop/other/atoll-seabirds/jl/upsample.jl")
-include("/Users/simonsteiger/Desktop/other/atoll-seabirds/jl/tune.jl")
+include("upsample.jl")
+include("tune.jl")
+include("preprocess.jl")
+
+using .Preprocess
 
 Random.seed!(0);
 
 const PRIOR_TEST = 0.5
 const PRIOR_DF = 3
-
-# Turn off progress monitor.
-# Turing.setprogress!(false)
-
-# Import the data
-envscores = CSV.read("data/jl_envscores.csv", DataFrame)
-
-# Convert "presence" to numeric values
-# envscores[!, :presence] = [r.presence == true ? 1.0 : 0.0 for r in eachrow(envscores)]
-
-envs_known = subset(envscores, :presence => ByRow(x -> !ismissing(x)))
-envs_unknown = subset(envscores, :presence => ByRow(x -> ismissing(x)))
-
-# Delete all species with known population from data
-envs_known = subset(envs_known, [:filtercondition, :region] => ByRow((x, y) -> occursin(Regex(x), y)))
-
-# Discard unused columns
-select!(envs_known, Not([:region, :filtercondition]))
-
-# split data function
-function split_data(df, target, species; at=0.70)
-    speciesdf = @chain df begin
-        subset(_, :species => ByRow(x -> x .== species))
-    end
-    shuffled = shuffleobs(speciesdf)
-    return trainset, testset = stratifiedobs(row -> row[target], shuffled; p=at)
-    # Below code upsamples PC1, but we want to upsample 1-6 simultaneously. Concatenate vectors to array - how?
-    # return trainset, testset = oversample(speciesdf.PC1, speciesdf.presence))
-end
-
-features = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]
-numerics = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]
-target = :presence
-
-# Dicts for trainset, testset
-trainset = Dict{String,DataFrame}()
-testset = Dict{String,DataFrame}()
-
-[(trainset[s], testset[s]) = split_data(envs_known, target, s; at=0.5) for s in unique(envs_known.species)]
-
-for f in numerics, k in keys(trainset)
-    μ, σ = rescale!(trainset[k][!, f]; obsdim=1)
-    rescale!(testset[k][!, f], μ, σ; obsdim=1)
-end
-
-trainset_up = Dict{String,DataFrame}()
-
-rng = StableRNG(1)
-
-[trainset_up[k] = our_smote(rng, trainset[k]) for k in keys(trainset)];
-
-# Dicts for train, test, train_label, test_label
-train = Dict{String,Matrix}()
-test = Dict{String,Matrix}()
-train_label = Dict{String,Vector}()
-test_label = Dict{String,Vector}()
-
-for k in keys(trainset)
-    train[k] = Matrix(trainset_up[k][:, features])
-    test[k] = Matrix(testset[k][:, features])
-    train_label[k] = trainset_up[k][:, target]
-    test_label[k] = testset[k][:, target]
-end
-
-# Bayesian logistic regression
-@model function logistic_regression(x, y, n, σ)
-    intercept ~ Normal(0, σ)
-
-    pc1 ~ Normal(0, σ)
-    pc2 ~ Normal(0, σ)
-    pc3 ~ Normal(0, σ)
-    pc4 ~ Normal(0, σ)
-    pc5 ~ Normal(0, σ)
-    pc6 ~ Normal(0, σ)
-
-    for i in 1:n
-        v = logistic(intercept + pc1 * x[i, 1] + pc2 * x[i, 2] + pc3 * x[i, 3] + pc4 * x[i, 4] + pc5 * x[i, 5] + pc6 * x[i, 6])
-        y[i] ~ Bernoulli(v)
-    end
-end;
 
 # Bayesian logistic regression
 @model function logistic_regressionT(x, y, n, df)
@@ -164,13 +87,12 @@ struct result
     diagnostics::Dict{String,Integer}
 end
 
-function wrap_model(species, model_fun, dispersion)
+function wrap_model(species, model)
     # Retrieve the number of observations
     n, _ = size(train[species])
 
     # Sample using HMC
-    m = model_fun(train[species], train_label[species], n, dispersion)
-    chain = sample(m, HMC(0.05, 10), MCMCThreads(), 10_000, 3, discard_initial=5000)
+    chain = sample(model, HMC(0.05, 10), MCMCThreads(), 7500, 4, discard_initial=2000)
 
     # Plot
     plot(chain)
@@ -237,6 +159,9 @@ end
 all_results_T = Dict{String,result}()
 
 [all_results_T[k] = wrap_model(k, logistic_regressionT, PRIOR_DF) for k in collect(keys(trainset))]
+
+s = "Gygis_alba"
+res = wrap_model(s, logistic_regressionT(train[s], train_label[s], length(train_label[s]), PRIOR_DF))
 
 # [all_results_N[k] = wrap_model(k, logistic_regression, p) for k in collect(keys(trainset)), p in PRIOR_TEST]
 

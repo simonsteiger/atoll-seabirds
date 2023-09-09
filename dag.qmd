@@ -1,0 +1,76 @@
+
+
+```{dot}
+digraph TrafficLights {
+    overlap = false
+    node [shape=box]; atoll;
+    node [shape=ellipse];
+    atoll->presence;
+    pcs->presence;
+    genus->presence;
+    nestingtype->presence;
+    species->presence;
+    species->genus;
+    species->nestingtype;
+}
+```
+
+Let the predicted presence P of species s of genus g and nesting type n on atoll a be:
+
+# Random intercept only
+$$
+\begin{equation}
+\begin{split}
+\begin{aligned}
+
+P_{as} &= \beta_{0a} + \epsilon_{as}\\
+\beta_{0a} &= \gamma_{00} + U_{0a}
+
+\end{aligned}
+\end{split}
+\end{equation}
+$$
+
+# Random intercept and species
+$$
+\begin{equation}
+\begin{split}
+\begin{aligned}
+
+P_{as} &= \beta_{0a} + \beta_{1s}(Species_s) + \epsilon_{as} \\ %% check notation for index coefficients (beta1s)
+\beta_{0a} &= \gamma_{00} + U_{0a}
+
+\end{aligned}
+\end{split}
+\end{equation}
+$$
+
+# Random intercept and species and PCs
+
+$$
+\begin{equation}
+\begin{split}
+\begin{aligned}
+
+P_{as} &= \beta_{0a} + \beta_{1s}(Species_s) + \beta_{2s}(PC1) + \dots + \beta_{7s}(PC6) + \epsilon_{as} \\
+\beta_{0a} &= \gamma_{00} + U_{0a}
+
+\end{aligned}
+\end{split}
+\end{equation}
+$$
+
+# Random intercept and species and PCs interacting with nesting type
+
+$$
+\begin{equation}
+\begin{split}
+\begin{aligned}
+
+P_{asn} &= \alpha_{a} + \beta_{s}(Species_s) + \theta_{1s}(PC1) \times \gamma_{1s}(Nesting_n) + \dots + \theta_{6s}(PC6) \times \gamma_{6s}(Nesting_n) + \epsilon_{as} \\
+\beta_{0a} &= \gamma_{00} + U_{0a}
+
+\end{aligned}
+\end{split}
+\end{equation}
+$$
