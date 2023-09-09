@@ -1,7 +1,7 @@
 module Preprocess
 
 export train, test, train_label, test_label, groupatoll, 
-       all_atoll, all_species, all_presence, all_pc
+       all_atoll, all_species, all_presence, all_pc, envs_known
 
 # Import Turing and Distributions.
 using Turing, Distributions

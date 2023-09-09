@@ -1,4 +1,4 @@
-using Turing, StatsFuns, StatsPlots
+using Turing, StatsFuns, StatsPlots, Chain, DataFrames
 
 include("preprocess.jl")
 include("tune.jl")
@@ -75,3 +75,18 @@ end;
 
 m3 = pc_species_intercept(all_atoll, all_species, all_pc, all_presence)
 chain3 = sample(m3, HMC(0.05, 10), 8000, discard_initial=2000)
+
+species_names = replace.(sort(unique(envs_known.species)), r"[a-z]+_" => " ")
+
+p = fill(plot(), 6)
+
+for i in 1:6
+    sm = @chain DataFrame(group(chain3, "θ$i")) begin
+        stack(_)
+        groupby(_, :variable)
+        combine(_, :value => (x -> (mean=mean(logistic.(x)), std=std(logistic.(x)))) => AsTable)
+    end
+    p[i] = scatter(sm.mean, species_names, label="θ$i", color=i, xerror=sm.std)
+end
+
+plot([i for i in p]..., size=(800,600))
