@@ -86,7 +86,10 @@ for i in 1:6
         groupby(_, :variable)
         combine(_, :value => (x -> (mean=mean(logistic.(x)), std=std(logistic.(x)))) => AsTable)
     end
-    p[i] = scatter(sm.mean, species_names, label="θ$i", color=i, xerror=sm.std)
+    p[i] = scatter(sm.mean, species_names, xerror=sm.std, title="θ$i", color=i, label=false)
+    yt = i in (1, 4) ? species_names : fill(" ", length(species_names))
+    yticks!([0.5:1:length(species_names)-0.5;], yt)
+    yflip!()
 end
 
-plot([i for i in p]..., size=(800,600))
+plot([i for i in p]..., size=(1000,1000))
