@@ -1,0 +1,38 @@
+﻿species,filtercondition,nestingtype,group
+Anous_stolidus,none,vegetation,tern
+Anous_minutus,"Melanesia, Micronesia, Polynesia",vegetation,tern
+Anous_tenuirostris,Indian_Ocean,vegetation,tern
+Anous_ceruleus,"Melanesia, Micronesia, Polynesia",ground,tern
+Gygis_alba,none,vegetation,tern
+Onychoprion_fuscatus,none,ground,tern
+Onychoprion_lunatus,"Melanesia, Micronesia, Polynesia",ground,tern
+Onychoprion_anaethetus,"Indian_Ocean, Melanesia",ground,tern
+Sternula_nereis,EXCLUDE,ground,tern
+Sternula_saundersi,EXCLUDE,ground,tern
+Hydroprogne_caspia,EXCLUDE,ground,tern
+Sterna_dougallii,"Indian_Ocean, Melanesia",ground,tern
+Sterna_sumatrana,"Indian_Ocean, Melanesia, Micronesia",ground,tern
+Thalasseus_bergii,none,ground,tern
+Thalasseus_bengalensis,Indian_Ocean,ground,tern
+Phaethon_lepturus,none,ground,tropicbird
+Phaethon_rubricauda,none,ground,tropicbird
+Phoebastria_immutabilis,EXCLUDE,ground,albatros
+Phoebastria_nigripes,EXCLUDE,ground,albatros
+Phoebastria_albatrus,EXCLUDE,ground,albatros
+Nesofregetta_fuliginosa,EXCLUDE,burrow,tubenose
+Hydrobates_tristrami,EXCLUDE,burrow,tubenose
+Pterodroma_neglecta,EXCLUDE,ground,tubenose
+Pterodroma_heraldica,EXCLUDE,ground,tubenose
+Pterodroma_ultima,EXCLUDE,ground,tubenose
+Pterodroma_hypoleuca,EXCLUDE,burrow,tubenose
+Pterodroma_alba,EXCLUDE,ground,tubenose
+Bulweria_bulwerii,EXCLUDE,ground,tubenose
+Ardenna_pacifica,none,burrow,tubenose
+Puffinus_nativitatis,"Polynesia, Micronesia",burrow,tubenose
+Puffinus_bailloni,none,burrow,tubenose
+Fregata_ariel,none,ground,frigatebird
+Fregata_minor,none,vegetation,frigatebird
+Sula_dactylatra,none,ground,booby
+Sula_granti,EXCLUDE,ground,booby
+Sula_leucogaster,none,ground,booby
+Sula_sula,none,vegetation,booby
