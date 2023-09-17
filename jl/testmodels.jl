@@ -92,4 +92,51 @@ for i in 1:6
     yflip!()
 end
 
-plot([i for i in p]..., size=(1000,1000))
+plot([i for i in p]..., size=(1000, 1000))
+
+
+@model function interaction_model(atoll, species, pc, nesting, presence)
+    # Number of groups per predictor
+    a = length(unique(atoll))
+    s = length(unique(species))
+    n = length(unique(nesting))
+
+    # Priors for atolls
+    ᾱ ~ Normal()
+    τ ~ Exponential(1)
+    α ~ filldist(Normal(ᾱ, τ), a)
+    # Priors for species effect
+    β ~ filldist(Normal(0, 1), s)
+    # Priors for species PC
+    θ1 ~ filldist(Normal(0, 1), s)
+    θ2 ~ filldist(Normal(0, 1), s)
+    θ3 ~ filldist(Normal(0, 1), s)
+    θ4 ~ filldist(Normal(0, 1), s)
+    θ5 ~ filldist(Normal(0, 1), s)
+    θ6 ~ filldist(Normal(0, 1), s)
+    # Priors for nesting PC
+    γ1 ~ filldist(Normal(0, 1), n)
+    γ2 ~ filldist(Normal(0, 1), n)
+    γ3 ~ filldist(Normal(0, 1), n)
+    γ4 ~ filldist(Normal(0, 1), n)
+    γ5 ~ filldist(Normal(0, 1), n)
+    γ6 ~ filldist(Normal(0, 1), n)
+
+
+    for i in eachindex(presence)
+        v = logistic(
+            α[atoll[i]] +
+            β[species[i]] +
+            θ1[species[i]] * pc[i, 1] +
+            θ2[species[i]] * pc[i, 2] +
+            θ3[species[i]] * pc[i, 3] +
+            θ4[species[i]] * pc[i, 4] +
+            θ5[species[i]] * pc[i, 5] +
+            θ6[species[i]] * pc[i, 6]
+        )
+        presence[i] ~ Bernoulli(v)
+    end
+end;
+
+m3 = pc_species_intercept(all_atoll, all_species, all_pc, all_presence)
+chain3 = sample(m3, HMC(0.05, 10), 8000, discard_initial=2000)

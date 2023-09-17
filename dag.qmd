@@ -1,6 +1,9 @@
+---
+title: "atoll equations"
+format: pdf
+---
 
-
-```{dot}
+#```{dot}
 digraph TrafficLights {
     overlap = false
     node [shape=box]; atoll;
@@ -13,7 +16,7 @@ digraph TrafficLights {
     species->genus;
     species->nestingtype;
 }
-```
+#```
 
 Let the predicted presence P of species s of genus g and nesting type n on atoll a be:
 
@@ -67,10 +70,68 @@ $$
 \begin{split}
 \begin{aligned}
 
-P_{asn} &= \alpha_{a} + \beta_{s}(Species_s) + \theta_{1s}(PC1) \times \gamma_{1s}(Nesting_n) + \dots + \theta_{6s}(PC6) \times \gamma_{6s}(Nesting_n) + \epsilon_{as} \\
+P_{asn} &= \alpha_{a} + \beta_{s}(Species_s) + \theta_{1s}(PC1) + \dots + \theta_{6s}(PC6) + \gamma(Nesting_n) + \epsilon_{as} \\
 \beta_{0a} &= \gamma_{00} + U_{0a}
 
 \end{aligned}
 \end{split}
 \end{equation}
 $$
+
+# Random intercept and species and PCs interacting with nesting type
+
+$$
+\begin{equation}
+\begin{split}
+\begin{aligned}
+
+P_{asn} &= \beta_{0a} + \beta_{1s}(Species_s) + \beta_{2s}(PC1) + \dots + \beta_{7s}(PC6) + \beta_{8ns} + \epsilon_{as} \\
+\beta_{0a} &= \gamma_{00} + U_{0a} \\
+\beta_{8ns} &= \gamma_{800} + U_{8s}
+
+\end{aligned}
+\end{split}
+\end{equation}
+$$
+
+# Draft
+
+Level 1: Species
+
+$$
+\begin{equation}
+\begin{split}
+\begin{aligned}
+L1: \\
+P_{sna} &= \beta_{0na} + \beta_{1na}(Species_s) + \epsilon_{sna} \\
+\\
+L2: \\
+\beta_{0na} &= \gamma_{00a} + \gamma_{01a}(Nesting_n) \\
+\beta_{1na} &= \gamma_{10a} + \gamma_{11a}(Nesting_n) \\
+\\
+L3: \\
+\gamma_{00a} &= \theta_{000} + U_{00a} \\
+\gamma_{01a} &= \theta_{010} + U_{01a} \\
+\gamma_{10a} &= \theta_{100} + U_{10a} \\
+\gamma_{11a} &= \theta_{110} + U_{11a} \\
+
+\end{aligned}
+\end{split}
+\end{equation}
+$$
+
+$$
+\begin{split}
+\begin{aligned}
+L1: \\
+P_{sna} &= \beta_{0a} + \beta_{1a}(Species_s) + \beta_{2a}(Nesting_n) + \epsilon_{sna} \\
+\\
+L2: \\
+\beta_{0a} &= \gamma_{00} + \gamma_{01}(PC1) + \dots + \gamma_{06}(PC6) + U_{0a} \\
+\beta_{1a} &= \gamma_{10} + \gamma_{11}(PC1) + \dots + \gamma_{16}(PC6) + U_{1a} \\
+\beta_{2a} &= \gamma_{20} + \gamma_{21}(PC1) + \dots + \gamma_{26}(PC6) + U_{2a} \\
+\end{aligned}
+\end{split}
+$$
+
+Consider that for species s we have a $\beta_1$ parameters -> this is a distribution of $\beta_1$ parameters!
