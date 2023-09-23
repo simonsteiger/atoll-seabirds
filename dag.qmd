@@ -22,7 +22,6 @@ Let the predicted presence P of species s of genus g and nesting type n on atoll
 
 # Random intercept only
 $$
-\begin{equation}
 \begin{split}
 \begin{aligned}
 
@@ -31,12 +30,10 @@ P_{as} &= \beta_{0a} + \epsilon_{as}\\
 
 \end{aligned}
 \end{split}
-\end{equation}
 $$
 
 # Random intercept and species
 $$
-\begin{equation}
 \begin{split}
 \begin{aligned}
 
@@ -45,13 +42,11 @@ P_{as} &= \beta_{0a} + \beta_{1s}(Species_s) + \epsilon_{as} \\ %% check notatio
 
 \end{aligned}
 \end{split}
-\end{equation}
 $$
 
 # Random intercept and species and PCs
 
 $$
-\begin{equation}
 \begin{split}
 \begin{aligned}
 
@@ -60,13 +55,11 @@ P_{as} &= \beta_{0a} + \beta_{1s}(Species_s) + \beta_{2s}(PC1) + \dots + \beta_{
 
 \end{aligned}
 \end{split}
-\end{equation}
 $$
 
 # Random intercept and species and PCs interacting with nesting type
 
 $$
-\begin{equation}
 \begin{split}
 \begin{aligned}
 
@@ -75,13 +68,11 @@ P_{asn} &= \alpha_{a} + \beta_{s}(Species_s) + \theta_{1s}(PC1) + \dots + \theta
 
 \end{aligned}
 \end{split}
-\end{equation}
 $$
 
 # Random intercept and species and PCs interacting with nesting type
 
 $$
-\begin{equation}
 \begin{split}
 \begin{aligned}
 
@@ -91,7 +82,6 @@ P_{asn} &= \beta_{0a} + \beta_{1s}(Species_s) + \beta_{2s}(PC1) + \dots + \beta_
 
 \end{aligned}
 \end{split}
-\end{equation}
 $$
 
 # Draft
@@ -99,7 +89,6 @@ $$
 Level 1: Species
 
 $$
-\begin{equation}
 \begin{split}
 \begin{aligned}
 L1: \\
@@ -117,21 +106,38 @@ L3: \\
 
 \end{aligned}
 \end{split}
-\end{equation}
 $$
 
 $$
 \begin{split}
 \begin{aligned}
 L1: \\
-P_{sna} &= \beta_{0a} + \beta_{1a}(Species_s) + \beta_{2a}(Nesting_n) + \epsilon_{sna} \\
+P_{sna} &= \beta_{0a} + \beta_{1as} + \beta_{2an} + \epsilon_{sna} \\
 \\
 L2: \\
 \beta_{0a} &= \gamma_{00} + \gamma_{01}(PC1) + \dots + \gamma_{06}(PC6) + U_{0a} \\
-\beta_{1a} &= \gamma_{10} + \gamma_{11}(PC1) + \dots + \gamma_{16}(PC6) + U_{1a} \\
-\beta_{2a} &= \gamma_{20} + \gamma_{21}(PC1) + \dots + \gamma_{26}(PC6) + U_{2a} \\
+\beta_{1as} &= \gamma_{10s} + \gamma_{11s}(PC1) + \dots + \gamma_{16s}(PC6) + U_{1a} \\
+\beta_{2an} &= \gamma_{20n} + \gamma_{21n}(PC1) + \dots + \gamma_{26n}(PC6) + U_{2a} \\
+L3: \\
+\gamma_{10s} &= \gamma_{100} + \gamma_{101}(Species_s) \\
+\gamma_{11s} &= \gamma_{110} + \gamma_{111}(Species_s) \\
+\gamma_{20n} &= \gamma_{200} + \gamma_{201}(Nesting_n) \\
+\gamma_{21n} &= \gamma_{210} + \gamma_{211}(Nesting_n)
 \end{aligned}
 \end{split}
 $$
 
 Consider that for species s we have a $\beta_1$ parameters -> this is a distribution of $\beta_1$ parameters!
+
+SPECIES WITHIN NESTING TYPES
+gamma parameters are separate distributions for each nesting type
+main model would be $\theta1_{n, s}$ = when you estimate a new species, look at the distribution for that nesting type
+=> we can average over all species within each nesting type
+
+$$
+\begin{split}
+\begin{aligned}
+\gamma_{01s} = \gamma_{010} + \gamma_{011}(Species_s)
+\end{aligned}
+\end{split}
+$$
