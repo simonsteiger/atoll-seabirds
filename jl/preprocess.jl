@@ -109,10 +109,10 @@ for k in keys(trainset)
     groupatoll[k] = denserank(trainset[k][:, :atoll])
 end
 
-all_atoll = denserank(envs_known.atoll)
-all_species = denserank(envs_known.species)
-all_presence = envs_known.presence
+all_atoll = Int64.(denserank(envs_known.atoll))
+all_species = Int64.(denserank(envs_known.species))
+all_presence = Float64.(envs_known.presence)
 all_pc = Matrix(envs_known[:, features])
-all_nesting = envs_known.nestingtype
+all_nesting = Int64.(denserank(envs_known.nestingtype))
 
 end
