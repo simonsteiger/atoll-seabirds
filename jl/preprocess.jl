@@ -1,30 +1,18 @@
 module Preprocess
 
 export train, test, train_label, test_label, groupatoll, envs_known,
-       all_atoll, all_species, all_presence, all_pc, all_nesting
-
-# Import Turing and Distributions.
-using Turing, Distributions
+       all_atoll, all_species, all_presence, all_pc, all_nesting, 
+       distM, distM_known, distM_unknown
 
 # Working with tabular data
 using CSV, DataFrames, Chain
 
-# Import MCMCChains, Plots, and StatsPlots for visualizations and diagnostics.
-using MCMCChains, Plots, StatsPlots
-
-# We need a logistic function, which is provided by StatsFuns.
-using StatsFuns: logistic
-
 using StatsBase
 
-# Functionality for splitting and normalizing the data
 using MLDataUtils: shuffleobs, stratifiedobs, oversample, rescale!
 using Resample
 
-# Set a seed for reproducibility.
 using Random, StableRNGs
-
-#import .Upsample
 
 include("/Users/simonsteiger/Desktop/other/atoll-seabirds/jl/upsample.jl")
 include("/Users/simonsteiger/Desktop/other/atoll-seabirds/jl/tune.jl")
@@ -34,11 +22,23 @@ Random.seed!(0);
 const PRIOR_TEST = 0.5
 const PRIOR_DF = 3
 
-# Turn off progress monitor.
-# Turing.setprogress!(false)
-
 # Import the data
 envscores = CSV.read("data/jl_envscores.csv", DataFrame)
+
+# Import the data
+distances = CSV.read("data/pairwise_atoll_distance.csv", DataFrame)
+distM = Matrix{Float64}(distances[:, 2:end])
+distM ./= 10_000
+
+# Split distM into distM_known and distM_unknoqn
+ispresencemissing = @chain envscores begin
+    unique(_, :atoll)
+    getproperty(_, :presence)
+    map(x -> ismissing(x), _)
+end
+
+distM_known = distM[.!ispresencemissing, .!ispresencemissing]
+distM_unknown = distM[ispresencemissing, ispresencemissing]
 
 # Add data about nesting type
 specinfo = @chain begin

@@ -311,3 +311,26 @@ xlims!(0, 1)
 # end
 # 
 # printchain(chain4)
+
+# Spatial autocorrelation
+
+using LinearAlgebra
+
+@model function spatial(atoll, distM, presence)
+    rhosq ~ Exponential(0.5)
+    etasq ~ Exponential(2)
+
+    # GPL2
+    SIGMA_distM = etasq * exp.(-rhosq * distM.^2)
+    SIGMA_distM = SIGMA_distM + 0.01I
+    SIGMA_distM = (SIGMA_distM' + SIGMA_distM) / 2
+    g ~ MvNormal(zeros(size(SIGMA_distM, 1)), SIGMA_distM)
+
+    for i in eachindex(presence)
+        lambda = logistic(g[atoll[i]])
+        presence[i] ~ Bernoulli(lambda)
+    end
+end
+
+m_spatial = spatial(all_atoll, distM_known, all_presence)
+chain_spatial = sample(m_spatial, HMC(0.01, 10), 30_000)
