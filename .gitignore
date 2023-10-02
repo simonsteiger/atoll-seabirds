@@ -4,3 +4,5 @@
 .Ruserdata
 fits/_*
 data/copernicus_*
+*.jls
+.DS_Store
