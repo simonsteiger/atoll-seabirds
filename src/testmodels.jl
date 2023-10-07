@@ -5,6 +5,8 @@ include("tune.jl")
 
 using .Preprocess
 using ReverseDiff
+using StatsBase
+using LinearAlgebra
 
 # For saving stuff
 using Serialization, Dates
@@ -18,8 +20,6 @@ function printchain(chain)
     x = describe(chain)[1]
     show(DataFrame(x), allrows=true)
 end
-
-using StatsBase
 
 num_species = @chain Preprocess.envs_known begin
     groupby(_, :nestingtype)
@@ -35,9 +35,7 @@ vgb = @chain Preprocess.envs_known begin
     getproperty(_, :nrow)
 end
 
-# TODO dont throw out the albatrosses (dont exclude)
-
-@model function pc_species_nesting(atoll, species, nesting, v, g, b, pc, presence)
+@model function full_model(atoll, species, nesting, v, g, b, pc, dist, presence)
     # Number of groups per predictor
     a = length(unique(atoll))
     s = length(unique(species))
@@ -122,10 +120,22 @@ end
     ω63 ~ filldist(Normal(ω̄63, κ63), v) # Vector of distributions of burrow nesters
     ω6 = [ω61, ω62, ω63]
 
+    #### SPATIAL GAUSSIAN PROCESS ####
+    # see https://github.com/StatisticalRethinkingJulia/TuringModels.jl/blob/main/scripts/spatial-autocorrelation-oceanic.jl
+    # and https://peter-stewart.github.io/blog/gaussian-process-occupancy-tutorial/
+    rhosq ~ truncated(Cauchy(0, 1), 0, Inf)
+    etasq ~ truncated(Cauchy(0, 1), 0, Inf)
+
+    SIGMA_distM = etasq * exp.(-rhosq * dist.^2)
+    SIGMA_distM = SIGMA_distM + 0.01I
+    SIGMA_distM = (SIGMA_distM' + SIGMA_distM) / 2
+    γ ~ MvNormal(zeros(size(SIGMA_distM, 1)), SIGMA_distM)
+
     for i in eachindex(presence)
         v = logistic(
             α[atoll[i]] +
             β[species[i]] +
+            γ[atoll[i]] +
             ω1[nesting[i]][species[i]] * pc[i, 1] +
             ω2[nesting[i]][species[i]] * pc[i, 2] +
             ω3[nesting[i]][species[i]] * pc[i, 3] +
@@ -137,10 +147,10 @@ end
     end
 end;
 
-m3 = pc_species_nesting(all_atoll, num_species, all_nesting, vgb..., all_pc, all_presence);
-chain3 = sample(m3, HMC(0.01, 10), MCMCThreads(), 30_000, 4, discard_initial=5000)
+m3 = full_model(all_atoll, num_species, all_nesting, vgb..., all_pc, distM_known, all_presence);
+chain3 = sample(m3, NUTS(), 30_000, discard_initial=5000) # HMC(0.01, 10)
 
-serialize("../chains/$(TODAY)_chain_nesting.jls", chain3)
+serialize("model/chains/$(TODAY)_chain_nesting.jls", chain3)
 
 chain3 = deserialize("chains/chain_nesting.jls")
 # 
@@ -178,8 +188,7 @@ end
 nestingtypes = String.(unique(Preprocess.envs_known.nestingtype))
 species_names = replace.(sort(unique(Preprocess.envs_known.species)), r"[a-z]+_" => " ")
 
-plotparams(chain3, "ω6", 3, lab=nothing)
-xlims!(0, 1)
+ps = [begin plotparams(chain, "ω$i", 3, lab=nothing); xlims!(0, 1) end for i in 1:6]
 
 df_chain = @chain DataFrame(chain3) begin
     select(_, r"ω̄")
@@ -188,33 +197,8 @@ df_chain = @chain DataFrame(chain3) begin
     combine(_, :value => (x -> (std=std(logistic.(x)), mean=mean(logistic.(x)))) .=> AsTable)
 end
 
-[]
-
 groups = chop.(df_chain.variable, tail=1)
 scatter(df_chain.mean, df_chain.variable, xerror=df_chain.std, group=groups)
 yticks!((1:18).-0.5, df_chain.variable)
 xlims!(0, 1)
 yflip!()
-
-# Spatial autocorrelation
-
-# using LinearAlgebra
-# 
-# @model function spatial(atoll, distM, presence)
-#     rhosq ~ truncated(Cauchy(0, 1), 0, Inf)
-#     etasq ~ truncated(Cauchy(0, 1), 0, Inf)
-# 
-#     # GPL2
-#     SIGMA_distM = etasq * exp.(-rhosq * distM.^2)
-#     SIGMA_distM = SIGMA_distM + 0.1I # seems that this step is critical – setting I to 1 seems to avoid the error??
-#     SIGMA_distM = (SIGMA_distM' + SIGMA_distM) / 2
-#     g ~ MvNormal(zeros(size(SIGMA_distM, 1)), SIGMA_distM)
-# 
-#     for i in eachindex(presence)
-#         lambda = logistic(g[atoll[i]])
-#         presence[i] ~ Bernoulli(lambda)
-#     end
-# end
-# 
-# m_spatial = spatial(all_atoll, distM_known, all_presence)
-# chain_spatial = sample(m_spatial, HMC(0.01, 10), 500)

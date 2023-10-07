@@ -54,7 +54,7 @@ envs_unknown = subset(envscores, :presence => ByRow(x -> ismissing(x)))
 
 # Delete all species with known population from data
 # RETHINK Do we want to keep known populations to inform other groups?
-envs_known = subset(envs_known, [:filtercondition, :region] => ByRow((x, y) -> occursin(Regex(x), y)))
+# envs_known = subset(envs_known, [:filtercondition, :region] => ByRow((x, y) -> occursin(Regex(x), y)))
 
 # Add nestingtype to envscores
 leftjoin!(envs_known, specinfo, on=:species)
@@ -78,36 +78,36 @@ numerics = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]
 target = :presence
 
 # Dicts for trainset, testset
-trainset = Dict{String,DataFrame}()
-testset = Dict{String,DataFrame}()
-
-[(trainset[s], testset[s]) = split_data(envs_model, target, s; at=0.5) for s in unique(envs_model.species)]
-
-for f in numerics, k in keys(trainset)
-    μ, σ = rescale!(trainset[k][!, f]; obsdim=1)
-    rescale!(testset[k][!, f], μ, σ; obsdim=1)
-end
-
-trainset_up = Dict{String,DataFrame}()
-
-rng = StableRNG(1)
-
-[trainset_up[k] = our_smote(rng, trainset[k]) for k in keys(trainset)];
-
-# Dicts for train, test, train_label, test_label
-train = Dict{String,Matrix}()
-test = Dict{String,Matrix}()
-train_label = Dict{String,Vector}()
-test_label = Dict{String,Vector}()
-groupatoll = Dict{String, Vector}()
-
-for k in keys(trainset)
-    train[k] = Matrix(trainset[k][:, features])
-    test[k] = Matrix(testset[k][:, features])
-    train_label[k] = trainset[k][:, target]
-    test_label[k] = testset[k][:, target]
-    groupatoll[k] = denserank(trainset[k][:, :atoll])
-end
+# trainset = Dict{String,DataFrame}()
+# testset = Dict{String,DataFrame}()
+# 
+# [(trainset[s], testset[s]) = split_data(envs_model, target, s; at=0.5) for s in unique(envs_model.species)]
+# 
+# for f in numerics, k in keys(trainset)
+#     μ, σ = rescale!(trainset[k][!, f]; obsdim=1)
+#     rescale!(testset[k][!, f], μ, σ; obsdim=1)
+# end
+# 
+# trainset_up = Dict{String,DataFrame}()
+# 
+# rng = StableRNG(1)
+# 
+# [trainset_up[k] = our_smote(rng, trainset[k]) for k in keys(trainset)];
+# 
+# # Dicts for train, test, train_label, test_label
+# train = Dict{String,Matrix}()
+# test = Dict{String,Matrix}()
+# train_label = Dict{String,Vector}()
+# test_label = Dict{String,Vector}()
+# groupatoll = Dict{String, Vector}()
+# 
+# for k in keys(trainset)
+#     train[k] = Matrix(trainset[k][:, features])
+#     test[k] = Matrix(testset[k][:, features])
+#     train_label[k] = trainset[k][:, target]
+#     test_label[k] = testset[k][:, target]
+#     groupatoll[k] = denserank(trainset[k][:, :atoll])
+# end
 
 all_atoll = Int64.(denserank(envs_known.atoll))
 all_species = Int64.(denserank(envs_known.species))

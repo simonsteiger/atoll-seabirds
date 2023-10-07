@@ -58,5 +58,9 @@ df_proj = @chain begin
     insertcols(_, 1, :features => features)
 end
 
-heatmap(PC_NAMES, collect(1:16), proj, size=(800, 600), color=palette(:viridis))
+c = palette(:viridis, 50)
+
+cg = cgrad([c[1], :grey80, :grey80, c[50]])
+
+heatmap(PC_NAMES, collect(1:16), proj, size=(800, 600), color=cg)
 yticks!(collect(1:16), features)
