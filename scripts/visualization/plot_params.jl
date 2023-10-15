@@ -3,7 +3,7 @@ include("../preprocessing/preprocess.jl")
 using Turing, Serialization, StatsPlots
 using .Preprocess
 
-chain = deserialize("../models/chains/2023-10-15_chain.jls")
+chain = deserialize("../models/chains/2023-10-15_chain_splitregion.jls")
 
 function plotparams(chain::Chains, param::String, n::Int64; lab=nothing)
 
@@ -37,7 +37,7 @@ end
 nestingtypes = String.(unique(Preprocess.envs_known.nestingtype))
 species_names = replace.(sort(unique(Preprocess.envs_known.species)), r"[a-z]+_" => " ")
 
-ps = [begin plotparams(chain, "ω$i", 3, lab=nothing); xlims!(0, 1) end for i in 1:6]
+ps = [begin plotparams(chain, "θ$i", 3, lab=nothing); xlims!(0, 1) end for i in 1:6]
 
 df_chain = @chain DataFrame(chain) begin
     select(_, r"ω̄")

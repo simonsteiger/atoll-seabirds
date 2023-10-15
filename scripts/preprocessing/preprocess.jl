@@ -163,4 +163,15 @@ end
 
 num_species_within_nesting_unknown = df_species_unknown.within_nesting
 
+idx_nesting_species = @chain envs_known begin
+    DataFrames.transform(_, [:nestingtype, :species] => ByRow((x,y) -> "$x$y") => :ne_sp)
+    select(_, :ne_sp)
+    getproperty(_, :ne_sp)
+    denserank(_)
+end
+
+idx_species_region = @chain envs_known begin
+    
+end
+
 end

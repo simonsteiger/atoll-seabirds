@@ -27,4 +27,6 @@ function extractparams(chain, params::AbstractArray{T}) where {T<:Union{String,S
     return namedvalues
 end
 
+lu(x) = length(unique(x))
+
 end
