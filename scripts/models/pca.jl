@@ -3,20 +3,20 @@ import MultivariateStats as MS
 import StatsBase as SB
 using Match
 
-include("standardise.jl")
+include("../../src/standardise.jl")
 
 const PC_NAMES = ["PC1", "PC2", "PC3", "PC4", "PC5", "PC6"]
 
-envs = CSV.read("data/envs_jicp.csv", DataFrame, missingstring="NA")
+envs = CSV.read("../../data/envs_jicp.csv", DataFrame, missingstring="NA")
 
 DataFrames.transform!(envs, :human_population => ByRow(x -> ifelse(ismissing(x), round(median(skipmissing(envs.human_population)), digits=0), x)) => identity)
 
-seabirds = @chain CSV.read("data/atoll_seabird_populations_11Mar.csv", DataFrame) begin
+seabirds = @chain CSV.read("../../data/atoll_seabird_populations_11Mar.csv", DataFrame) begin
     stack(_, Not(:atoll), variable_name=:species, value_name=:presence)
     DataFrames.transform(_, :presence => ByRow(x -> ismissing(x) ? 0.0 : 1.0) => identity)
 end
 
-cond = CSV.read("data/seabird_filterconditions_03Jul.csv", DataFrame)
+cond = CSV.read("../../data/seabird_filterconditions_03Jul.csv", DataFrame)
 
 df_features = envs[!, [collect(8:13)..., 16, collect(18:26)...]]
 X_features = Matrix{Float64}(df_features)'

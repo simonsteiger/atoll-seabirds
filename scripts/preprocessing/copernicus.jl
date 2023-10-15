@@ -39,16 +39,24 @@ dct = Dict()
 [dct[v[1]] = abs.(dct[v[1]]) for v in vars[collect(1:9)]]; # only nppv, chl, phyc
 
 # Calculate mean of array slices
-[dct[v[1]] = mean(dct[v[1]], dims=4) for v in vars[collect(1:9)]];
+[dct[v[1]] = mean(dct[v[1]], dims=4) for v in vars[collect(1:9)]]
+
+for k in keys(dct)
+  dct[k] = allowmissing(Float64.(dct[k]))
+end
+
+[map!(x -> isinf(x) ? missing : x, dct[v[1]], dct[v[1]]) for v in vars[collect(1:9)]];
 
 # Concatenate temp arrays on time axis
 dct["temp"] = @chain Base.cat(dct["temp_1"], dct["temp_2"], dims=3) begin
   mean(_, dims=3)
+  map(x -> x == 32767.0 ? missing : x, _)
 end
 
 # Concatenate velo arrays on time axis
 dct["velo"] = @chain Base.cat(dct["velo_1"], dct["velo_2"], dct["velo_3"], dct["velo_4"], dims=3) begin
   mean(_, dims=3)
+  map(x -> x == 32767.0 ? missing : x, _)
 end
 
 # Remove no longer necessary arrays from dictionary
