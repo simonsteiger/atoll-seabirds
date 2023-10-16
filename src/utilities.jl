@@ -3,7 +3,7 @@ module CustomUtilityFuns
 export showall,
        extractparams
 
-using Turing
+using Turing, DataFrames
 
 # Default method for printing all entries of an object
 function showall(x)

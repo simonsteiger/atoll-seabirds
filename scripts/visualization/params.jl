@@ -1,3 +1,7 @@
+module ParamPlots
+
+export plotparams
+
 include("../preprocessing/preprocess.jl")
 
 using Turing, Serialization, StatsPlots
@@ -52,4 +56,4 @@ yticks!((1:18).-0.5, df_chain.variable)
 xlims!(0, 1)
 yflip!()
 
-
+end

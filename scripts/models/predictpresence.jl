@@ -1,24 +1,42 @@
 # Full model to predict species presence
 
-using Turing, TuringBenchmarking
-using StatsFuns
-using Chain, DataFrames
+### SETUP ###
 
+# Probabilistic programming
+using Turing, TuringBenchmarking
+# Statistics
+using StatsFuns, LinearAlgebra
+# Working with tabular data
+using Chain, DataFrames
+# Saving results
+using Serialization
+
+# Load custom modules
 include("../preprocessing/preprocess.jl")
 include("../../src/postprocess.jl")
+include("../../src/utilities.jl")
+include("../visualization/diagnostics.jl")
+include("../visualization/params.jl")
 
+# Add names to environment
 using .Preprocess
 using .Postprocess
-using ReverseDiff
-using StatsBase
-using LinearAlgebra
+using .CustomUtilityFuns
+using .DiagnosticPlots
+using .ParamPlots
 
-# For saving stuff
-using Serialization, Dates
+# Benchmark model?
+benchmark = false
 
-const TODAY = Dates.format(now(), "yyyy-mm-dd")
+# Load a saved chain?
+load = true
 
-@model function full_model(PC, r, s, n, s_in_n, Nv, Ng, Nb, y)
+# Which chain should be loaded?
+filepath = "chains/predictpresence.jls"
+
+### MODEL SPECIFICATION ###
+
+@model function modelpresence(PC, r, s, n, s_in_n, Nv, Ng, Nb, y)
     # Number of groups per predictor
     Nr = length(unique(r))
     Ns = length(unique(s))
@@ -91,7 +109,7 @@ const TODAY = Dates.format(now(), "yyyy-mm-dd")
     end
 end;
 
-model = full_model(
+model = modelpresence(
     PC,
     num_region,
     num_species,
@@ -101,37 +119,55 @@ model = full_model(
     presence
 );
 
-# benchmark_model(
-#     model;
-#     # Check correctness of computations
-#     check=true,
-#     # Automatic differentiation backends to check and benchmark
-#     adbackends=[:forwarddiff, :reversediff, :reversediff_compiled, :zygote]
-# )
+### SAMPLING ###
 
-# Set AD backend
+# Benchmark different backends to find out which is fastest
+if benchmark
+    adbackends = [:forwarddiff, :reversediff, :reversediff_compiled]
+    benchmark_model(model; check=true, adbackends=adbackends)
+end
+
+# ------- BENCHMARK RESULTS ------- #
+# 18.817 ms ReverseDiff             #
+# 28.948 ms ForwardDiff             #
+#  6.608 ms ReverseDiff[compiled]   #
+# ??.??? ms Zygote "never" finished #
+# --------------------------------- #
+
+# Set AD backend to :reversediff and compile with setrdcache(true)
 Turing.setadbackend(:reversediff)
 Turing.setrdcache(true)
 
-# Tune sampler: step_size 0.025 results in good acceptance_rates (≈ 0.65)
-# https://pythonhosted.org/pyhmc/tuning.html
-sampler = HMC(0.025, 10)
-n_samples = 10_000
-n_chains = 4
-chain3 = sample(model, sampler, MCMCThreads(), n_samples, n_chains; discard_initial=2000)
+# Sample from model
+if load
+    chain = deserialze(filename)
+else
+    chain = sample(
+        model,
+        HMC(0.025, 10), # tuned to acceptance_rate ≈ 0.65, see https://pythonhosted.org/pyhmc/tuning.html
+        MCMCThreads(),
+        20_000,         # number of samples
+        3;              # number of chains
+        discard_initial=2000
+    )
+    serialize("chains/predictpresence.jls", chain)
+end
 
-serialize("$(TODAY)_chain.jls", chain)
+# Check acceptance rate
+plot_acceptance_rate(chain)
+# Check rhat
+plot_rhat(chain)
 
 params = Postprocess.extractparams(chain, Postprocess.targets)
 
-λ = @chain chain3 begin
+λ = @chain chain begin
     group(_, "λ")
     mean(_)
     _[:, 2]
     reshape(_, 4, 37)
 end
 
-thetas = [mean(group(chain3, "θ$i$j"))[:, 2] for i in 1:6, j in 1:3]
+thetas = [mean(group(chain, "θ$i$j"))[:, 2] for i in 1:6, j in 1:3]
 θ11, θ12, θ13 = [thetas[1, i] for i in 1:3]
 θ21, θ22, θ23 = [thetas[1, i] for i in 1:3]
 θ31, θ32, θ33 = [thetas[1, i] for i in 1:3]
