@@ -4,10 +4,7 @@ export plotparams
 
 include("../preprocessing/preprocess.jl")
 
-using Turing, Serialization, StatsPlots
-using .Preprocess
-
-chain = deserialize("../models/chains/2023-10-15_chain_splitregion.jls")
+using Turing, Chain, StatsPlots
 
 function plotparams(chain::Chains, param::String, n::Int64; lab=nothing)
 
@@ -38,22 +35,22 @@ function plotparams(chain::Chains, param::String, n::Int64; lab=nothing)
     return out
 end
 
-nestingtypes = String.(unique(Preprocess.envs_known.nestingtype))
-species_names = replace.(sort(unique(Preprocess.envs_known.species)), r"[a-z]+_" => " ")
-
-ps = [begin plotparams(chain, "θ$i", 3, lab=nothing); xlims!(0, 1) end for i in 1:6]
-
-df_chain = @chain DataFrame(chain) begin
-    select(_, r"ω̄")
-    stack(_)
-    groupby(_, :variable)
-    combine(_, :value => (x -> (std=std(logistic.(x)), mean=mean(logistic.(x)))) .=> AsTable)
-end
-
-groups = chop.(df_chain.variable, tail=1)
-scatter(df_chain.mean, df_chain.variable, xerror=df_chain.std, group=groups)
-yticks!((1:18).-0.5, df_chain.variable)
-xlims!(0, 1)
-yflip!()
+#nestingtypes = String.(unique(Preprocess.envs_known.nestingtype))
+#species_names = replace.(sort(unique(Preprocess.envs_known.species)), r"[a-z]+_" => " ")
+#
+#ps = [begin plotparams(chain, "θ$i", 3, lab=nothing); xlims!(0, 1) end for i in 1:6]
+#
+#df_chain = @chain DataFrame(chain) begin
+#    select(_, r"ω̄")
+#    stack(_)
+#    groupby(_, :variable)
+#    combine(_, :value => (x -> (std=std(logistic.(x)), mean=mean(logistic.(x)))) .=> AsTable)
+#end
+#
+#groups = chop.(df_chain.variable, tail=1)
+#scatter(df_chain.mean, df_chain.variable, xerror=df_chain.std, group=groups)
+#yticks!((1:18).-0.5, df_chain.variable)
+#xlims!(0, 1)
+#yflip!()
 
 end

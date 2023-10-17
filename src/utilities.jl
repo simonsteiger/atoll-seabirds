@@ -21,9 +21,16 @@ end
 extractparams(chain, param) = getproperty(get_params(chain), Symbol(param))
 
 # `extractparams()` automatically loops over all entries of params if params is a Vector of Symbols or Strings
-function extractparams(chain, params::AbstractArray{T}) where {T<:Union{String,Symbol}}
-    values = [getproperty(get_params(chain), p) for p in Symbol.(params)]
+function extractparams(chain, params::AbstractArray{Symbol})
+    values = [getproperty(get_params(chain), p) for p in params]
     namedvalues = (; zip(params, values)...)
+    return namedvalues
+end
+
+function extractparams(chain, params::AbstractArray{String})
+    sym_params = Symbol.(params)
+    values = [getproperty(get_params(chain), p) for p in sym_params]
+    namedvalues = (; zip(sym_params, values)...)
     return namedvalues
 end
 

@@ -15,8 +15,8 @@ using Serialization
 include("../preprocessing/preprocess.jl")
 include("../../src/postprocess.jl")
 include("../../src/utilities.jl")
-include("../visualization/diagnostics.jl")
-include("../visualization/params.jl")
+include("../visualization/diagnosticplots.jl")
+include("../visualization/paramplots.jl")
 
 # Add names to environment
 using .Preprocess
@@ -140,14 +140,14 @@ Turing.setrdcache(true)
 
 # Sample from model
 if load
-    chain = deserialze(filename)
+    chain = deserialize(filepath)
 else
     chain = sample(
         model,
         HMC(0.025, 10), # tuned to acceptance_rate ≈ 0.65, see https://pythonhosted.org/pyhmc/tuning.html
         MCMCThreads(),
-        20_000,         # number of samples
-        3;              # number of chains
+        40_000,         # number of samples
+        4;              # number of chains
         discard_initial=2000
     )
     serialize("chains/predictpresence.jls", chain)
@@ -158,46 +158,50 @@ plot_acceptance_rate(chain)
 # Check rhat
 plot_rhat(chain)
 
-params = Postprocess.extractparams(chain, Postprocess.targets)
+
+θs = ["θ$i$j" for i in 1:6, j in 1:3]
+
+params = extractparams(chain, ["λ", θs...])
 
 λ = @chain chain begin
     group(_, "λ")
-    mean(_)
-    _[:, 2]
-    reshape(_, 4, 37)
+    #mean(_)
+    DataFrame(_)
+    #_[:, 2]
+    #reshape(_, 4, 37)
 end
 
-thetas = [mean(group(chain, "θ$i$j"))[:, 2] for i in 1:6, j in 1:3]
-θ11, θ12, θ13 = [thetas[1, i] for i in 1:3]
-θ21, θ22, θ23 = [thetas[1, i] for i in 1:3]
-θ31, θ32, θ33 = [thetas[1, i] for i in 1:3]
-θ41, θ42, θ43 = [thetas[1, i] for i in 1:3]
-θ51, θ52, θ53 = [thetas[1, i] for i in 1:3]
-θ61, θ62, θ63 = [thetas[1, i] for i in 1:3]
+μθ = [mean(group(chain, θ_ij))[:, 2] for θ_ij in θs]
+θ11, θ12, θ13 = [μθ[1, i] for i in 1:3]
+θ21, θ22, θ23 = [μθ[1, i] for i in 1:3]
+θ31, θ32, θ33 = [μθ[1, i] for i in 1:3]
+θ41, θ42, θ43 = [μθ[1, i] for i in 1:3]
+θ51, θ52, θ53 = [μθ[1, i] for i in 1:3]
+θ61, θ62, θ63 = [μθ[1, i] for i in 1:3]
 
-params = (
-    λ,
-    θ1=[θ11, θ12, θ13],
-    θ2=[θ21, θ22, θ23],
-    θ3=[θ31, θ32, θ33],
-    θ4=[θ41, θ42, θ43],
-    θ5=[θ51, θ52, θ53],
-    θ6=[θ61, θ62, θ63],
-)
+# params = (
+#     λ,
+#     θ1=[θ11, θ12, θ13],
+#     θ2=[θ21, θ22, θ23],
+#     θ3=[θ31, θ32, θ33],
+#     θ4=[θ41, θ42, θ43],
+#     θ5=[θ51, θ52, θ53],
+#     θ6=[θ61, θ62, θ63],
+# )
 
-preds = Dict{Any,Vector{Bool}}()
+preds = Dict()
 
-for i in eachindex(Preprocess.num_species_unknown)
-    preds[Preprocess.str_species_unknown[i]] =
-        Postprocess.prediction(
+for i in eachindex(num_species_unknown)
+    preds[str_species_unknown[i]] =
+        prediction(
             "presence",
             params,
-            Preprocess.num_species_unknown[i],
-            Preprocess.num_species_within_nesting_unknown[i],
-            Preprocess.num_nesting_unknown[i],
-            Preprocess.num_region_unknown,
-            Preprocess.num_atoll_unknown,
-            Preprocess.PC_unknown
+            num_species_unknown[i],
+            num_species_within_nesting_unknown[i],
+            num_nesting_unknown[i],
+            num_region_unknown,
+            num_atoll_unknown,
+            PC_unknown
         )
 end
 

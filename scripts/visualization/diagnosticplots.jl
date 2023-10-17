@@ -1,6 +1,6 @@
 module DiagnosticPlots
 
-export plot_acceptance_rate
+export plot_acceptance_rate, plot_rhat
 
 using DataFrames, Turing, StatsPlots
 
