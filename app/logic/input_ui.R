@@ -7,11 +7,11 @@ box::use(
   R/global,
 )
 
-pick_var <- function(id) {
+pick_var <- function(id, lvls) {
   swd$prettyRadioButtons(
     id,
     label = "Pick variable",
-    choices = global$names,
+    choices = lvls,
     status = "primary",
     shape = "round",
     fill = TRUE,

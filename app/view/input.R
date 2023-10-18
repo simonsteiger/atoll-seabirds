@@ -15,6 +15,8 @@ box::use(
   inp = app / logic / input_ui,
 )
 
+lvls <- names(disk$out)[!names(disk$out) %in% c("X", "atoll", "lat", "long")]
+
 #' @export
 ui <- function(id) {
   ns <- sh$NS(id)
@@ -23,8 +25,8 @@ ui <- function(id) {
     class = "m-8 shadow",
     bsl$card_header(class = "bg-info", "Controls"),
     bsl$card_body_fill(
-      inp$pick_var(ns("variable")),
-      inp$slider_range(ns("slider"))
+      inp$pick_var(ns("variable"), lvls)#,
+      #inp$slider_range(ns("slider"))
     )
   )
 }

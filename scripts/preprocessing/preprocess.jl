@@ -8,6 +8,7 @@ export train,
        envs_known,
        num_atoll,
        num_atoll_unknown,
+       str_atoll_unknown,
        num_species,
        num_species_within_nesting,
        num_species_unknown,
@@ -138,6 +139,7 @@ end
 # Atolls. ...
 num_atoll = Int64.(denserank(envs_known.atoll))
 num_atoll_unknown = Int64.(denserank(envs_unknown.atoll))
+str_atoll_unknown = envs_unknown.atoll
 
 num_region = Int64.(denserank(envs_known.region))
 num_region_unknown = Int64.(denserank(envs_unknown.region))

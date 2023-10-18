@@ -26,7 +26,7 @@ gir$set_girafe_defaults(
 
 #' @export
 atoll_map <- function(atoll_data, fill) {
-  pal_name <- switch(fill,
+  pal_name <- switch("nppv",
     "nppv" = "mako",
     "chl" = "vangogh3",
     "phyc" = "okeeffe2",
@@ -36,7 +36,7 @@ atoll_map <- function(atoll_data, fill) {
 
   p <- sh$reactive(
     gg$ggplot() +
-      gg$geom_raster(data = disk$cp_data, gg$aes(longitude, latitude, fill = .data[[fill]])) +
+      gg$geom_raster(data = disk$cp_data, gg$aes(longitude, latitude, fill = .data[["nppv"]])) +
       gir$geom_point_interactive(
         data = atoll_data,
         gg$aes(
@@ -62,13 +62,13 @@ atoll_map <- function(atoll_data, fill) {
       gg$theme(legend.position = "bottom") +
       gg$guides(
         colour = gg$guide_colorbar(
-          title = paste0("Atoll vicinity ", fill),
+          title = paste0("Atoll vicinity ", "nppv"),
           title.position = "bottom",
           title.hjust = 0.5,
           label.position = "top"
         ),
         fill = gg$guide_colorbar(
-          title = paste0("Oceanic ", fill),
+          title = paste0("Oceanic ", "nppv"),
           title.position = "bottom",
           title.hjust = 0.5,
           label.position = "top"

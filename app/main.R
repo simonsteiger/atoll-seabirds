@@ -22,8 +22,8 @@ ui <- function(id) {
       sh$tags$h1(paste0(emo$ji("fish"), " Atoll Explorer ", emo$ji("island")), class = "m-4"),
       bsl$layout_column_wrap(
         width = 1 / 2, height = 300,
-        input$ui(ns("main")),
-        hist$ui(ns("main"))
+        input$ui(ns("main"))#,
+        #hist$ui(ns("main"))
       )
     ),
     sh$div(

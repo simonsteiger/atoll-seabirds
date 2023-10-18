@@ -2,6 +2,8 @@
 
 ### SETUP ###
 
+cd("scripts/models")
+
 # Probabilistic programming
 using Turing, TuringBenchmarking
 # Statistics
@@ -140,7 +142,7 @@ Turing.setrdcache(true)
 
 # Sample from model
 if load
-    chain = deserialize(filepath)
+    chain = deserialize(filepath);
 else
     chain = sample(
         model,
@@ -158,41 +160,14 @@ plot_acceptance_rate(chain)
 # Check rhat
 plot_rhat(chain)
 
-
 θs = ["θ$i$j" for i in 1:6, j in 1:3]
 
 params = extractparams(chain, ["λ", θs...])
 
-λ = @chain chain begin
-    group(_, "λ")
-    #mean(_)
-    DataFrame(_)
-    #_[:, 2]
-    #reshape(_, 4, 37)
-end
-
-μθ = [mean(group(chain, θ_ij))[:, 2] for θ_ij in θs]
-θ11, θ12, θ13 = [μθ[1, i] for i in 1:3]
-θ21, θ22, θ23 = [μθ[1, i] for i in 1:3]
-θ31, θ32, θ33 = [μθ[1, i] for i in 1:3]
-θ41, θ42, θ43 = [μθ[1, i] for i in 1:3]
-θ51, θ52, θ53 = [μθ[1, i] for i in 1:3]
-θ61, θ62, θ63 = [μθ[1, i] for i in 1:3]
-
-# params = (
-#     λ,
-#     θ1=[θ11, θ12, θ13],
-#     θ2=[θ21, θ22, θ23],
-#     θ3=[θ31, θ32, θ33],
-#     θ4=[θ41, θ42, θ43],
-#     θ5=[θ51, θ52, θ53],
-#     θ6=[θ61, θ62, θ63],
-# )
-
 preds = Dict()
 
 for i in eachindex(num_species_unknown)
-    preds[str_species_unknown[i]] =
+    preds[Preprocess.str_species_unknown[i]] =
         prediction(
             "presence",
             params,
@@ -205,8 +180,28 @@ for i in eachindex(num_species_unknown)
         )
 end
 
-[println("$k: $(round(sum(preds[k])/84*100, digits=1))") for k in keys(preds)]
+for k in keys(preds)
+    preds[k] = mean.(preds[k])
+end
+
+df = DataFrame([preds...])
+insertcols!(df, 1, :atoll => Preprocess.str_atoll_unknown)
+
+using CSV
+
+CSV.write("../../data/predictpresence.csv", df)
+
+function specieshisto(df, idx)
+    p = histogram(df[:, idx], bins=10)
+    xlims!(0, 1)
+    title!(names(df)[idx])
+    return p
+end
+
+specieshisto(df, 37)
 
 # TODO
-# Use all samples for prediction
-# Plot all atolls color coded known true/false and prediction certainty
+# Add human population? PC or directly?
+# Try TDist
+# Prior predictive simulation - how sensitive is our model to variation in the predictors? Shouldn't be suuuper sensitive
+# LOO - how sensitive is our model to single data points in the known data
