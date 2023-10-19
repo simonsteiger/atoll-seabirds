@@ -146,7 +146,7 @@ num_region_unknown = Int64.(denserank(envs_unknown.region))
 
 num_species = Int64.(denserank(envs_known.species))
 num_species_unknown = df_species_unknown.num_species
-str_species_unknown = df_species_unknown.species
+str_species_unknown = sort(df_species_unknown.species)
 
 presence = Float64.(envs_known.presence)
 

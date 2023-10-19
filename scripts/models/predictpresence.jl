@@ -45,17 +45,21 @@ lu(x) = length(unique(x))
 
 @model function modelpresence(r, s, y; Nr=lu(r), Ns=lu(s), k=maximum(s))
     # Priors for region
-    θ_reg ~ filldist(TDist(3), Nr)
+    # θ_reg ~ filldist(TDist(3), Nr)
 
     # Priors for species
     θ_spe ~ filldist(TDist(3), Ns)
 
     # Priors for region x species
-    τ_rxs ~ Exponential(0.5)
-    θ_rxs ~ filldist(Normal(0, τ_rxs), Nr * Ns)
+    # τ_rxs ~ Exponential(0.5)
+    # θ_rxs ~ filldist(Normal(0, τ_rxs), Nr * Ns)
 
     for i in eachindex(y)
-        p = logistic(θ_reg[r[i]] + θ_spe[s[i]] + θ_rxs[s[i]+(r[i]-1)*k])
+        p = logistic(
+            #θ_reg[r[i]] + 
+            θ_spe[s[i]]# + 
+            #θ_rxs[s[i]+(r[i]-1)*k]
+        )
         y[i] ~ Bernoulli(p)
     end
 end;
@@ -91,13 +95,13 @@ if load
 else
     chain = sample(
         model,
-        HMC(0.025, 10), # tuned to acceptance_rate ≈ 0.65, see https://pythonhosted.org/pyhmc/tuning.html
+        HMC(0.075, 10), # tuned to acceptance_rate ≈ 0.65, see https://pythonhosted.org/pyhmc/tuning.html
         #MCMCThreads(),
-        5_000,         # number of samples
+        2_000,         # number of samples
         #1;              # number of chains
-        discard_initial=2000
+        discard_initial=1000
     )
-    serialize("chains/$savetofile.jls", chain)
+    #serialize("chains/$savetofile.jls", chain)
 end
 
 # Check acceptance rate
