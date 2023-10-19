@@ -17,6 +17,8 @@ predictions <- tbl$tibble(read.csv("data/predictpresence.csv"))
 observed <- tbl$tibble(read.csv("data/atoll_seabird_populations_29Jul.csv")) %>%
   dp$mutate(dp$across(ts$where(is.numeric), \(x) ifelse(is.na(x), 0, 1)))
 
+# need to pivot to long and match by atoll and species, then pivot back to wide
+
 full_presence <- dp$bind_rows(observed, predictions)
 
 out <- dp$left_join(cp$out, full_presence)
