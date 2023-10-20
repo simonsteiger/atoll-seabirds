@@ -19,6 +19,8 @@ observed <- tbl$tibble(read.csv("data/atoll_seabird_populations_29Jul.csv")) %>%
 
 full_presence <- dp$bind_rows(observed, predictions)
 
+# TODO pivot longer -> merge by atoll, species -> pivot wider
+
 out <- dp$left_join(cp$out, full_presence)
 
 write.csv(full_presence, file = "data/full_presence.csv")

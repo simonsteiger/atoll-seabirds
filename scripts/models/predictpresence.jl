@@ -5,7 +5,7 @@
 cd("scripts/models")
 
 # Probabilistic programming
-using Turing, TuringBenchmarking
+using Turing, TuringBenchmarking, LazyArrays
 # Statistics
 using StatsFuns, LinearAlgebra
 # Working with tabular data
@@ -28,7 +28,7 @@ using .DiagnosticPlots
 using .ParamPlots
 
 # Benchmark model?
-benchmark = true
+benchmark = false
 
 # Load a saved chain?
 load = false
@@ -43,30 +43,34 @@ loadfrompath = "chains/predictpresence.jls"
 
 lu(x) = length(unique(x))
 
-@model function modelpresence(r, s, y; Nr=lu(r), Ns=lu(s), k=maximum(s))
-    # Priors for region
-    # θ_reg ~ filldist(TDist(3), Nr)
+@model function modelpresence(r, s, n, X, y; Nr=lu(r), Ns=lu(s), Nn=lu(n), preds=size(X, 2), k=maximum(s))
+    # Prior for region
+    θ_reg ~ filldist(Normal(), Nr)
 
     # Priors for species
-    θ_spe ~ filldist(TDist(3), Ns)
+    θ_spe ~ filldist(Normal(), Ns)
+
+    # Priors for nesting type
+    θ_nes ~ filldist(Normal(), Nn)
+
+    # Priors for PC
+    β ~ filldist(Normal(), preds)
 
     # Priors for region x species
-    # τ_rxs ~ Exponential(0.5)
-    # θ_rxs ~ filldist(Normal(0, τ_rxs), Nr * Ns)
+    τ_rxs ~ Exponential(1)
+    z_rxs ~ filldist(Normal(), Nr * Ns)
+    θ_rxs = τ_rxs .* getindex.((z_rxs,), s.+(r.-1)*k)
 
-    for i in eachindex(y)
-        p = logistic(
-            #θ_reg[r[i]] + 
-            θ_spe[s[i]]# + 
-            #θ_rxs[s[i]+(r[i]-1)*k]
-        )
-        y[i] ~ Bernoulli(p)
-    end
+    # Likelihood
+    v = logistic.(θ_spe[s] .+ θ_spe[s] .+ θ_rxs[s.+(r.-1)*k] .+ θ_nes[n] .+ β' .* X)
+    y .~ Bernoulli.(v)
 end;
 
 model = modelpresence(
     num_region,
     num_species,
+    num_nesting,
+    PC,
     presence
 );
 
@@ -95,10 +99,10 @@ if load
 else
     chain = sample(
         model,
-        HMC(0.075, 10), # tuned to acceptance_rate ≈ 0.65, see https://pythonhosted.org/pyhmc/tuning.html
+        NUTS(1000, 0.65; max_depth=5), # tuned to acceptance_rate ≈ 0.65, see https://pythonhosted.org/pyhmc/tuning.html
         #MCMCThreads(),
-        2_000,         # number of samples
-        #1;              # number of chains
+        1000,         # number of samples
+        #3;              # number of chains
         discard_initial=1000
     )
     #serialize("chains/$savetofile.jls", chain)
