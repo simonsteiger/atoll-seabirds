@@ -42,28 +42,44 @@ loadfrompath = "chains/predictpresence.jls"
 ### MODEL SPECIFICATION ###
 
 lu(x) = length(unique(x))
+idx(i, j) = i .+ (j .- 1) * maximum(i)
 
-@model function modelpresence(r, s, n, X, y; Nr=lu(r), Ns=lu(s), Nn=lu(n), preds=size(X, 2), k=maximum(s))
-    # Prior for region
-    θ_reg ~ filldist(Normal(), Nr)
+@model function modelpresence(r, s, n, PC, y;       # Main inputs
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2),  # Number of groups
+    idx_sr=idx(s, r), idx_PC=[1:NPC;])              # Vectors for indexing
 
-    # Priors for species
-    θ_spe ~ filldist(Normal(), Ns)
+    # Priors for species × region
+    μ_sxr ~ TDist(2)
+    τ_sxr ~ Exponential(1)
+    z_sxr ~ filldist(TDist(2), Ns * Nr)
+    α_sxr = μ_sxr .+ τ_sxr .* getindex.((z_sxr,), idx_sr)
 
-    # Priors for nesting type
-    θ_nes ~ filldist(Normal(), Nn)
+    # Priors for burrow nesters × PCs
+    μ_pxb ~ TDist(2)
+    τ_pxb ~ Exponential(1)
+    z_pxb ~ filldist(TDist(2), NPC)
+    β_pxb = μ_pxb .+ τ_pxb .* getindex.((z_pxb,), idx_PC)
 
-    # Priors for PC
-    β ~ filldist(Normal(), preds)
+    # Priors for ground nesters × PCs
+    μ_pxg ~ TDist(2)
+    τ_pxg ~ Exponential(1)
+    z_pxg ~ filldist(TDist(2), NPC)
+    β_pxg = μ_pxg .+ τ_pxg .* getindex.((z_pxg,), idx_PC)
 
-    # Priors for region x species
-    τ_rxs ~ Exponential(1)
-    z_rxs ~ filldist(Normal(), Nr * Ns)
-    θ_rxs = τ_rxs .* getindex.((z_rxs,), s.+(r.-1)*k)
+    # Priors for tree nesters × PCs
+    μ_pxv ~ TDist(2)
+    τ_pxv ~ Exponential(1)
+    z_pxv ~ filldist(TDist(2), NPC)
+    β_pxv = μ_pxv .+ τ_pxv .* getindex.((z_pxv,), idx_PC)
+
+    # Convert to matrix for vectorization
+    β_pxn = reshape([β_pxb; β_pxg; β_pxv], (NPC, Nn))
 
     # Likelihood
-    v = logistic.(θ_spe[s] .+ θ_spe[s] .+ θ_rxs[s.+(r.-1)*k] .+ θ_nes[n] .+ β' .* X)
-    y .~ Bernoulli.(v)
+    v = α_sxr[idx_sr] .+ β_pxn[:, n]' .* PC
+    y .~ BernoulliLogit.(v)
+
+    return (α_sxr=α_sxr, β_pxn=β_pxn)
 end;
 
 model = modelpresence(
@@ -79,7 +95,11 @@ model = modelpresence(
 # Benchmark different backends to find out which is fastest
 if benchmark
     adbackends = [:forwarddiff, :reversediff, :reversediff_compiled]
-    benchmark_model(model; check=true, adbackends=adbackends)
+    benchmark_model(
+        model;
+        check=true, # Assert that model is correctly specified
+        adbackends=adbackends
+    )
 end
 
 # ------- BENCHMARK RESULTS ------- #
@@ -95,14 +115,15 @@ Turing.setrdcache(true)
 
 # Sample from model
 if load
-    chain = deserialize(loadfrompath);
+    chain = deserialize(loadfrompath)
 else
+    sampler = NUTS(1000, 0.65; max_depth=4)
     chain = sample(
         model,
-        NUTS(1000, 0.65; max_depth=5), # tuned to acceptance_rate ≈ 0.65, see https://pythonhosted.org/pyhmc/tuning.html
-        #MCMCThreads(),
-        1000,         # number of samples
-        #3;              # number of chains
+        sampler,
+        MCMCThreads(),
+        3000,
+        3;
         discard_initial=1000
     )
     #serialize("chains/$savetofile.jls", chain)
