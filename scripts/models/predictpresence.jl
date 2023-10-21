@@ -49,27 +49,27 @@ idx(i, j) = i .+ (j .- 1) * maximum(i)
     idx_sr=idx(s, r), idx_PC=[1:NPC;])              # Vectors for indexing
 
     # Priors for species × region
-    μ_sxr ~ TDist(2)
-    τ_sxr ~ Exponential(1)
-    z_sxr ~ filldist(TDist(2), Ns * Nr)
+    μ_sxr ~ Normal()
+    τ_sxr ~ Exponential(2)
+    z_sxr ~ filldist(Normal(), Ns * Nr)
     α_sxr = μ_sxr .+ τ_sxr .* getindex.((z_sxr,), idx_sr)
 
     # Priors for burrow nesters × PCs
-    μ_pxb ~ TDist(2)
-    τ_pxb ~ Exponential(1)
-    z_pxb ~ filldist(TDist(2), NPC)
+    μ_pxb ~ Normal()
+    τ_pxb ~ Exponential(2)
+    z_pxb ~ filldist(Normal(), NPC)
     β_pxb = μ_pxb .+ τ_pxb .* getindex.((z_pxb,), idx_PC)
 
     # Priors for ground nesters × PCs
-    μ_pxg ~ TDist(2)
-    τ_pxg ~ Exponential(1)
-    z_pxg ~ filldist(TDist(2), NPC)
+    μ_pxg ~ Normal()
+    τ_pxg ~ Exponential(2)
+    z_pxg ~ filldist(Normal(), NPC)
     β_pxg = μ_pxg .+ τ_pxg .* getindex.((z_pxg,), idx_PC)
 
     # Priors for tree nesters × PCs
-    μ_pxv ~ TDist(2)
-    τ_pxv ~ Exponential(1)
-    z_pxv ~ filldist(TDist(2), NPC)
+    μ_pxv ~ Normal()
+    τ_pxv ~ Exponential(2)
+    z_pxv ~ filldist(Normal(), NPC)
     β_pxv = μ_pxv .+ τ_pxv .* getindex.((z_pxv,), idx_PC)
 
     # Convert to matrix for vectorization
