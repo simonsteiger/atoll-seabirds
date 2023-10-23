@@ -31,13 +31,13 @@ using .ParamPlots
 benchmark = false
 
 # Load a saved chain?
-load = false
+load = true
 
 # If not loading a chain, save results to path below
-savetofile = "predictpresence_T"
+savetofile = "predictpresence_new"
 
 # If loading a chain, which file should be loaded?
-loadfrompath = "chains/predictpresence.jls"
+loadfrompath = "chains/predictpresence_new.jls"
 
 ### MODEL SPECIFICATION ###
 
@@ -121,12 +121,12 @@ else
     chain = sample(
         model,
         sampler,
-        MCMCThreads(),
+        #MCMCThreads(),
         3000,
-        3;
+        #3;
         discard_initial=1000
     )
-    #serialize("chains/$savetofile.jls", chain)
+    serialize("chains/$savetofile.jls", chain)
 end
 
 # Check acceptance rate
