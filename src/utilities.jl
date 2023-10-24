@@ -1,7 +1,8 @@
 module CustomUtilityFuns
 
 export showall,
-       extractparams
+       extractparams,
+       pct
 
 using Turing, DataFrames
 
@@ -34,6 +35,9 @@ function extractparams(chain, params::AbstractArray{String})
     return namedvalues
 end
 
-lu(x) = length(unique(x))
+# Helper to print info message about divergent transitions
+function pct(vec, val)
+    round(sum(vec .== val) / length(vec) * 100, digits=2)
+end
 
 end

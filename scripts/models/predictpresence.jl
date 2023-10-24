@@ -10,6 +10,8 @@ using Turing, TuringBenchmarking, LazyArrays
 using StatsFuns, LinearAlgebra
 # Working with tabular data
 using Chain, DataFrames
+# Plotting
+using StatsPlots
 # Saving results
 using Serialization, CSV
 
@@ -31,7 +33,7 @@ using .ParamPlots
 benchmark = false
 
 # Load a saved chain?
-load = true
+load = false
 
 # If not loading a chain, save results to path below
 savetofile = "predictpresence_new"
@@ -117,13 +119,13 @@ Turing.setrdcache(true)
 if load
     chain = deserialize(loadfrompath)
 else
-    sampler = NUTS(1000, 0.65; max_depth=4)
+    sampler = NUTS(1000, 0.65; max_depth=6)
     chain = sample(
         model,
         sampler,
-        #MCMCThreads(),
-        3000,
-        #3;
+        MCMCThreads(),
+        2_000,
+        3;
         discard_initial=1000
     )
     serialize("chains/$savetofile.jls", chain)

@@ -1,8 +1,11 @@
 module DiagnosticPlots
 
+include("../../src/utilities.jl")
+
 export plot_diagnostic
 
 using DataFrames, Turing, StatsPlots
+using .CustomUtilityFuns
 
 function plot_rhat(c::Chains; alpha=1)
     df = DataFrame(describe(c)[1])
@@ -36,6 +39,7 @@ function plot_diagnostic(c::Chains, var::String; alpha=1)
     plot!(seq[begin:end-1], μ .+ σ, fillrange=μ .- σ, fillalpha=0.2, alpha=0, c=1, label="Rolling σ")
     # Add a horizontal line at 0.65 if acceptance_rate is plotted
     var == "acceptance_rate" && hline!([0.65], c=:red, lw=1.5, ls=:dash, label=:none)
+    var == "numerical_error" && @info "$(pct(diagnostics, 1))% of samples ended in divergent transitions."
     # Label axes
     xlabel!("Iteration")
     ylabel!(titlecase(replace(var, "_" => " ")))
