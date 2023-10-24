@@ -4,6 +4,7 @@ box::use(
   ts = tidyselect,
   tbl = tibble,
   magrittr[`%>%`],
+  tdr = tidyr,
 )
 
 box::use(
@@ -17,13 +18,12 @@ predictions <- tbl$tibble(read.csv("data/predictpresence.csv"))
 observed <- tbl$tibble(read.csv("data/atoll_seabird_populations_29Jul.csv")) %>%
   dp$mutate(dp$across(ts$where(is.numeric), \(x) ifelse(is.na(x), 0, 1)))
 
-# need to pivot to long and match by atoll and species, then pivot back to wide
+obs_long <- tdr$pivot_longer(observed, !atoll, names_to = "species", values_to = "presence")
+pred_long <- tdr$pivot_longer(predictions, !atoll, names_to = "species", values_to = "presence")
+full_long <- dp$bind_rows(obs_long, pred_long)
+full_wide <- tdr$pivot_wider(full_long, names_from = "species", values_from = "presence")
 
-full_presence <- dp$bind_rows(observed, predictions)
-
-out <- dp$left_join(cp$out, full_presence)
-
-write.csv(full_presence, file = "data/full_presence.csv")
+write.csv(full_wide, file = "data/full_presence.csv")
 
 write.csv(cp$cp_data, file = "data/cp_data.csv")
 

@@ -189,7 +189,7 @@ insertcols!(df, 1, :atoll => Preprocess.str_atoll_unknown)
 
 using CSV
 
-CSV.write("../../data/predictpresence.csv", df)
+# CSV.write("../../data/predictpresence.csv", df)
 
 function specieshisto(df, idx)
     p = histogram(df[:, idx], bins=10)
