@@ -2,7 +2,8 @@ module CustomUtilityFuns
 
 export showall,
        extractparams,
-       pct
+       pct,
+       safelogistic
 
 using Turing, DataFrames
 
@@ -39,5 +40,11 @@ end
 function pct(vec, val)
     round(sum(vec .== val) / length(vec) * 100, digits=2)
 end
+
+# Not sure how to use this wrapper yet
+lazyarray(f, x) = LazyArray(Base.broadcasted(f, x))
+
+# This version of logistic should not underflow
+safelogistic(x::T) where {T} = logistic(x) * (1 - 2 * eps(T)) + eps(T)
 
 end
