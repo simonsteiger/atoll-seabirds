@@ -1,1 +1,0 @@
-# Inference model to understand relevance of ecological parameters for seabird presence
