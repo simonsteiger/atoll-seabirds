@@ -1,11 +1,7 @@
-# Full model to predict species presence
-
 const PATH = "scripts/models/"
 
 # Paths relative to this folder
 cd(PATH)
-
-### PACKAGES AND MODULES ###
 
 # Probabilistic programming
 using Turing, TuringBenchmarking, LazyArrays, Random
@@ -25,32 +21,32 @@ include("../../src/utilities.jl")
 include("../visualization/diagnosticplots.jl")
 include("../visualization/paramplots.jl")
 
-# Add custom modules
+# Make custom modules available
 using .Preprocess
 using .Postprocess
 using .CustomUtilityFuns
 using .DiagnosticPlots
 using .ParamPlots
 
-### SETTINGS ###
-
+# Set seed
 Random.seed!(42)
 
 # Benchmark model?
-benchmark = true
+benchmark = false
+
+# Load saved chains?
+load = false
 
 # Save the result?
 save = true
-!save && @info "The samples will NOT be saved automatically."
+!save && @warn "Samples will NOT be saved automatically."
 
 # If not loading a chain, save results to path below
 chainpath = "predictpresence_new2.jls"
-modelpath = "newmodel.jls"
 
 ### MODEL SPECIFICATION ###
 
 lu(x) = length(unique(x))
-idx(i, j) = i .+ (j .- 1) * maximum(i)
 
 @model function modelpresence(r, s, n, PC, y;       # Main inputs
     Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2),  # Number of groups
@@ -69,11 +65,14 @@ idx(i, j) = i .+ (j .- 1) * maximum(i)
     β_pxn = μ_pxn .+ τ_pxn .* z_pxn
 
     # Likelihood
-    y ~ arraydist(LazyArray(@~ BernoulliLogit.(α_sxr[idx_sr] + β_pxn[n, :] * PC)))
+    v = α_sxr[idx_sr] + sum(β_pxn[n, :] .* PC, dims=2)
+    y .~ BernoulliLogit.(v)
 
+    # Generated quantities
     return (α_sxr=α_sxr, β_pxn=β_pxn)
 end;
 
+# Create model
 model = modelpresence(
     num_region,
     num_species,
@@ -82,45 +81,52 @@ model = modelpresence(
     presence
 );
 
-### BENCHMARK ###
-
 # Benchmark different backends to find out which is fastest
 let adbackends = [:forwarddiff, :reversediff, :reversediff_compiled]
     benchmark && benchmark_model(model; check=true, adbackends=adbackends)
 end
 
-### SAMPLING CONFIGURATION ###
+# Sample from model unless a saved chain should be used
+if load
+    chain = deserialize("chains/$chainpath")
+else
+    # Set AD backend to :reversediff and compile with setrdcache(true)
+    Turing.setadbackend(:reversediff)
+    Turing.setrdcache(true)
 
-# Set AD backend to :reversediff and compile with setrdcache(true)
-Turing.setadbackend(:reversediff)
-Turing.setrdcache(true)
+    # Configure sampling
+    sampler = NUTS(1000, 0.99; max_depth=10) # Sampler picks depth=9, restrict for speedup?
+    nsamples = 2000
+    nthreads = 3
+    ndiscard = 1000
 
-sampler = NUTS(1000, 0.99; max_depth=10)
-nsamples = 2000
-nthreads = 3
-ndiscard = 1000
-
-@info """\nSampler: $(string(sampler))
-Samples: $(nsamples)
-Threads: $(nthreads)
-Discard: $(ndiscard)
-"""
-
-### SAMPLE ###
-
-@info "🚀 Starting sampling: $(Dates.now())"
-chain = sample(model, sampler, MCMCThreads(), nsamples, nthreads; discard_initial=ndiscard);
-@info "🏁 Finished sampling: $(Dates.now())"
-
-if save
-    serialize("chains/$chainpath", chain)
-    serialize("chains/$modelpath", model)
-end
-
-if isfile("chains/$chainpath") && isfile("chains/$modelpath")
-    @info """
-    \n💾 Save successful!
-    Chain saved to '$PATH$chainpath'.
-    Model saved to '$PATH$modelpath'.
+    @info """Sampler: $(string(sampler))
+    Samples: $(nsamples)
+    Threads: $(nthreads)
+    Discard: $(ndiscard)
     """
+
+    @info "🚀 Starting sampling: $(Dates.now())"
+    chain = sample(model, sampler, MCMCThreads(), nsamples, nthreads; discard_initial=ndiscard)
+
+    save && serialize("chains/$chainpath", chain)
+    isfile("chains/$chainpath") && @info "💾 Chain saved to '$(PATH)chains/$chainpath'."
 end
+
+load && chain = deserialize("chains/$chainpath")
+
+θ = generated_quantities(model, chain)
+
+function predictpresence(α, β, n, s, r, X; idx_sr=idx(s, r))
+    [rand.(BernoulliLogit.(α[i][idx_sr] .+ β[i][n, :] .* X)) for i in eachindex(α)]
+end
+
+α = [θ[i].α_sxr for i in eachindex(θ[:, 1])]
+β = [θ[i].β_pxn for i in eachindex(θ[:, 1])]
+
+nnu_long = [fill(num_nesting_unknown, length(num_region_unknown))...;]
+nru_long = [fill(num_region_unknown, length(num_nesting_unknown))...;]
+nsu_long = [fill(num_species_unknown, length(num_region_unknown))...;]
+PCu_long = [fill(PC_unknown, length(num_nesting_unknown))...;]
+
+preds = predictpresence(α, β, nnu_long, nsu_long, nru_long, PCu_long);
