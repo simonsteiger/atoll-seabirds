@@ -12,7 +12,7 @@ box::use(
   ji = R/clean_jisao,
 )
 
-predictions <- tbl$tibble(read.csv("data/predictpresence.csv"))
+predictions <- tbl$tibble(read.csv("data/newpreds.csv"))
 
 observed <- tbl$tibble(read.csv("data/atoll_seabird_populations_29Jul.csv")) %>%
   dp$mutate(dp$across(ts$where(is.numeric), \(x) ifelse(is.na(x), 0, 1)))

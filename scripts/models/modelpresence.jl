@@ -42,15 +42,15 @@ save = true
 !save && @warn "Samples will NOT be saved automatically."
 
 # If not loading a chain, save results to path below
-chainpath = "predictpresence_new2.jls"
+chainpath = "predictpresence_s_in_n.jls"
 
 ### MODEL SPECIFICATION ###
 
 lu(x) = length(unique(x))
 
-@model function modelpresence(r, s, n, PC, y;       # Main inputs
-    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2),  # Number of groups
-    idx_sr=idx(s, r))                               # Vector for indexing
+@model function modelpresence(r, s, n, s_in_n, Nv, Ng, Nb, PC, y;       # Main inputs
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r))    # Number of groups and indices
+                                               
 
     # Priors for species × region
     μ_sxr ~ Normal()
@@ -59,13 +59,16 @@ lu(x) = length(unique(x))
     α_sxr = μ_sxr .+ τ_sxr .* z_sxr
 
     # Priors for nesting types × PCs
-    μ_pxn ~ Normal()
-    τ_pxn ~ Exponential(1)
-    z_pxn ~ filldist(Normal(), Nn, NPC)
-    β_pxn = μ_pxn .+ τ_pxn .* z_pxn
+    μ_pxn ~ filldist(Normal(), Nn)
+    τ_pxn ~ filldist(Exponential(1), Nn)
+    z_pxb ~ filldist(Normal(), Nb, NPC)
+    z_pxg ~ filldist(Normal(), Ng, NPC)
+    z_pxv ~ filldist(Normal(), Nv, NPC)
+    z_pxn = reduce(vcat, [z_pxb, z_pxg, z_pxv])
+    β_pxn = getindex.((μ_pxn,), n) .+ getindex.((τ_pxn,), n) .* getindex.((z_pxn,), s_in_n)
 
     # Likelihood
-    v = α_sxr[idx_sr] + sum(β_pxn[n, :] .* PC, dims=2)
+    v = α_sxr[idx_sr] + sum(β_pxn[s_in_n, :] .* PC, dims=2)
     y .~ BernoulliLogit.(v)
 
     # Generated quantities
@@ -77,6 +80,8 @@ model = modelpresence(
     num_region,
     num_species,
     num_nesting,
+    idx_nesting_species,
+    count_species_by_nesting...,
     PC,
     presence
 );
@@ -113,20 +118,40 @@ else
     isfile("chains/$chainpath") && @info "💾 Chain saved to '$(PATH)chains/$chainpath'."
 end
 
-load && chain = deserialize("chains/$chainpath")
+if load chain = deserialize("chains/$chainpath") end;
 
 θ = generated_quantities(model, chain)
 
 function predictpresence(α, β, n, s, r, X; idx_sr=idx(s, r))
-    [rand.(BernoulliLogit.(α[i][idx_sr] .+ β[i][n, :] .* X)) for i in eachindex(α)]
+    [rand.(BernoulliLogit.(α[i][idx_sr] .+ sum(β[i][n, :] .* X, dims=2))) for i in eachindex(α)]
 end
 
 α = [θ[i].α_sxr for i in eachindex(θ[:, 1])]
 β = [θ[i].β_pxn for i in eachindex(θ[:, 1])]
 
 nnu_long = [fill(num_nesting_unknown, length(num_region_unknown))...;]
-nru_long = [fill(num_region_unknown, length(num_nesting_unknown))...;]
+nru_long = [fill.(num_region_unknown, length(num_nesting_unknown))...;]
 nsu_long = [fill(num_species_unknown, length(num_region_unknown))...;]
-PCu_long = [fill(PC_unknown, length(num_nesting_unknown))...;]
+PCu_long = reduce(vcat, [permutedims(hcat(fill(s, length(num_nesting_unknown))...)) for s in eachslice(PC_unknown, dims=1)])
 
-preds = predictpresence(α, β, nnu_long, nsu_long, nru_long, PCu_long);
+preds = Matrix{Float64}(reduce(hcat, vec(predictpresence(α, β, nnu_long, nsu_long, nru_long, PCu_long));))
+
+pct_preds = vec(mean(preds, dims=2))
+
+ssu_long = [fill(Preprocess.str_species_unknown, length(num_region_unknown))...;]
+
+sau_long = [fill.(Preprocess.str_atoll_unknown, length(num_nesting_unknown))...;]
+
+df_preds = @chain begin
+    DataFrame([sau_long, ssu_long, pct_preds], [:atoll, :species, :percent])
+    unstack(_, :species, :percent)
+end
+
+CSV.write("../../data/newpreds.csv", df_preds)
+
+# Find out what pushes some species onto the maledives 
+# Not regional parameters
+# Model parameters for these nesting types also not crazy
+# So there are some outliers in the observed PC matrix? 
+# PC histograms?
+# Compare the observed and predicted data - are they very different?
