@@ -32,7 +32,7 @@ using .ParamPlots
 Random.seed!(42)
 
 # Benchmark model?
-benchmark = false
+benchmark = true
 
 # Load saved chains?
 load = false
@@ -48,9 +48,11 @@ chainpath = "predictpresence_s_in_n.jls"
 
 lu(x) = length(unique(x))
 
-@model function modelpresence(r, s, n, s_in_n, Nv, Ng, Nb, PC, y;       # Main inputs
-    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r))    # Number of groups and indices
-                                               
+@model function modelpresence(
+    r, s, n, PC, y,
+    idx_sn, u_n, u_sn, Nv, Ng, Nb;
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
+)
 
     # Priors for species × region
     μ_sxr ~ Normal()
@@ -65,10 +67,10 @@ lu(x) = length(unique(x))
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
     z_pxn = reduce(vcat, [z_pxb, z_pxg, z_pxv])
-    β_pxn = getindex.((μ_pxn,), n) .+ getindex.((τ_pxn,), n) .* getindex.((z_pxn,), s_in_n)
+    β_pxn = getindex.((μ_pxn,), u_n) .+ getindex.((τ_pxn,), u_n) .* getindex.((z_pxn,), u_sn)
 
     # Likelihood
-    v = α_sxr[idx_sr] + sum(β_pxn[s_in_n, :] .* PC, dims=2)
+    v = α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2)
     y .~ BernoulliLogit.(v)
 
     # Generated quantities
@@ -80,10 +82,12 @@ model = modelpresence(
     num_region,
     num_species,
     num_nesting,
-    idx_nesting_species,
-    count_species_by_nesting...,
     PC,
-    presence
+    presence,
+    num_species_within_nesting,
+    unique_nesting,
+    unique_species_within_nesting,
+    count_species_by_nesting...,
 );
 
 # Benchmark different backends to find out which is fastest
@@ -118,7 +122,9 @@ else
     isfile("chains/$chainpath") && @info "💾 Chain saved to '$(PATH)chains/$chainpath'."
 end
 
-if load chain = deserialize("chains/$chainpath") end;
+if load
+    chain = deserialize("chains/$chainpath")
+end;
 
 θ = generated_quantities(model, chain)
 
