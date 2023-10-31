@@ -21,7 +21,8 @@ export train,
        num_region,
        num_region_unknown,
        unique_nesting,
-       unique_species_within_nesting
+       unique_species_within_nesting,
+       num_species_within_nesting_unknown
 
 # Working with tabular data
 using CSV, DataFrames, Chain
@@ -180,8 +181,6 @@ num_species_within_nesting = @chain envs_known begin
     denserank(_)
 end
 
-idx_species_region = @chain envs_known begin
-    
-end
+num_species_within_nesting_unknown = df_species_unknown.within_nesting
 
 end

@@ -32,10 +32,10 @@ using .ParamPlots
 Random.seed!(42)
 
 # Benchmark model?
-benchmark = true
+benchmark = false
 
 # Load saved chains?
-load = false
+load = true
 
 # Save the result?
 save = true
@@ -128,14 +128,14 @@ end;
 
 θ = generated_quantities(model, chain)
 
-function predictpresence(α, β, n, s, r, X; idx_sr=idx(s, r))
-    [rand.(BernoulliLogit.(α[i][idx_sr] .+ sum(β[i][n, :] .* X, dims=2))) for i in eachindex(α)]
+function predictpresence(α, β, idx_sn, s, r, X; idx_sr=idx(s, r))
+    [rand.(BernoulliLogit.(α[i][idx_sr] .+ sum(β[i][idx_sn, :] .* X, dims=2))) for i in eachindex(α)]
 end
 
 α = [θ[i].α_sxr for i in eachindex(θ[:, 1])]
 β = [θ[i].β_pxn for i in eachindex(θ[:, 1])]
 
-nnu_long = [fill(num_nesting_unknown, length(num_region_unknown))...;]
+nnu_long = [fill(num_species_within_nesting_unknown, length(num_region_unknown))...;]
 nru_long = [fill.(num_region_unknown, length(num_nesting_unknown))...;]
 nsu_long = [fill(num_species_unknown, length(num_region_unknown))...;]
 PCu_long = reduce(vcat, [permutedims(hcat(fill(s, length(num_nesting_unknown))...)) for s in eachslice(PC_unknown, dims=1)])
