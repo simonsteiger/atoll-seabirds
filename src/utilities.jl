@@ -4,7 +4,8 @@ export showall,
        extractparams,
        pct,
        safelogistic,
-       idx
+       idx,
+       sdim
 
 using Turing, DataFrames
 
@@ -47,5 +48,8 @@ idx(i, j) = i .+ (j .- 1) * maximum(i)
 
 # This version of logistic should not underflow
 safelogistic(x::T) where {T} = logistic(x) * (1 - 2 * eps(T)) + eps(T)
+
+# Slice a dimension?
+sdim(n) = (a) -> map(d -> d[n], a)
 
 end

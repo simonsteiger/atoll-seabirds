@@ -67,7 +67,7 @@ lu(x) = length(unique(x))
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
     z_pxn = reduce(vcat, [z_pxb, z_pxg, z_pxv])
-    β_pxn = getindex.((μ_pxn,), u_n) .+ getindex.((τ_pxn,), u_n) .* getindex.((z_pxn,), u_sn)
+    β_pxn = μ_pxn[u_n] .+ τ_pxn[u_n] .* z_pxn[u_sn, :]
 
     # Likelihood
     v = α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2)
@@ -104,7 +104,7 @@ else
     Turing.setrdcache(true)
 
     # Configure sampling
-    sampler = NUTS(1000, 0.99; max_depth=10) # Sampler picks depth=9, restrict for speedup?
+    sampler = NUTS(1000, 0.95; max_depth=10) # Sampler picks depth=9, restrict for speedup?
     nsamples = 2000
     nthreads = 3
     ndiscard = 1000
@@ -121,10 +121,6 @@ else
     save && serialize("chains/$chainpath", chain)
     isfile("chains/$chainpath") && @info "💾 Chain saved to '$(PATH)chains/$chainpath'."
 end
-
-if load
-    chain = deserialize("chains/$chainpath")
-end;
 
 θ = generated_quantities(model, chain)
 
