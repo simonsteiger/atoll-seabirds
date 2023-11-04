@@ -1,7 +1,11 @@
 module CustomUtilityFuns
 
 export showall,
-       extractparams
+       extractparams,
+       pct,
+       safelogistic,
+       idx,
+       sdim
 
 using Turing, DataFrames
 
@@ -34,6 +38,18 @@ function extractparams(chain, params::AbstractArray{String})
     return namedvalues
 end
 
-lu(x) = length(unique(x))
+# Helper to print info message about divergent transitions
+function pct(vec, val)
+    round(sum(vec .== val) / length(vec) * 100, digits=2)
+end
+
+# Convert matrix indexing to vector indexing
+idx(i, j) = i .+ (j .- 1) * maximum(i)
+
+# This version of logistic should not underflow
+safelogistic(x::T) where {T} = logistic(x) * (1 - 2 * eps(T)) + eps(T)
+
+# Slice a dimension?
+sdim(n) = (a) -> map(d -> d[n], a)
 
 end
