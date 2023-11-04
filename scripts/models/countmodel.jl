@@ -15,14 +15,14 @@ using StatsPlots
 using Serialization, CSV, Dates, Markdown
 
 # Load custom modules
-include("../preprocessing/preprocess.jl")
+include("../preprocessing/countvars.jl")
 include("../../src/postprocess.jl")
 include("../../src/utilities.jl")
 include("../visualization/diagnosticplots.jl")
 include("../visualization/paramplots.jl")
 
 # Make custom modules available
-using .Preprocess
+using .CountVariables
 using .Postprocess
 using .CustomUtilityFuns
 using .DiagnosticPlots
@@ -35,14 +35,14 @@ Random.seed!(42)
 benchmark = false
 
 # Load saved chains?
-load = true
+load = false
 
 # Save the result?
 save = true
 !save && @warn "Samples will NOT be saved automatically."
 
 # If not loading a chain, save results to path below
-chainpath = "predictpresence_s_in_n.jls"
+chainpath = "predictcount.jls"
 
 ### MODEL SPECIFICATION ###
 
@@ -61,17 +61,19 @@ lu(x) = length(unique(x))
     α_sxr = μ_sxr .+ τ_sxr .* z_sxr
 
     # Priors for nesting types × PCs
-    μ_pxn ~ filldist(Normal(), Nn)
-    τ_pxn ~ filldist(Exponential(1), Nn)
+    μ_pxn ~ filldist(Normal(), Nn, NPC)
+    τ_pxn ~ filldist(Exponential(1), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
     z_pxn = reduce(vcat, [z_pxb, z_pxg, z_pxv])
-    β_pxn = μ_pxn[u_n] .+ τ_pxn[u_n] .* z_pxn[u_sn, :]
+    β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
+
+    σ ~ Exponential(1)
 
     # Likelihood
-    v = α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2)
-    y .~ BernoulliLogit.(v)
+    μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
+    y ~ MvNormal(μ, σ^2 * I)
 
     # Generated quantities
     return (α_sxr=α_sxr, β_pxn=β_pxn)
@@ -83,7 +85,7 @@ model = modelpresence(
     num_species,
     num_nesting,
     PC,
-    presence,
+    log.(nbirds),
     num_species_within_nesting,
     unique_nesting,
     unique_species_within_nesting,
@@ -104,7 +106,7 @@ else
     Turing.setrdcache(true)
 
     # Configure sampling
-    sampler = NUTS(1000, 0.95; max_depth=10) # Sampler picks depth=9, restrict for speedup?
+    sampler = NUTS(1000, 0.95; max_depth=10)
     nsamples = 2000
     nthreads = 3
     ndiscard = 1000
