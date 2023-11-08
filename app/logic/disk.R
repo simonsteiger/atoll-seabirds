@@ -11,7 +11,7 @@ out_ji <- ut$read.csv("data/out_ji.csv")
 cp_data <- ut$read.csv("data/cp_data.csv")
 
 #' @export
-out <- ut$read.csv("data/full_presence.csv")
+out <- ut$read.csv("data/out.csv")
 
 #' @export
 ji_data <- ut$read.csv("data/ji_data.csv")

@@ -42,7 +42,7 @@ save = true
 !save && @warn "Samples will NOT be saved automatically."
 
 # If not loading a chain, save results to path below
-chainpath = "predictpresence_long.jls"
+chainpath = "chain_newpca.jls"
 
 ### MODEL SPECIFICATION ###
 
@@ -66,7 +66,7 @@ lu(x) = length(unique(x))
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
-    z_pxn = reduce(vcat, [z_pxb, z_pxg, z_pxv])
+    z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
     β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
 
     # Likelihood
@@ -105,9 +105,9 @@ else
 
     # Configure sampling
     sampler = NUTS(1000, 0.95; max_depth=10)
-    nsamples = 10_000
+    nsamples = 2_000
     nthreads = 3
-    ndiscard = 2500
+    ndiscard = 1000
 
     @info """Sampler: $(string(sampler))
     Samples: $(nsamples)
@@ -140,9 +140,9 @@ preds = Matrix{Float64}(reduce(hcat, vec(predictpresence(α, β, nnu_long, nsu_l
 
 pct_preds = vec(mean(preds, dims=2))
 
-ssu_long = [fill(Preprocess.str_species_unknown, length(num_region_unknown))...;]
+ssu_long = [fill(PresenceVariables.str_species_unknown, length(num_region_unknown))...;]
 
-sau_long = [fill.(Preprocess.str_atoll_unknown, length(num_nesting_unknown))...;]
+sau_long = [fill.(PresenceVariables.str_atoll_unknown, length(num_nesting_unknown))...;]
 
 df_preds = @chain begin
     DataFrame([sau_long, ssu_long, pct_preds], [:atoll, :species, :percent])
@@ -150,10 +150,3 @@ df_preds = @chain begin
 end
 
 CSV.write("../../data/newpreds.csv", df_preds)
-
-# Find out what pushes some species onto the maledives 
-# Not regional parameters
-# Model parameters for these nesting types also not crazy
-# So there are some outliers in the observed PC matrix? 
-# PC histograms?
-# Compare the observed and predicted data - are they very different?

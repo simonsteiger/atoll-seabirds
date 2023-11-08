@@ -12,7 +12,18 @@ envs = CSV.read("../../data/envs_jicp.csv", DataFrame, missingstring="NA")
 
 DataFrames.transform!(envs, :human_population => ByRow(x -> ifelse(ismissing(x), round(median(skipmissing(envs.human_population)), digits=0), x)) => identity)
 
-DataFrames.transform!(envs, Cols(r"human|distance|islets") .=> ByRow(x -> log1p(x)) => identity)
+
+# number of islets      => log
+# land area             => log
+# lagoon area           => log1p
+# tropical storms 50k   => log1p
+# hurricanes 50k        => log1p
+# dist nearest atol     => log
+# dist nearest high i   => log
+# human population      => log1p
+
+DataFrames.transform!(envs, [:number_islets, :land_area_sqkm, :distance_nearest_atoll_km, :distance_nearest_high_island_km] .=> ByRow(x -> log(x)) => identity)
+DataFrames.transform!(envs, [:lagoon_area_sqkm, :tropical_storms_50km, :hurricanes_50km, :human_population] .=> ByRow(x -> log1p(x)) => identity)
 
 seabirds = @chain CSV.read("../../data/atoll_seabird_populations_29Jul.csv", DataFrame) begin
     stack(_, Not(:atoll), variable_name=:species, value_name=:presence)
@@ -35,7 +46,7 @@ envscores = @chain predict(M, X_features)' begin
     outerjoin(_, seabirds, on=:atoll)
 end
 
-# CSV.write("data/jl_envscores.csv", envscores)
+CSV.write("../../data/jl_envscores.csv", envscores)
 
 # Make a heatmap from PCA projections
 proj = MS.projection(M)

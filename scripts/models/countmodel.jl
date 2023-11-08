@@ -32,7 +32,7 @@ using .ParamPlots
 Random.seed!(42)
 
 # Benchmark model?
-benchmark = false
+benchmark = true
 
 # Load saved chains?
 load = false
@@ -48,7 +48,7 @@ chainpath = "predictcount.jls"
 
 lu(x) = length(unique(x))
 
-@model function modelpresence(
+@model function modelcount(
     r, s, n, PC, y,
     idx_sn, u_n, u_sn, Nv, Ng, Nb;
     Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
@@ -80,7 +80,7 @@ lu(x) = length(unique(x))
 end;
 
 # Create model
-model = modelpresence(
+model = modelcount(
     num_region,
     num_species,
     num_nesting,
@@ -126,7 +126,7 @@ end
 
 θ = generated_quantities(model, chain)
 
-function predictpresence(α, β, idx_sn, s, r, X; idx_sr=idx(s, r))
+function predictcount(α, β, idx_sn, s, r, X; idx_sr=idx(s, r))
     [rand.(BernoulliLogit.(α[i][idx_sr] .+ sum(β[i][idx_sn, :] .* X, dims=2))) for i in eachindex(α)]
 end
 

@@ -2,7 +2,8 @@ module Preprocess
 
 export envs_known,
        envs_unknown,
-       pop_known
+       pop_known,
+       pop_unknown
 
 # Working with tabular data
 using CSV, DataFrames, Chain
@@ -51,7 +52,16 @@ pop_known = @chain begin
     stack(_, Not(:atoll), variable_name=:species, value_name=:nbirds)
     subset(_, :nbirds => ByRow(x -> x != 0))
     leftjoin(_, envs_known, on=[:atoll, :species])
-    select(_, Not(:presence, :filtercondition))
+    select(_, Not(:presence))
+end
+
+pop_unknown = @chain begin
+    CSV.read("../../data/atoll_seabird_populations_29Jul.csv", DataFrame)
+    DataFrames.transform(_, All() .=> ByRow(x -> ismissing(x) ? 0 : x) => identity)
+    stack(_, Not(:atoll), variable_name=:species, value_name=:nbirds)
+    subset(_, :nbirds .=> ByRow(x -> x == -1))
+    leftjoin(_, dropmissing!(envscores, :species), on=[:atoll, :species])
+    select(_, Not(:presence))
 end
 
 end
