@@ -55,13 +55,30 @@ pop_known = @chain begin
     select(_, Not(:presence))
 end
 
+preds = @chain begin
+    CSV.read("../../data/newpreds.csv", DataFrame)
+    stack(_)
+    select(_, :atoll, :variable => :species, :value => :nbirds)
+    leftjoin(_, select(envs_unknown, r"PC|region|atoll"), on=:atoll)
+end
+
+df_species_nestingtype = unique(envs_known[:, [:species, :nestingtype]], :species)
+
 pop_unknown = @chain begin
     CSV.read("../../data/atoll_seabird_populations_29Jul.csv", DataFrame)
     DataFrames.transform(_, All() .=> ByRow(x -> ismissing(x) ? 0 : x) => identity)
     stack(_, Not(:atoll), variable_name=:species, value_name=:nbirds)
-    subset(_, :nbirds .=> ByRow(x -> x == -1))
+    subset(_, :nbirds => ByRow(x -> x == -1))
     leftjoin(_, dropmissing!(envscores, :species), on=[:atoll, :species])
     select(_, Not(:presence))
+    vcat(_, preds)
+    subset(_, :species => ByRow(x -> x ∈ pop_known.species))
+    select(_, :atoll, :region, :species, :nbirds => :ppres, Cols(contains("PC")))
+    transform(_, :ppres => ByRow(x -> x == -1 ? 1.0 : x) => identity)
+    leftjoin(_, df_species_nestingtype, on=:species)
 end
+
+maximum(denserank(pop_known.species))
+maximum(denserank(pop_unknown.species))
 
 end

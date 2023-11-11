@@ -1,14 +1,23 @@
 module CountVariables
 
-export num_atoll,
-       num_region,
-       num_species,
+export num_atoll_known,
+       num_atoll_unknown,
+       num_region_known,
+       num_region_unknown,
+       num_species_known,
+       num_species_unknown,
        nbirds,
-       PC,
-       num_nesting,
-       unique_nesting,
-       unique_species_within_nesting,
-       num_species_within_nesting,
+       ppres,
+       PC_known,
+       PC_unknown,
+       num_nesting_known,
+       num_nesting_unknown,
+       unique_nesting_known,
+       unique_nesting_unknown,
+       unique_species_within_nesting_known,
+       unique_species_within_nesting_unknown,
+       num_species_within_nesting_known,
+       num_species_within_nesting_unknown,
        count_species_by_nesting
    
 include("preprocess.jl")
@@ -28,47 +37,53 @@ count_species_by_nesting = @chain begin
 end
 
 # Atolls. ...
-num_atoll = Int64.(denserank(pop_known.atoll))
-# num_atoll_unknown = Int64.(denserank(envs_unknown.atoll))
-# str_atoll_unknown = envs_unknown.atoll
+num_atoll_known = Int64.(denserank(pop_known.atoll))
+num_atoll_unknown = Int64.(denserank(pop_unknown.atoll))
 
-num_region = Int64.(denserank(pop_known.region))
-# num_region_unknown = Int64.(denserank(envs_unknown.region))
+num_region_known = Int64.(denserank(pop_known.region))
+num_region_unknown = Int64.(denserank(pop_unknown.region))
 
-num_species = Int64.(denserank(pop_known.species))
-# num_species_unknown = df_species_unknown.num_species
-# str_species_unknown = df_species_unknown.species
+num_species_known = Int64.(denserank(pop_known.species))
+num_species_unknown = Int64.(denserank(pop_unknown.species))
+
+maximum(num_species_unknown), maximum(num_species_known)
 
 nbirds = Float64.(pop_known.nbirds)
-PC = Matrix(pop_known[:, FEATURES])
-# PC_unknown = Matrix(envs_unknown[!, begin:6])
+ppres = Float64.(pop_unknown.ppres)
+PC_known = Matrix(pop_known[!, FEATURES])
+PC_unknown = Matrix(pop_unknown[!, FEATURES])
 
-num_nesting = Int64.(denserank(pop_known.nestingtype))
-# num_nesting_unknown = df_species_unknown.num_nestingtype
+num_nesting_known = Int64.(denserank(pop_known.nestingtype))
+num_nesting_unknown = Int64.(denserank(pop_unknown.nestingtype))
 
-unique_nesting = @chain pop_known begin
-    unique(_, [:nestingtype, :species])
-    DataFrames.transform(_, [:nestingtype, :species] => ByRow((x,y) -> "$x$y") => :ne_sp)
-    getproperty(_, :nestingtype)
-    denserank(_)
-    map(Int64, _)
+function unique_pop_var(df, unique_vars, pull)
+    @chain df begin
+        unique(_, unique_vars)
+        DataFrames.transform(_, [:nestingtype, :species] => ByRow((x,y) -> "$x$y") => :ne_sp)
+        getproperty(_, pull)
+        denserank(_)
+        map(Int64, _)
+    end
 end
 
-unique_species_within_nesting = @chain pop_known begin
-    unique(_, [:nestingtype, :species])
-    DataFrames.transform(_, [:nestingtype, :species] => ByRow((x,y) -> "$x$y") => :ne_sp)
-    getproperty(_, :ne_sp)
-    denserank(_)
-    map(Int64, _)
-end
+unique_nesting_known = unique_pop_var(pop_known, [:nestingtype, :species], :nestingtype)
+unique_nesting_unknown = unique_pop_var(pop_unknown, [:nestingtype, :species], :nestingtype)
 
-num_species_within_nesting = @chain pop_known begin
+unique_species_within_nesting_known = unique_pop_var(pop_known, [:nestingtype, :species], :ne_sp)
+unique_species_within_nesting_unknown = unique_pop_var(pop_unknown, [:nestingtype, :species], :ne_sp)
+
+num_species_within_nesting_known = @chain pop_known begin
     DataFrames.transform(_, [:nestingtype, :species] => ByRow((x,y) -> "$x$y") => :ne_sp)
     select(_, :ne_sp)
     getproperty(_, :ne_sp)
     denserank(_)
 end
 
-# num_species_within_nesting_unknown = df_species_unknown.within_nesting
+num_species_within_nesting_unknown = @chain pop_unknown begin
+    DataFrames.transform(_, [:nestingtype, :species] => ByRow((x,y) -> "$x$y") => :ne_sp)
+    select(_, :ne_sp)
+    getproperty(_, :ne_sp)
+    denserank(_)
+end
 
 end

@@ -35,7 +35,7 @@ Random.seed!(42)
 benchmark = false
 
 # Load saved chains?
-load = true
+load = false
 
 # Save the result?
 save = true
@@ -105,9 +105,9 @@ else
 
     # Configure sampling
     sampler = NUTS(1000, 0.95; max_depth=10)
-    nsamples = 2_000
-    nthreads = 3
-    ndiscard = 1000
+    nsamples = 20_000
+    nthreads = 4
+    ndiscard = 5000
 
     @info """Sampler: $(string(sampler))
     Samples: $(nsamples)
