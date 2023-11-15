@@ -8,17 +8,7 @@ export envs_known,
 # Working with tabular data
 using CSV, DataFrames, Chain
 
-using StatsBase
-
-using MLDataUtils: shuffleobs, stratifiedobs, oversample, rescale!
-using Resample
-
-using Random, StableRNGs
-
-include("../../src/upsample.jl")
-include("../../src/tune.jl")
-
-Random.seed!(0);
+import StatsBase: denserank
 
 # Import the data
 envscores = CSV.read("../../data/jl_envscores.csv", DataFrame)
@@ -77,8 +67,5 @@ pop_unknown = @chain begin
     transform(_, :ppres => ByRow(x -> x == -1 ? 1.0 : x) => identity)
     leftjoin(_, df_species_nestingtype, on=:species)
 end
-
-maximum(denserank(pop_known.species))
-maximum(denserank(pop_unknown.species))
 
 end

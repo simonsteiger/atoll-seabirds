@@ -35,14 +35,14 @@ Random.seed!(42)
 benchmark = false
 
 # Load saved chains?
-load = false
+load = true
 
 # Save the result?
 save = true
 !save && @warn "Samples will NOT be saved automatically."
 
 # If not loading a chain, save results to path below
-chainpath = "chain_newpca.jls"
+chainpath = "chains_presence.jls"
 
 ### MODEL SPECIFICATION ###
 
@@ -120,7 +120,7 @@ else
 
     save && serialize("chains/$chainpath", chain)
     isfile("chains/$chainpath") && @info "💾 Chain saved to '$(PATH)chains/$chainpath'."
-end
+end;
 
 θ = generated_quantities(model, chain)
 

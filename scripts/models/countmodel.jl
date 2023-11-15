@@ -14,16 +14,12 @@ using StatsPlots
 # Saving results and logging
 using Serialization, CSV, Dates, Markdown
 
-@info "packages loaded"
-
 # Load custom modules
 include("../preprocessing/countvars.jl")
 include("../../src/postprocess.jl")
 include("../../src/utilities.jl")
 include("../visualization/diagnosticplots.jl")
 include("../visualization/paramplots.jl")
-
-@info "modules loaded"
 
 # Make custom modules available
 using .CountVariables
@@ -39,7 +35,7 @@ Random.seed!(42)
 benchmark = false
 
 # Load saved chains?
-load = true
+load = false
 
 # Save the result?
 save = true
@@ -112,27 +108,23 @@ else
     # Configure sampling
     sampler = NUTS(1000, 0.95; max_depth=10)
     nsamples = 20_000
-    nthreads = 4
+    nchains = 4
     ndiscard = 5000
 
     @info """Sampler: $(string(sampler))
     Samples: $(nsamples)
-    Threads: $(nthreads)
+    Chains: $(nchains)
     Discard: $(ndiscard)
     """
 
     @info "🚀 Starting sampling: $(Dates.now())"
-    chain = sample(model, sampler, MCMCThreads(), nsamples, nthreads; discard_initial=ndiscard)
+    chain = sample(model, sampler, MCMCThreads(), nsamples, nchains; discard_initial=ndiscard)
 
     save && serialize("chains/$chainpath", chain)
     isfile("chains/$chainpath") && @info "💾 Chain saved to '$(PATH)chains/$chainpath'."
 end;
 
-@info "chain loaded"
-
 θ = generated_quantities(model, chain);
-
-@info "parameters extracted"
 
 function predictcount(α, β, σ, idx_sn, s, r, X; idx_sr=idx(s, r))
     out = Vector(undef, length(α))
@@ -187,21 +179,22 @@ end
 avg_preds_unknown = vec(mean(countpreds_unknown, dims=2))
 avg_preds_known = vec(mean(countpreds_known, dims=2))
 
-pred_x = avg_preds_known[num_species_known .== 29]
-obs_x = log.(nbirds)[num_species_known .== 29]
+pred_x = avg_preds_known[num_species_known.==29]
+obs_x = log.(nbirds)[num_species_known.==29]
 scatter(eachindex(pred_x), pred_x, label="pred")
 scatter!(eachindex(pred_x), obs_x, label="obs")
 
 sum(pred_x)
 sum(obs_x)
-# 
-# ssu_long = [fill(Preprocess.str_species_unknown, length(num_region_unknown))...;]
-# 
-# sau_long = [fill.(Preprocess.str_atoll_unknown, length(num_nesting_unknown))...;]
-# 
-# df_preds = @chain begin
-#     DataFrame([sau_long, ssu_long, pct_preds], [:atoll, :species, :percent])
-#     unstack(_, :species, :percent)
-# end
-# 
-# CSV.write("../../data/newpreds.csv", df_preds)
+
+df_countpreds = DataFrame(
+    [
+        num_atoll_unknown[threshold],
+        num_region_unknown[threshold],
+        num_species_unknown[threshold],
+        avg_preds_unknown
+    ],
+    [:atoll, :region, :species, :nbirds]
+)
+
+CSV.write("../../data/countpreds.csv", df_countpreds)
