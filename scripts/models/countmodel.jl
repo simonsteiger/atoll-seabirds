@@ -1,7 +1,4 @@
-const PATH = "scripts/models/"
-
-# Paths relative to this folder
-cd(PATH)
+const ROOT = dirname(Base.active_project())
 
 # Probabilistic programming
 using Turing, TuringBenchmarking, LazyArrays, Random
@@ -15,11 +12,11 @@ using StatsPlots
 using Serialization, CSV, Dates, Markdown
 
 # Load custom modules
-include("../preprocessing/countvars.jl")
-include("../../src/postprocess.jl")
-include("../../src/utilities.jl")
-include("../visualization/diagnosticplots.jl")
-include("../visualization/paramplots.jl")
+include("$ROOT/scripts/preprocessing/countvars.jl")
+include("$ROOT/src/postprocess.jl")
+include("$ROOT/src/utilities.jl")
+include("$ROOT/scripts/visualization/diagnosticplots.jl")
+include("$ROOT/scripts/visualization/paramplots.jl")
 
 # Make custom modules available
 using .CountVariables
@@ -197,4 +194,4 @@ df_countpreds = DataFrame(
     [:atoll, :region, :species, :nbirds]
 )
 
-CSV.write("../../data/countpreds.csv", df_countpreds)
+CSV.write("$ROOT/data/countpreds.csv", df_countpreds)

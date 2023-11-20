@@ -1,7 +1,4 @@
-const PATH = "scripts/models/"
-
-# Paths relative to this folder
-cd(PATH)
+const ROOT = dirname(Base.active_project())
 
 # Probabilistic programming
 using Turing, TuringBenchmarking, LazyArrays, Random
@@ -15,11 +12,11 @@ using StatsPlots
 using Serialization, CSV, Dates, Markdown
 
 # Load custom modules
-include("../preprocessing/presencevars.jl")
-include("../../src/postprocess.jl")
-include("../../src/utilities.jl")
-include("../visualization/diagnosticplots.jl")
-include("../visualization/paramplots.jl")
+include("$ROOT/scripts/preprocessing/presencevars.jl")
+include("$ROOT/src/postprocess.jl")
+include("$ROOT/src/utilities.jl")
+include("$ROOT/scripts/visualization/diagnosticplots.jl")
+include("$ROOT/scripts/visualization/paramplots.jl")
 
 # Make custom modules available
 using .PresenceVariables
@@ -35,7 +32,7 @@ Random.seed!(42)
 benchmark = false
 
 # Load saved chains?
-load = true
+load = false
 
 # Save the result?
 save = true
@@ -149,4 +146,4 @@ df_preds = @chain begin
     unstack(_, :species, :percent)
 end
 
-CSV.write("../../data/newpreds.csv", df_preds)
+CSV.write("$ROOT/data/newpreds.csv", df_preds)
