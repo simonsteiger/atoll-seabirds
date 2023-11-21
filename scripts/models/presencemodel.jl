@@ -1,3 +1,18 @@
+# Prior settings can be set from command line
+σₚ, λₚ = 1, 1
+
+if isempty(ARGS) || ARGS[1] == "default"
+    @info "Fitting model with default priors: σₚ=$σₚ, λₚ=$λₚ."
+elseif all(ARGS[1] .!= ["narrow", "wide"])
+    throw("Unknown prior setting: '$(ARGS[1])'. Pass nothing or one of 'default', 'narrow', 'wide'.")
+else
+    σₚ, λₚ = ARGS[1] == "wide" ? [σₚ, λₚ] .* 3 : [σₚ, λₚ] .* 1/3
+    @info "Fitting model with $(ARGS[1]) priors: σₚ=$(round(σₚ, digits=2)), λₚ=$(round(λₚ, digits=2))."
+end
+
+PRIORSUFFIX = isempty(ARGS[1]) ? "default" : ARGS[1]
+
+# Pathing
 const ROOT = dirname(Base.active_project())
 
 # Probabilistic programming
@@ -39,7 +54,7 @@ save = true
 !save && @warn "Samples will NOT be saved automatically."
 
 # If not loading a chain, save results to path below
-chainpath = "chains_presence.jls"
+chainpath = "chains_presence_$PRIORSUFFIX.jls"
 
 ### MODEL SPECIFICATION ###
 
@@ -52,14 +67,14 @@ lu(x) = length(unique(x))
 )
 
     # Priors for species × region
-    μ_sxr ~ Normal()
-    τ_sxr ~ Exponential(1)
+    μ_sxr ~ Normal(0, σpₚ)
+    τ_sxr ~ Exponential(λₚ)
     z_sxr ~ filldist(Normal(), Ns * Nr)
     α_sxr = μ_sxr .+ τ_sxr .* z_sxr
 
     # Priors for nesting types × PCs
-    μ_pxn ~ filldist(Normal(), Nn, NPC)
-    τ_pxn ~ filldist(Exponential(1), Nn, NPC)
+    μ_pxn ~ filldist(Normal(0, pₚ), Nn, NPC)
+    τ_pxn ~ filldist(Exponential(λₚ), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
@@ -71,7 +86,7 @@ lu(x) = length(unique(x))
     y .~ BernoulliLogit.(v)
 
     # Generated quantities
-    return (α_sxr=α_sxr, β_pxn=β_pxn)
+    return (; α_sxr, β_pxn)
 end;
 
 # Create model
@@ -94,7 +109,7 @@ end
 
 # Sample from model unless a saved chain should be used
 if load
-    chain = deserialize("chains/$chainpath")
+    chain = deserialize("$ROOT/scripts/models/chains/$chainpath")
 else
     # Set AD backend to :reversediff and compile with setrdcache(true)
     Turing.setadbackend(:reversediff)
@@ -102,9 +117,9 @@ else
 
     # Configure sampling
     sampler = NUTS(1000, 0.95; max_depth=10)
-    nsamples = 20_000
+    nsamples = 5_000
     nthreads = 4
-    ndiscard = 5000
+    ndiscard = 500
 
     @info """Sampler: $(string(sampler))
     Samples: $(nsamples)
@@ -115,8 +130,8 @@ else
     @info "🚀 Starting sampling: $(Dates.now())"
     chain = sample(model, sampler, MCMCThreads(), nsamples, nthreads; discard_initial=ndiscard)
 
-    save && serialize("chains/$chainpath", chain)
-    isfile("chains/$chainpath") && @info "💾 Chain saved to '$(PATH)chains/$chainpath'."
+    save && serialize("$ROOT/scripts/models/chains/$chainpath", chain)
+    isfile("$ROOT/scripts/models/chains/$chainpath") && @info "💾 Chain saved to `$ROOT/scripts/models/chains/$chainpath`."
 end;
 
 θ = generated_quantities(model, chain)
@@ -146,4 +161,5 @@ df_preds = @chain begin
     unstack(_, :species, :percent)
 end
 
-CSV.write("$ROOT/data/newpreds.csv", df_preds)
+CSV.write("$ROOT/data/presencepreds_$PRIORSUFFIX.csv", df_preds);
+@info "Successfully saved predictions to `$ROOT/data/presencepreds_$PRIORSUFFIX.csv`."

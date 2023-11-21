@@ -4,23 +4,20 @@ export nothing
 
 using CSV, DataFrames, Chain
 
-import StatsBase: denserank
+import StatsBase: denserank, mean
 
-const PATH = "scripts/output/"
+const ROOT = dirname(Base.active_project())
 
-# Paths relative to this folder
-cd(PATH)
-
-include("../preprocessing/preprocess.jl")
+include("$ROOT/scripts/preprocessing/preprocess.jl")
 
 known = Preprocess.pop_known[:, [:atoll, :region, :species, :nbirds]]
-glob = CSV.read("../../data/atoll_seabird_global_popestimates.csv", DataFrame)
+glob = CSV.read("$ROOT/data/atoll_seabird_global_popestimates.csv", DataFrame)
 
 DataFrames.transform!(Preprocess.pop_unknown, [:atoll, :species, :region] .=> denserank => x -> string("num_", x))
 
 # Load data sets
 preds = @chain begin
-    CSV.read("../../data/countpreds.csv", DataFrame)
+    CSV.read("$ROOT/data/countpreds.csv", DataFrame)
     DataFrames.transform(_, :nbirds => ByRow(exp) => identity)
     rename(_, :atoll => :num_atoll, :species => :num_species, :region => :num_region)
 end
