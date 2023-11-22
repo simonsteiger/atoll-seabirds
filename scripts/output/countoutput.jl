@@ -17,7 +17,7 @@ DataFrames.transform!(Preprocess.pop_unknown, [:atoll, :species, :region] .=> de
 
 # Load data sets
 preds = @chain begin
-    CSV.read("$ROOT/data/countpreds.csv", DataFrame)
+    CSV.read("$ROOT/data/countpreds_default.csv", DataFrame)
     DataFrames.transform(_, :nbirds => ByRow(exp) => identity)
     rename(_, :atoll => :num_atoll, :species => :num_species, :region => :num_region)
 end
@@ -44,5 +44,8 @@ function calcratio(row)
 end
 
 tot_species.ratio = map(calcratio, eachrow(tot_species))
+
+CSV.write("$ROOT/data/allpopulations.csv", full)
+CSV.write("$ROOT/data/ratios.csv", tot_species)
 
 end

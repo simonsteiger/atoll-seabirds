@@ -10,6 +10,8 @@ using CSV, DataFrames, Chain
 
 import StatsBase: denserank
 
+ARGS2 = isempty(ARGS) ? "default" : ARGS[2]
+
 ROOT = dirname(Base.active_project())
 
 # Import the data
@@ -48,12 +50,13 @@ pop_known = @chain begin
 end
 
 # Check if prediction data frame for a given prior setting exists
-preds_exist = isfile("$ROOT/data/presencepreds_$(isempty(ARGS[1]) ? "default" : ARGS[1]).csv")
+preds_exist = isfile("$ROOT/data/presencepreds_$ARGS2.csv")
 
 # Create pred data frame if this is the case
 if preds_exist
+    @info "Using $ARGS2 predictions."
     preds = @chain begin
-        CSV.read("$ROOT/data/presencepreds_$(isempty(ARGS[1]) ? "default" : ARGS[1]).csv", DataFrame)
+        CSV.read("$ROOT/data/presencepreds_$ARGS2.csv", DataFrame)
         stack(_)
         select(_, :atoll, :variable => :species, :value => :nbirds)
         leftjoin(_, select(envs_unknown, r"PC|region|atoll"), on=:atoll)

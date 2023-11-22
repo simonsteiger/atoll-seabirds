@@ -10,7 +10,7 @@ else
     @info "Fitting model with $(ARGS[1]) priors: σₚ=$(round(σₚ, digits=2)), λₚ=$(round(λₚ, digits=2))."
 end
 
-PRIORSUFFIX = isempty(ARGS[1]) ? "default" : ARGS[1]
+PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[1]
 
 # Pathing
 const ROOT = dirname(Base.active_project())
@@ -67,7 +67,7 @@ lu(x) = length(unique(x))
 )
 
     # Priors for species × region
-    μ_sxr ~ Normal(0, σpₚ)
+    μ_sxr ~ Normal(0, σₚ)
     τ_sxr ~ Exponential(λₚ)
     z_sxr ~ filldist(Normal(), Ns * Nr)
     α_sxr = μ_sxr .+ τ_sxr .* z_sxr

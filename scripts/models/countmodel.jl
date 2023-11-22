@@ -10,7 +10,7 @@ else
     @info "Fitting model with $(ARGS[1]) priors: σₚ=$(round(σₚ, digits=2)), λₚ=$(round(λₚ, digits=2))."
 end
 
-PRIORSUFFIX = isempty(ARGS[1]) ? "default" : ARGS[1]
+PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[1]
 
 const ROOT = dirname(Base.active_project())
 
@@ -157,6 +157,7 @@ end
 α, β = [getsamples(θ, s) for s in [:α_sxr, :β_pxn]];
 σ = reduce(hcat, get_params(chain).σ)'
 
+# TODO use [0.75, 0.80, 0.85]
 threshold = ppres .> 0.8
 
 countpreds_unknown = @chain begin
