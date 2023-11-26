@@ -6,7 +6,7 @@ if isempty(ARGS) || ARGS[1] == "default"
 elseif all(ARGS[1] .!= ["narrow", "wide"])
     throw("Unknown prior setting: '$(ARGS[1])'. Pass nothing or one of 'default', 'narrow', 'wide'.")
 else
-    σₚ, λₚ = ARGS[1] == "wide" ? [σₚ, λₚ] .* 3 : [σₚ, λₚ] .* 1/3
+    σₚ, λₚ = ARGS[1] == "wide" ? [σₚ, λₚ] .* 3 : [σₚ, λₚ] .* 1 / 3
     @info "Fitting model with $(ARGS[1]) priors: σₚ=$(round(σₚ, digits=2)), λₚ=$(round(λₚ, digits=2))."
 end
 
@@ -87,8 +87,10 @@ lu(x) = length(unique(x))
     y ~ MvNormal(μ, σ^2 * I) # Can we LazyArray μ?
 
     # Generated quantities
-    return (; α_sxr, β_pxn)
+    return (; y, α_sxr, β_pxn)
 end;
+
+standardise(x) = (x .- mean(x)) ./ std(x)
 
 # Create model
 model = modelcount(
@@ -96,7 +98,7 @@ model = modelcount(
     num_species_known,
     num_nesting_known,
     PC_known,
-    log.(nbirds),
+    standardise(log.(nbirds)),
     num_species_within_nesting_known,
     unique_nesting_known,
     unique_species_within_nesting_known,
@@ -211,3 +213,57 @@ df_countpreds = DataFrame(
 
 CSV.write("$ROOT/data/countpreds_$PRIORSUFFIX.csv", df_countpreds)
 @info "Successfully saved predictions to `$ROOT/data/countpreds_$PRIORSUFFIX.csv`."
+
+# Posterior predictive checks
+post_preds = let
+    model_y_missing = modelcount(
+        num_region_known,
+        num_species_known,
+        num_nesting_known,
+        PC_known,
+        missing,
+        num_species_within_nesting_known,
+        unique_nesting_known,
+        unique_species_within_nesting_known,
+        count_species_by_nesting...,
+    )
+
+    generated_quantities(model_y_missing, chain)
+end
+
+check_posterior = map(x -> x.y, vec(post_preds))
+
+histogram(log.(nbirds), normalize=true, alpha=0.5)
+histogram!(vcat(check_posterior...), normalize=true, c=:white, lw=3)
+histogram!(vcat(check_posterior...), normalize=true, c=2, lw=1.5, legend=:none)
+
+# Prior predictive checks ... not yet
+model_missing = modelcount(
+    [missing for _ in eachindex(num_region_known)],
+    [missing for _ in eachindex(num_species_known)],
+    [missing for _ in eachindex(num_nesting_known)],
+    reshape([missing for _ in eachindex(PC_known)], size(PC_known)),
+    [missing for _ in eachindex(nbirds)],
+    num_species_within_nesting_known,
+    unique_nesting_known,
+    unique_species_within_nesting_known,
+    count_species_by_nesting...,
+    Nr=lu(num_region_known),
+    Ns=lu(num_species_known),
+    Nn=lu(num_nesting_known),
+    NPC=size(PC_known, 2),
+    idx_sr=idx(num_species_known, num_region_known)
+)
+
+# Prior predictive checks
+prior_preds = let
+    prior_chain = sample(model, Prior(), 5000)
+    predict(model_missing, prior_chain)
+end;
+
+density(get_params(prior_chain).τ_sxr)
+
+check_prior = map(x -> x.y, vec(prior_preds))
+
+histogram(log.(nbirds), normalize=true, lw=1.5, bins=20)
+histogram!(vcat(check_prior...), normalize=true, c=2, lw=1.5, legend=:none, bins=20)

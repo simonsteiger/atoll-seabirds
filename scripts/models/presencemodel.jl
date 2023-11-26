@@ -6,7 +6,7 @@ if isempty(ARGS) || ARGS[1] == "default"
 elseif all(ARGS[1] .!= ["narrow", "wide"])
     throw("Unknown prior setting: '$(ARGS[1])'. Pass nothing or one of 'default', 'narrow', 'wide'.")
 else
-    σₚ, λₚ = ARGS[1] == "wide" ? [σₚ, λₚ] .* 3 : [σₚ, λₚ] .* 1/3
+    σₚ, λₚ = ARGS[1] == "wide" ? [σₚ, λₚ] .* 3 : [σₚ, λₚ] .* 1 / 3
     @info "Fitting model with $(ARGS[1]) priors: σₚ=$(round(σₚ, digits=2)), λₚ=$(round(λₚ, digits=2))."
 end
 
@@ -86,7 +86,7 @@ lu(x) = length(unique(x))
     y .~ BernoulliLogit.(v)
 
     # Generated quantities
-    return (; α_sxr, β_pxn)
+    return (; y, α_sxr, β_pxn)
 end;
 
 # Create model
@@ -101,6 +101,9 @@ model = modelpresence(
     unique_species_within_nesting,
     count_species_by_nesting...,
 );
+
+# Prior predictive checks
+check_prior = sample(model, Prior(), 5000)
 
 # Benchmark different backends to find out which is fastest
 let adbackends = [:forwarddiff, :reversediff, :reversediff_compiled]
@@ -136,6 +139,7 @@ end;
 
 θ = generated_quantities(model, chain)
 
+
 function predictpresence(α, β, idx_sn, s, r, X; idx_sr=idx(s, r))
     [rand.(BernoulliLogit.(α[i][idx_sr] .+ sum(β[i][idx_sn, :] .* X, dims=2))) for i in eachindex(α)]
 end
@@ -163,3 +167,26 @@ end
 
 CSV.write("$ROOT/data/presencepreds_$PRIORSUFFIX.csv", df_preds);
 @info "Successfully saved predictions to `$ROOT/data/presencepreds_$PRIORSUFFIX.csv`."
+
+# Posterior predictive checks
+post_preds = let
+    model_y_missing = modelpresence(
+        num_region,
+        num_species,
+        num_nesting,
+        PC,
+        missing,
+        num_species_within_nesting,
+        unique_nesting,
+        unique_species_within_nesting,
+        count_species_by_nesting...,
+    )
+
+    generated_quantities(model_y_missing, chain)
+end
+
+check_posterior = map(x -> x.y, vec(post_preds))
+
+histogram(presence, normalize=true, alpha=0.5)
+histogram!(vcat(check_posterior...), normalize=true, c=:white, lw=3)
+histogram!(vcat(check_posterior...), normalize=true, c=2, lw=1.5, legend=:none)
