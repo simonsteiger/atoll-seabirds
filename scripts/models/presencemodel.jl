@@ -16,7 +16,9 @@ PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[1]
 const ROOT = dirname(Base.active_project())
 
 # Probabilistic programming
-using Turing, TuringBenchmarking, LazyArrays, Random
+using Turing, TuringBenchmarking, ReverseDiff
+# Model speed optimization
+using LazyArrays
 # Statistics
 using StatsFuns, LinearAlgebra
 # Working with tabular data
@@ -25,6 +27,8 @@ using Chain, DataFrames
 using StatsPlots
 # Saving results and logging
 using Serialization, CSV, Dates, Markdown
+# Random seeds
+using Random
 
 # Load custom modules
 include("$ROOT/scripts/preprocessing/presencevars.jl")
@@ -50,7 +54,7 @@ benchmark = false
 load = false
 
 # Save the result?
-save = true
+save = false
 !save && @warn "Samples will NOT be saved automatically."
 
 # If not loading a chain, save results to path below
@@ -67,13 +71,10 @@ lu(x) = length(unique(x))
 )
 
     # Priors for species × region
-    μ_sxr ~ Normal(0, σₚ)
-    τ_sxr ~ Exponential(λₚ)
-    z_sxr ~ filldist(Normal(), Ns * Nr)
-    α_sxr = μ_sxr .+ τ_sxr .* z_sxr
+    α_sxr ~ filldist(Normal(0, σₚ), Ns * Nr)
 
     # Priors for nesting types × PCs
-    μ_pxn ~ filldist(Normal(0, pₚ), Nn, NPC)
+    μ_pxn ~ filldist(Normal(0, σₚ), Nn, NPC)
     τ_pxn ~ filldist(Exponential(λₚ), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
@@ -119,10 +120,10 @@ else
     Turing.setrdcache(true)
 
     # Configure sampling
-    sampler = NUTS(1000, 0.95; max_depth=10)
-    nsamples = 5_000
+    sampler = NUTS(1000, 0.90; max_depth=10)
+    nsamples = 1_000
     nthreads = 4
-    ndiscard = 500
+    ndiscard = 100
 
     @info """Sampler: $(string(sampler))
     Samples: $(nsamples)
@@ -165,8 +166,8 @@ df_preds = @chain begin
     unstack(_, :species, :percent)
 end
 
-CSV.write("$ROOT/data/presencepreds_$PRIORSUFFIX.csv", df_preds);
-@info "Successfully saved predictions to `$ROOT/data/presencepreds_$PRIORSUFFIX.csv`."
+save && CSV.write("$ROOT/data/presencepreds_$PRIORSUFFIX.csv", df_preds)
+isfile("$ROOT/data/presencepreds_$PRIORSUFFIX.csv") && @info "Successfully saved predictions to `$ROOT/data/presencepreds_$PRIORSUFFIX.csv`."
 
 # Posterior predictive checks
 post_preds = let
