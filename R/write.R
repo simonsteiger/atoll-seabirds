@@ -16,7 +16,7 @@ box::use(
 pcs <- tbl$tibble(read.csv("data/jl_envscores.csv")) %>%
   dp$distinct(atoll, .keep_all = TRUE)
 
-predictions <- tbl$tibble(read.csv("data/newpreds.csv"))
+predictions <- tbl$tibble(read.csv("data/presencepreds_default.csv"))
 
 observed <- tbl$tibble(read.csv("data/atoll_seabird_populations_29Jul.csv")) %>%
   dp$mutate(dp$across(ts$where(is.numeric), \(x) ifelse(is.na(x), 0, 1)))
