@@ -1,0 +1,416 @@
+---
+title: "map test"
+output: html_document
+date: "2023-11-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load packages}
+
+library("tidyverse")
+library("sf")
+library("patchwork")
+library("rnaturalearth")
+library("rnaturalearthdata")
+library("RColorBrewer")
+library("ggh4x")
+library("adespatial")
+library("scales")
+
+```
+
+```{r load data}
+
+dat <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/allpopulations.csv")
+est <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_global_popestimates.csv")
+envs <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_atolls_envs_25Nov.csv")
+nest <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_filterconditions_13Sep.csv")
+
+# turn into factors
+envs <- envs %>% select(atoll, region, lat, long) %>% mutate(across(1:2, as.factor))
+dat <- dat %>% select(atoll, species, nbirds)
+nest <- nest %>% select(species, nestingtype, group, bodymass) %>% mutate(across(1:3, as.factor))
+
+
+###########################################################
+# --- IRRELEVANT ONCE ERROR IN ALLPOPULATIONS IS FIXED ----
+###########################################################
+
+raw <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_populations_25Nov.csv")
+raw$Phaethon_rubricauda <- as.numeric(raw$Phaethon_rubricauda)
+raw$atoll <- as.factor(raw$atoll)
+
+# long format
+raw.long <- raw %>%  pivot_longer(cols = !atoll, names_to = "species", values_to = "nbirds", 
+                                  values_drop_na = TRUE) %>% 
+                    filter(nbirds > 0)
+
+# comb
+comb <- rbind(raw.long, dat) %>% distinct(atoll, species, .keep_all = TRUE) %>% as.data.frame()
+comb <- comb[order(comb$atoll),] # sort alphabetically by atolls
+
+#############################################################
+
+matrix <- comb %>% pivot_wider(names_from = species, values_from = nbirds, values_fill = 0)
+
+
+# calculate local contribution to beta diversity (LCBD) [and species contribution to beta diversity (SCBD)]
+beta.atoll <- beta.div(matrix[,-1], method = "percentdiff", sqrt.D = TRUE, samp = FALSE)
+
+# Richness differences versus compositional turnover
+comp.atoll <- beta.div.comp(matrix[,-1], coef = "J", quant = FALSE)
+
+
+# summarize atoll-wise
+
+comb <- left_join(comb, nest[,c(1,4)], by = "species")
+comb$biomass <- comb$nbirds*comb$bodymass
+
+atoll <- comb %>% group_by(atoll) %>% summarise(nbirds = sum(nbirds),
+                                               nspec = length(species),
+                                               totbiomass = sum(biomass))
+atoll$lcbd <- beta.atoll$LCBD
+
+# add environmental information
+atoll.sum <- left_join(envs, atoll, by = "atoll") %>% 
+                mutate(nbirds = replace_na(nbirds, 0)) %>% 
+                mutate(nspec = replace_na(nspec, 0)) %>%
+                mutate(totbiomass = replace_na(totbiomass, 0)) %>% 
+                mutate(lcbd = replace_na(lcbd, 0))
+
+
+# summarize species-wise
+spec <- comb %>% group_by(species) %>% summarise(nbirds = sum(nbirds),
+                                                 totbiomass = sum(biomass)) %>% as.data.frame() 
+
+spec <- left_join(spec, est, by = "species")
+spec <- left_join(spec, nest[,-4], by = "species")
+
+spec$ratios <- ifelse(is.na(spec$Callaghan) == FALSE, spec$nbirds*1/spec$Callaghan,
+            ifelse(is.na(spec$HBW) == FALSE, spec$nbirds*1/spec$HBW, 
+              ifelse(is.na(spec$birdlife_max) == TRUE, spec$nbirds*1/spec$birdlife_min,
+                      spec$nbirds*1/spec$birdlife_max)))
+
+spec$species <- as.factor(spec$species)
+
+```
+
+
+```{r base map}
+mapWorld <- ne_countries(scale = "medium", returnclass = "sf")
+
+atoll.sum$long.c <- ifelse(atoll.sum$long < 0, atoll.sum$long+360, atoll.sum$long)
+spat <- st_as_sf(atoll.sum, coords = c("long.c", "lat"), crs = 4326)
+
+coords <- spat %>% st_coordinates(extract())
+
+# create map layer
+map <- ggplot(data = mapWorld) + 
+  geom_sf(fill = "#EBE3D5") +
+  coord_sf(xlim = c(48, 255),
+           ylim = c(-30, 30)) +
+  theme_classic() +
+  geom_segment(aes(x = 37.7, xend = 37.7, y = -30.1, yend = 30.1), linewidth = 0.8) +
+  geom_segment(aes(x = 49.9, xend = 250.1, y = -33, yend = -33), linewidth = 0.8) +
+  theme(
+    axis.title = element_blank(),
+    axis.line = element_blank(),
+    axis.text = element_text(size = 13),
+    axis.ticks = element_line(linewidth = 0.8),
+    title = element_text(size = 13))
+
+```
+
+```{r abundance and richness}
+# total bird numbers 
+p1 <- map + 
+  geom_point(data = spat,
+             aes(x = coords[,1], y = coords[,2], colour = log10(nbirds+1)), 
+             size = 3.3, shape = 21, alpha = 0.7, stroke = 3) +
+  scale_colour_gradientn(colours = c("red", "yellow", "green","black","black"),
+                         values = c(1.0, 0.6, 0.1, 0.099, 0)) +
+  ggtitle("Seabird population sizes")
+
+# species richness
+p2 <- map + 
+  geom_point(data = spat,
+             aes(x = coords[,1], y = coords[,2], colour = nspec), 
+             size = 3.3, shape = 21, alpha = 0.7, stroke = 3) +
+  scale_colour_gradientn(colours = c("red", "yellow", "green","black"),
+                         values = c(1.0, 0.5, 0.05, 0)) +
+  ggtitle("Seabird species richness")
+
+# dissimilarity
+p3 <- map +
+  geom_point(data = spat,
+             aes(x = coords[,1], y = coords[,2], colour = lcbd),
+             size = 3.3, shape = 21, alpha = 0.9, stroke = 3) +
+   scale_colour_gradientn(colours = c("red", "yellow", "green","black"),
+                         values = c(1, 0.85, 0.001, 0)) +
+  ggtitle("Compositional distinctness of atolls")
+
+p1/p2/p3
+
+```
+
+
+```{r heatmap}
+# heatmap
+n <- atoll.sum$nspec
+
+temp <- data.frame()
+long <- data.frame()
+
+for (i in seq_along(n)) {
+  temp <- atoll.sum[rep(i, n[i]),]
+  long <- rbind(long, temp)
+}
+
+long.spat <- st_as_sf(long, coords = c("long.c", "lat"), crs = 4326)
+long.coords <- long.spat %>% st_coordinates(extract())
+
+palette <- c("transparent", brewer.pal(n = 9, "YlOrRd"))
+
+map +
+  geom_density_2d_filled(data = long.spat,
+                         aes(x = long.coords[,1], y = long.coords[,2]),
+                         bins = 10) +
+    geom_point(data = long.spat,
+             aes(x = long.coords[,1], y = long.coords[,2]), 
+             size = 1.5, alpha = 0.5) +
+  scale_fill_manual(values = palette) +
+  ggtitle("Heatmap seabird species richness") +
+  theme(legend.position = "none")
+
+```
+
+
+```{r bird populations}
+
+ggplot(data = spec, aes(x = ratios*100, y = reorder(species, ratios), fill = group)) +
+  scale_fill_viridis_d(option = "mako") +
+  geom_bar(stat = "identity", color = "black", width = 0.8) +
+  guides(x = "axis_truncated", y = "axis_truncated") +
+  ggtitle("Global relevance of atolls") +
+  xlab("% of global population") +
+  theme_classic() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.ticks.y =element_blank(),
+    axis.text = element_text(size = 13),
+    axis.title.x = element_text(size = 15),
+    title = element_text(size = 17),
+    legend.title = element_blank(),
+    legend.position = c(0.8, 0.2),
+    legend.text = element_text(size = 13))
+
+### coolors.co : colour gradient for relevance
+
+
+ggplot(data = spec, aes(x = totbiomass/1000, y = reorder(species, totbiomass))) +
+  geom_bar(stat = "identity", colour = "black") +
+  scale_x_continuous(trans = "log",
+                     breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000, 10000000),
+                     labels = scales::comma) +
+  
+  guides(x = "axis_truncated", y = "axis_truncated") +
+  ggtitle("Atoll nesting") +
+  xlab("total biomass [kg]") +
+  theme_classic() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text = element_text(size = 13),
+    axis.title.x = element_text(size = 15),
+    title = element_text(size = 17))
+
+
+```
+
+
+```{r atol properties global}
+
+p6 <- ggplot(data = atoll.sum[which(atoll.sum$nbirds > 0), ], aes(x = "identity", y = nbirds)) +
+  geom_violin(fill = "#B5D5C5") +
+  geom_boxplot(fill = "#B5D5C5", width = 0.1) +
+  geom_jitter(width = 0.15, size = 1.5) +
+  scale_y_continuous(trans = "log",
+                     breaks = c(10, 100, 1000, 10000, 100000, 1000000, 10000000),
+                     labels = scales::comma) +
+  guides(x = "axis_truncated", y = guide_axis_truncated(trunc_lower = 10, trunc_upper = 1000000)) +
+  ggtitle("Population size per atoll") +
+  ylab("no. of seabirds") +
+  geom_hline(yintercept = 13200, linetype = "dashed", linewidth = 0.8) + 
+  annotate("text", label = "B3b (A4iii) threshold)", x = 1.4, y = 18500, size = 5, fontface = "italic") +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 13),
+    axis.title.y = element_text(size = 15),
+    title = element_text(size = 17))
+
+p7 <- ggplot(data = atoll.sum, aes(x = "identity", y = nspec)) +
+  geom_violin(fill = "#B5D5C5") +
+  geom_boxplot(fill = "#B5D5C5", width = 0.1) +
+  geom_jitter(width = 0.15, size = 1.5) +
+  guides(x = "axis_truncated", y = "axis_truncated") +
+  ggtitle("Diversity of atolls") +
+  ylab("no. of seabirds species") +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 13),
+    axis.title.y = element_text(size = 15),
+    title = element_text(size = 17))
+
+
+p8 <- ggplot(data = atoll.sum[which(atoll.sum$nbirds > 0), ], aes(x = "identity", y = totbiomass/1000)) +
+  geom_violin(fill = "#B5D5C5") +
+  geom_boxplot(fill = "#B5D5C5", width = 0.1) +
+  geom_jitter(width = 0.15, size = 1.5) +
+  scale_y_continuous(trans = "log",
+                     breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000, 10000000),
+                     labels = scales::comma) +
+  guides(x = "axis_truncated", y = "axis_truncated") +
+  ggtitle("Biomass") +
+  ylab("total seabird biomass [kg]") +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 13),
+    axis.title.y = element_text(size = 15),
+    title = element_text(size = 17))
+
+p6 + p7 + p8
+
+```
+
+```{r atoll properties region stratified}
+
+p4 <- ggplot(data = atoll.sum[which(atoll.sum$nbirds > 0), ], aes(x = region, y = nbirds)) +
+  geom_violin(aes(fill = region)) +
+  geom_boxplot(aes(fill = region), width = 0.1) +
+  geom_jitter(width = 0.15, size = 1.5) +
+  scale_y_continuous(trans = "log",
+                     breaks = c(10, 100, 1000, 10000, 100000, 1000000, 10000000),
+                     labels = scales::comma) +
+  scale_x_discrete(labels = c("Indian Ocean", 
+                              "Melanesia",
+                              "Micronesia",
+                              "Polynesia")) +
+  scale_fill_manual(values = c("#B5D5C5", "#B08BBB", "#ECA869", "#F5F5DC")) +
+  guides(x = "axis_truncated", y = guide_axis_truncated(trunc_lower = 10, trunc_upper = 1000000)) +
+  ggtitle("Population size per atoll") +
+  ylab("no. of seabirds") +
+  geom_hline(yintercept = 13200, linetype = "dashed", linewidth = 0.8) + 
+  annotate("text", label = "B3b (A4iii) threshold)", x = 4.35, y = 18500, size = 5, fontface = "italic") +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text = element_text(size = 13),
+    axis.title.y = element_text(size = 15),
+    title = element_text(size = 17))
+
+
+p5 <- ggplot(data = atoll.sum, aes(x = region, y = nspec)) +
+  geom_violin(aes(fill = region)) +
+  geom_boxplot(aes(fill = region), width = 0.1) +
+  geom_jitter(width = 0.15, size = 1.5) +
+  scale_x_discrete(labels = c("Indian Ocean", 
+                              "Melanesia",
+                              "Micronesia",
+                              "Polynesia")) +
+  scale_fill_manual(values = c("#B5D5C5", "#B08BBB", "#ECA869", "#F5F5DC")) +
+  guides(x = "axis_truncated", y = "axis_truncated") +
+  ggtitle("Diversity of atolls") +
+  ylab("no. of seabirds species") +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text = element_text(size = 13),
+    axis.title.y = element_text(size = 15),
+    title = element_text(size = 17))
+  
+p4 + p5
+
+```
+
+```{r significant breeding sites}
+
+atollw <- left_join(comb, est, by = "species")
+
+atollw$ratios <- ifelse(is.na(atollw$Callaghan) == FALSE, atollw$nbirds*1/atollw$Callaghan,
+            ifelse(is.na(atollw$HBW) == FALSE, atollw$nbirds*1/atollw$HBW, 
+              ifelse(is.na(atollw$birdlife_max) == TRUE, atollw$nbirds*1/atollw$birdlife_min,
+                      atollw$nbirds*1/atollw$birdlife_max)))
+
+atollw$species <- as.factor(atollw$species)
+
+# add lat long
+atollw <- left_join(atollw, envs, by = "atoll") %>% select(c(atoll, species, nbirds, ratios, lat, long))
+atollw$long.c <- ifelse(atollw$long < 0, atollw$long+360, atollw$long)
+
+# add cutoffs
+atollw$cuts <- cut(atollw$ratios,
+                   breaks = c(0, 0.01, 0.10, 0.25, 0.50, 0.70, 1),
+                   labels = c("<1%", "1-10%", "10-25%", "25-50%", "50-70%", ">70%"))
+
+# subset only for largest value per atoll
+atollmax <- atollw %>% group_by(atoll, lat, long.c) %>% summarise(ratios = max(ratios)) %>% as.data.frame()
+atollmax$cuts <- cut(atollmax$ratios,
+                   breaks = c(0, 0.01, 0.10, 0.25, 0.50, 0.70, 1),
+                   labels = c("<1%", "1-10%", "10-25%", "25-50%", "50-70%", ">70%"))
+
+atollmax <- atollmax %>% arrange(cuts)
+
+spatw <- st_as_sf(atollmax, coords = c("long.c", "lat"), crs = 4326)
+
+coordsw <- spatw %>% st_coordinates(extract())
+
+p10 <- map +
+  geom_point(data = spatw,
+             aes(x = coordsw[,1], y = coordsw[,2], colour = cuts), 
+             size = 3.3, shape = 21, alpha = 0.9, stroke = 3) +
+  scale_colour_manual(values = c("#ECEE81","#7ED7C1", "#BEADFA", "#DC8686", "#B06161", "#D10015")) +
+ # scale_colour_manual(values = c("#ECEE81", "#F79CA5" ,"#F47683" , "#EF4E5E" ,"#EB2438", "#D10015")) +
+#  scale_colour_viridis_d(option = "inferno", direction = -1) +
+  ggtitle("Single atoll contribution to global populations") +
+  theme(
+    legend.title = element_blank(),
+    legend.text = element_text(size = 13))
+
+
+inlet <- ggplot(data = atollmax, aes(x = "identity", fill = fct_rev(cuts))) +
+  geom_bar(colour = "black", width = 0.4) +
+  scale_fill_manual(values =c("#632626","#B06161", "#DC8686", "#BEADFA", "#7ED7C1", "#ECEE81")) +
+  theme_classic() +
+  guides(x = "axis_truncated", y = "axis_truncated") +
+  xlab("[%]") +
+  theme(
+    legend.position = "none",
+    axis.text = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank(),
+    panel.background = element_rect(fill='transparent'),
+    plot.background = element_rect(fill='transparent', color=NA),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  coord_flip()
+
+p10 + inset_element(inlet, 0.7, 0.7, 1, 1)
+
+```
+
