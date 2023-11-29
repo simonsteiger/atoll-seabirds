@@ -18,7 +18,7 @@ pcs <- tbl$tibble(read.csv("data/jl_envscores.csv")) %>%
 
 predictions <- tbl$tibble(read.csv("data/presencepreds_default.csv"))
 
-observed <- tbl$tibble(read.csv("data/atoll_seabird_populations_29Jul.csv")) %>%
+observed <- tbl$tibble(read.csv("data/atoll_seabird_populations.csv")) %>%
   dp$mutate(dp$across(ts$where(is.numeric), \(x) ifelse(is.na(x), 0, 1)))
 
 full_presence <- dp$bind_rows(observed, predictions) %>%

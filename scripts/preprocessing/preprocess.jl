@@ -16,6 +16,7 @@ ROOT = dirname(Base.active_project())
 
 # Import the data
 envscores = CSV.read("$ROOT/data/jl_envscores.csv", DataFrame)
+pop = CSV.read("$ROOT/data/atoll_seabird_populations.csv", DataFrame)
 
 # Split distM into distM_known and distM_unknoqn
 ispresencemissing = @chain envscores begin
@@ -26,7 +27,7 @@ end
 
 # Add data about nesting type
 specinfo = @chain begin
-    CSV.read("$ROOT/data/seabird_filterconditions_13Sep.csv", DataFrame)
+    CSV.read("$ROOT/data/seabird_filterconditions.csv", DataFrame)
     select(_, [:species, :nestingtype])
 end
 
@@ -39,8 +40,7 @@ envs_unknown = subset(envscores, :presence => ByRow(x -> ismissing(x)))
 # Add nestingtype to envscores
 leftjoin!(envs_known, specinfo, on=:species)
 
-pop_known = @chain begin
-    CSV.read("$ROOT/data/atoll_seabird_populations_29Jul.csv", DataFrame)
+pop_known = @chain pop begin
     DataFrames.transform(_, All() .=> ByRow(x -> ismissing(x) ? 0 : x) => identity)
     subset(_, All() .=> ByRow(x -> x != -1))
     stack(_, Not(:atoll), variable_name=:species, value_name=:nbirds)
@@ -66,8 +66,7 @@ else
 end
 
 # Create pop_unknown
-pop_unknown = @chain begin
-    CSV.read("$ROOT/data/atoll_seabird_populations_29Jul.csv", DataFrame)
+pop_unknown = @chain pop begin
     DataFrames.transform(_, All() .=> ByRow(x -> ismissing(x) ? 0 : x) => identity)
     stack(_, Not(:atoll), variable_name=:species, value_name=:nbirds)
     subset(_, :nbirds => ByRow(x -> x == -1))
