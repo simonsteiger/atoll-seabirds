@@ -6,10 +6,7 @@ export standardise,
 using StatsBase
 
 # Z standardise
-function standardise(x::AbstractArray)
-    x̄, σ = mean(x), std(x)
-    [(x - x̄) / σ for x in x]
-end
+standardise(x) = (x .- mean(x)) ./ std(x)
 
 # Recover natural scale from Z values
 unstandardise(x::AbstractArray, x̄::Real, σ::Real) = x * σ .+ x̄

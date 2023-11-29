@@ -33,6 +33,7 @@ using Random
 include("$ROOT/scripts/preprocessing/countvars.jl")
 include("$ROOT/src/postprocess.jl")
 include("$ROOT/src/utilities.jl")
+include("$ROOT/src/stats.jl")
 include("$ROOT/scripts/visualization/diagnosticplots.jl")
 include("$ROOT/scripts/visualization/paramplots.jl")
 
@@ -40,6 +41,7 @@ include("$ROOT/scripts/visualization/paramplots.jl")
 using .CountVariables
 using .Postprocess
 using .CustomUtilityFuns
+using .CustomStatsFuns
 using .DiagnosticPlots
 using .ParamPlots
 
@@ -90,8 +92,6 @@ lu(x) = length(unique(x))
     # Generated quantities
     return (; y, α_sxr, β_pxn)
 end;
-
-standardise(x) = (x .- mean(x)) ./ std(x)
 
 # Create model
 model = modelcount(
@@ -211,6 +211,8 @@ df_countpreds = DataFrame(
     ],
     [:atoll, :region, :species, :nbirds]
 )
+
+df_countpreds.nbirds = unstandardise(df_countpreds.nbirds, mean(log.(nbirds)), std(log.(nbirds)))
 
 CSV.write("$ROOT/data/countpreds_$PRIORSUFFIX.csv", df_countpreds)
 @info "Successfully saved predictions to `$ROOT/data/countpreds_$PRIORSUFFIX.csv`."
