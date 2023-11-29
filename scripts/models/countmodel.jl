@@ -113,7 +113,7 @@ end
 
 # Sample from model unless a saved chain should be used
 if load
-    chain = deserialize("chains/$chainpath")
+    chain = deserialize("$ROOT/scripts/models/chains/$chainpath")
 else
     # Set AD backend to :reversediff and compile with setrdcache(true)
     Turing.setadbackend(:reversediff)
@@ -196,7 +196,7 @@ avg_preds_known = vec(mean(countpreds_known, dims=2))
 
 pred_x = avg_preds_known[num_species_known.==29]
 obs_x = log.(nbirds)[num_species_known.==29]
-scatter(eachindex(pred_x), pred_x, label="pred")
+scatter(eachindex(pred_x), unstandardise(pred_x, mean(log.(nbirds)), std(log.(nbirds))), label="pred")
 scatter!(eachindex(pred_x), obs_x, label="obs")
 
 sum(pred_x)
@@ -214,7 +214,7 @@ df_countpreds = DataFrame(
 
 df_countpreds.nbirds = unstandardise(df_countpreds.nbirds, mean(log.(nbirds)), std(log.(nbirds)))
 
-CSV.write("$ROOT/data/countpreds_$PRIORSUFFIX.csv", df_countpreds)
+CSV.write("$ROOT/data/countpreds_$(PRIORSUFFIX)_hierarchical.csv", df_countpreds)
 @info "Successfully saved predictions to `$ROOT/data/countpreds_$PRIORSUFFIX.csv`."
 
 # Posterior predictive checks
