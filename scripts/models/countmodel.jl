@@ -15,7 +15,9 @@ PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[1]
 const ROOT = dirname(Base.active_project())
 
 # Probabilistic programming
-using Turing, TuringBenchmarking, LazyArrays, Random
+using Turing, TuringBenchmarking, ReverseDiff
+# Model speed optimization
+using LazyArrays
 # Statistics
 using StatsFuns, LinearAlgebra
 # Working with tabular data
@@ -24,6 +26,8 @@ using Chain, DataFrames
 using StatsPlots
 # Saving results and logging
 using Serialization, CSV, Dates, Markdown
+# Random seeds
+using Random
 
 # Load custom modules
 include("$ROOT/scripts/preprocessing/countvars.jl")
@@ -66,10 +70,7 @@ lu(x) = length(unique(x))
 )
 
     # Priors for species × region
-    μ_sxr ~ Normal(0, σₚ)
-    τ_sxr ~ Exponential(λₚ)
-    z_sxr ~ filldist(Normal(), Ns * Nr)
-    α_sxr = μ_sxr .+ τ_sxr .* z_sxr
+    α_sxr ~ filldist(Normal(0, σₚ), Ns * Nr)
 
     # Priors for nesting types × PCs
     μ_pxn ~ filldist(Normal(0, σₚ), Nn, NPC)

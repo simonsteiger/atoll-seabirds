@@ -3,12 +3,14 @@ import MultivariateStats as MS
 import StatsBase as SB
 using Match
 
+const ROOT = dirname(Base.active_project())
+
 include("../../src/stats.jl")
 using .CustomStatsFuns
 
 const PC_NAMES = ["PC1", "PC2", "PC3", "PC4", "PC5", "PC6"]
 
-envs = CSV.read("../../data/envs_jicp.csv", DataFrame, missingstring="NA")
+envs = CSV.read("$ROOT/data/envs_jicp.csv", DataFrame, missingstring="NA")
 
 DataFrames.transform!(envs, :human_population => ByRow(x -> ifelse(ismissing(x), round(median(skipmissing(envs.human_population)), digits=0), x)) => identity)
 
@@ -25,12 +27,12 @@ DataFrames.transform!(envs, :human_population => ByRow(x -> ifelse(ismissing(x),
 DataFrames.transform!(envs, [:number_islets, :land_area_sqkm, :distance_nearest_atoll_km, :distance_nearest_high_island_km] .=> ByRow(x -> log(x)) => identity)
 DataFrames.transform!(envs, [:lagoon_area_sqkm, :tropical_storms_50km, :hurricanes_50km, :human_population] .=> ByRow(x -> log1p(x)) => identity)
 
-seabirds = @chain CSV.read("../../data/atoll_seabird_populations_29Jul.csv", DataFrame) begin
+seabirds = @chain CSV.read("$ROOT/data/atoll_seabird_populations.csv", DataFrame) begin
     stack(_, Not(:atoll), variable_name=:species, value_name=:presence)
     DataFrames.transform(_, :presence => ByRow(x -> ismissing(x) ? 0.0 : 1.0) => identity)
 end
 
-df_features = envs[!, [collect(8:13)..., 16, collect(18:26)...]]
+df_features = envs[!, [collect(7:12)..., 15, collect(17:25)...]] # was 8:13, 
 X_features = Matrix{Float64}(df_features)'
 
 Z = MS.fit(SB.ZScoreTransform, X_features)
@@ -39,14 +41,13 @@ SB.transform!(Z, X_features)
 M = MS.fit(MS.PCA, X_features; maxoutdim=6)
 
 envscores = @chain predict(M, X_features)' begin
-    [standardise(col) for col in eachslice(_, dims=2)]
     DataFrame(_, PC_NAMES)
     insertcols(_, :atoll => envs.atoll)
     insertcols(_, :region => envs.region)
     outerjoin(_, seabirds, on=:atoll)
 end
 
-CSV.write("../../data/jl_envscores.csv", envscores)
+CSV.write("$ROOT/data/jl_envscores.csv", envscores)
 
 # Make a heatmap from PCA projections
 proj = MS.projection(M)

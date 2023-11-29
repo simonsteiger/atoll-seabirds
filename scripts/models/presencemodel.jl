@@ -54,7 +54,7 @@ benchmark = false
 load = false
 
 # Save the result?
-save = false
+save = true
 !save && @warn "Samples will NOT be saved automatically."
 
 # If not loading a chain, save results to path below
@@ -120,10 +120,10 @@ else
     Turing.setrdcache(true)
 
     # Configure sampling
-    sampler = NUTS(1000, 0.90; max_depth=10)
-    nsamples = 1_000
+    sampler = NUTS(1000, 0.95; max_depth=10)
+    nsamples = 2500
     nthreads = 4
-    ndiscard = 100
+    ndiscard = 500
 
     @info """Sampler: $(string(sampler))
     Samples: $(nsamples)

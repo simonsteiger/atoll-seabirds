@@ -2,8 +2,6 @@ module ParamPlots
 
 export plotparams
 
-include("../preprocessing/preprocess.jl")
-
 using Turing, Chain, StatsPlots
 
 function plotparams(chain::Chains, param::String, n::Int64; lab=nothing)
