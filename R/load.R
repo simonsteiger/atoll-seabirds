@@ -4,6 +4,7 @@ box::use(
   pr = purrr,
   ab = abind,
   dp = dplyr,
+  ts = tidyselect,
   magrittr[`%>%`],
 )
 
@@ -65,6 +66,6 @@ envs_trans_coord <- envs %>%
 pop <- ut$read.csv("data/atoll_seabird_populations.csv")
 
 # Assert that all counts are integers
-if (!all(summarise(pop, across(where(is.numeric), is.integer)))) {
+if (!all(dp$summarise(pop, dp$across(ts$where(is.numeric), is.integer)))) {
   stop("Population counts must be integers!")
 }
