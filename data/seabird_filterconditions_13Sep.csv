@@ -16,20 +16,20 @@ Thalasseus_bergii,none,ground,tern,328
 Thalasseus_bengalensis,Indian_Ocean,ground,tern,209
 Phaethon_lepturus,none,ground,tropicbird,328
 Phaethon_rubricauda,none,ground,tropicbird,671.9
-Phoebastria_immutabilis,EXCLUDE,ground,albatros,3145.9
-Phoebastria_nigripes,EXCLUDE,ground,albatros,3188.4
-Phoebastria_albatrus,EXCLUDE,ground,albatros,4411
-Nesofregetta_fuliginosa,EXCLUDE,burrow,tubenose,70
-Hydrobates_tristrami,EXCLUDE,burrow,tubenose,89.1
-Pterodroma_neglecta,EXCLUDE,ground,tubenose,501
-Pterodroma_heraldica,EXCLUDE,ground,tubenose,394
-Pterodroma_ultima,EXCLUDE,ground,tubenose,360
-Pterodroma_hypoleuca,EXCLUDE,burrow,tubenose,176
-Pterodroma_alba,EXCLUDE,ground,tubenose,259
-Bulweria_bulwerii,EXCLUDE,ground,tubenose,99
-Ardenna_pacifica,none,burrow,tubenose,388
-Puffinus_nativitatis,"Polynesia, Micronesia",burrow,tubenose,356
-Puffinus_bailloni,none,burrow,tubenose,214
+Phoebastria_immutabilis,EXCLUDE,ground,albatross,3145.9
+Phoebastria_nigripes,EXCLUDE,ground,albatross,3188.4
+Phoebastria_albatrus,EXCLUDE,ground,albatross,4411
+Nesofregetta_fuliginosa,EXCLUDE,burrow,petrel/shearwater,70
+Hydrobates_tristrami,EXCLUDE,burrow,petrel/shearwater,89.1
+Pterodroma_neglecta,EXCLUDE,ground,petrel/shearwater,501
+Pterodroma_heraldica,EXCLUDE,ground,petrel/shearwater,394
+Pterodroma_ultima,EXCLUDE,ground,petrel/shearwater,360
+Pterodroma_hypoleuca,EXCLUDE,burrow,petrel/shearwater,176
+Pterodroma_alba,EXCLUDE,ground,petrel/shearwater,259
+Bulweria_bulwerii,EXCLUDE,ground,petrel/shearwater,99
+Ardenna_pacifica,none,burrow,petrel/shearwater,388
+Puffinus_nativitatis,"Polynesia, Micronesia",burrow,petrel/shearwater,356
+Puffinus_bailloni,none,burrow,petrel/shearwater,214
 Fregata_ariel,none,ground,frigatebird,804.3
 Fregata_minor,none,vegetation,frigatebird,1274.7
 Sula_dactylatra,none,ground,booby,1732.1
