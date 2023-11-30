@@ -54,7 +54,7 @@ preds_exist = isfile("$ROOT/data/presencepreds_$ARGS2.csv")
 
 # Create pred data frame if this is the case
 if preds_exist
-    @info "Using $ARGS2 predictions."
+    @info "Joining envs_unknown onto predictions made using $ARGS2 priors."
     preds = @chain begin
         CSV.read("$ROOT/data/presencepreds_$ARGS2.csv", DataFrame)
         stack(_)

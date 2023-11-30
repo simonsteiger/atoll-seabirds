@@ -52,7 +52,7 @@ Random.seed!(42)
 benchmark = false
 
 # Load saved chains?
-load = false
+load = true
 
 # Save the result?
 save = true
@@ -72,7 +72,10 @@ lu(x) = length(unique(x))
 )
 
     # Priors for species × region
-    α_sxr ~ filldist(Normal(0, σₚ), Ns * Nr)
+    μ_sxr ~ filldist(Normal(0, σₚ), Ns)
+    τ_sxr ~ filldist(Exponential(λₚ), Ns)
+    z_sxr ~ filldist(Normal(), Ns, Nr)
+    α_sxr = μ_sxr .+ τ_sxr .* z_sxr
 
     # Priors for nesting types × PCs
     μ_pxn ~ filldist(Normal(0, σₚ), Nn, NPC)
@@ -99,7 +102,7 @@ model = modelcount(
     num_species_known,
     num_nesting_known,
     PC_known,
-    standardise(log.(nbirds)),
+    log.(nbirds),
     num_species_within_nesting_known,
     unique_nesting_known,
     unique_species_within_nesting_known,
@@ -123,7 +126,7 @@ else
     sampler = NUTS(1000, 0.90; max_depth=10)
     nsamples = 2000
     nchains = 4
-    ndiscard = 1000
+    ndiscard = 200
 
     @info """Sampler: $(string(sampler))
     Samples: $(nsamples)
@@ -194,9 +197,9 @@ end
 avg_preds_unknown = vec(mean(countpreds_unknown, dims=2))
 avg_preds_known = vec(mean(countpreds_known, dims=2))
 
-pred_x = avg_preds_known[num_species_known.==29]
-obs_x = log.(nbirds)[num_species_known.==29]
-scatter(eachindex(pred_x), unstandardise(pred_x, mean(log.(nbirds)), std(log.(nbirds))), label="pred")
+pred_x = avg_preds_known[num_species_known.==5]
+obs_x = log.(nbirds)[num_species_known.==5]
+scatter(eachindex(pred_x), pred_x, label="pred")
 scatter!(eachindex(pred_x), obs_x, label="obs")
 
 sum(pred_x)
@@ -212,9 +215,7 @@ df_countpreds = DataFrame(
     [:atoll, :region, :species, :nbirds]
 )
 
-df_countpreds.nbirds = unstandardise(df_countpreds.nbirds, mean(log.(nbirds)), std(log.(nbirds)))
-
-CSV.write("$ROOT/data/countpreds_$(PRIORSUFFIX)_hierarchical.csv", df_countpreds)
+CSV.write("$ROOT/data/countpreds_$PRIORSUFFIX.csv", df_countpreds)
 @info "Successfully saved predictions to `$ROOT/data/countpreds_$PRIORSUFFIX.csv`."
 
 # Posterior predictive checks

@@ -121,7 +121,7 @@ else
 
     # Configure sampling
     sampler = NUTS(1000, 0.95; max_depth=10)
-    nsamples = 2500
+    nsamples = 5000
     nthreads = 4
     ndiscard = 500
 

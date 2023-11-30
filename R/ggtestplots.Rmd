@@ -19,15 +19,26 @@ library("RColorBrewer")
 library("ggh4x")
 library("adespatial")
 library("scales")
+library("here")
 
 ```
 
 ```{r load data}
 
-preds <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/allpopulations.csv")
-est <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_global_popestimates.csv")
-envs <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_atolls_envs.csv")
-nest <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_filterconditions.csv")
+if (Sys.info()["sysname"] == "Darwin") {
+  preds <- read.csv(here("data/allpopulations.csv"))
+  est <- read.csv(here("data/atoll_seabird_global_popestimates.csv"))
+  envs <- read.csv(here("data/seabird_atolls_envs.csv"))
+  nest <- read.csv(here("data/seabird_filterconditions.csv"))
+  raw <- read.csv(here("data/atoll_seabird_populations.csv"))
+} else {
+  preds <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/allpopulations.csv")
+  est <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_global_popestimates.csv")
+  envs <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_atolls_envs.csv")
+  nest <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_filterconditions.csv")
+  # Don't load after allpop fix
+  raw <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_populations.csv")
+}
 
 # turn into factors
 envs <- envs %>% select(atoll, region, lat, long) %>% mutate(across(1:2, as.factor))
@@ -45,7 +56,6 @@ envs$long <- ifelse(envs$long < 0, envs$long+360, envs$long)
 # --- IRRELEVANT ONCE ERROR IN ALLPOPULATIONS IS FIXED ----
 ###########################################################
 
-raw <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_populations.csv")
 raw$atoll <- as.factor(raw$atoll)
 
 # long format
