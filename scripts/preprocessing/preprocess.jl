@@ -18,21 +18,11 @@ ROOT = dirname(Base.active_project())
 envscores = CSV.read("$ROOT/data/jl_envscores.csv", DataFrame)
 pop = CSV.read("$ROOT/data/atoll_seabird_populations.csv", DataFrame)
 
-# Split distM into distM_known and distM_unknoqn
-ispresencemissing = @chain envscores begin
-    unique(_, :atoll)
-    getproperty(_, :presence)
-    map(x -> ismissing(x), _)
-end
-
 # Add data about nesting type
 specinfo = @chain begin
     CSV.read("$ROOT/data/seabird_filterconditions.csv", DataFrame)
     select(_, [:species, :nestingtype])
 end
-
-# Convert "presence" to numeric values
-# envscores[!, :presence] = [r.presence == true ? 1.0 : 0.0 for r in eachrow(envscores)]
 
 envs_known = subset(envscores, :presence => ByRow(x -> !ismissing(x)))
 envs_unknown = subset(envscores, :presence => ByRow(x -> ismissing(x)))
@@ -42,8 +32,8 @@ leftjoin!(envs_known, specinfo, on=:species)
 
 pop_known = @chain pop begin
     DataFrames.transform(_, All() .=> ByRow(x -> ismissing(x) ? 0 : x) => identity)
-    subset(_, All() .=> ByRow(x -> x != -1))
     stack(_, Not(:atoll), variable_name=:species, value_name=:nbirds)
+    subset(_, :nbirds => ByRow(x -> x != -1))
     subset(_, :nbirds => ByRow(x -> x != 0))
     leftjoin(_, envs_known, on=[:atoll, :species])
     select(_, Not(:presence))

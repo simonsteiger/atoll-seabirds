@@ -52,7 +52,7 @@ Random.seed!(42)
 benchmark = false
 
 # Load saved chains?
-load = true
+load = false
 
 # Save the result?
 save = true
@@ -123,7 +123,7 @@ else
     Turing.setrdcache(true)
 
     # Configure sampling
-    sampler = NUTS(1000, 0.90; max_depth=10)
+    sampler = NUTS(1000, 0.95; max_depth=10)
     nsamples = 2000
     nchains = 4
     ndiscard = 200
@@ -197,8 +197,8 @@ end
 avg_preds_unknown = vec(mean(countpreds_unknown, dims=2))
 avg_preds_known = vec(mean(countpreds_known, dims=2))
 
-pred_x = avg_preds_known[num_species_known.==5]
-obs_x = log.(nbirds)[num_species_known.==5]
+pred_x = avg_preds_known[num_species_known.==10]
+obs_x = log.(nbirds)[num_species_known.==10]
 scatter(eachindex(pred_x), pred_x, label="pred")
 scatter!(eachindex(pred_x), obs_x, label="obs")
 
