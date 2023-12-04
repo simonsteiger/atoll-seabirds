@@ -7,56 +7,78 @@ using Statistics, DataFrames, Compat, Chain, StatsFuns # wrangling
 # Second entry is csv file name
 # Third entry is variable name in nc file
 
-vars = [
-  ["nppv", "nppv", "nppv"],
-  ["chl", "chl", "chl"],
-  ["phyc", "phyc", "phyc"],
-  ["temp_1", "temp_1", "thetao"],
-  ["temp_2", "temp_2", "thetao"],
-  ["velo_1", "velo_1", "vo"],
-  ["velo_2", "velo_2", "vo"],
-  ["velo_3", "velo_3", "vo"],
-  ["velo_4", "velo_4", "vo"],
-  ["longitude", "nppv", "longitude"],
-  ["latitude", "nppv", "latitude"],
-  ["longitude_velo", "velo_1", "longitude"],
-  ["latitude_velo", "velo_1", "latitude"],
-  ["longitude_temp", "temp_1", "longitude"],
-  ["latitude_temp", "temp_1", "latitude"],
+const KEYS = [
+  "nppv", 
+  "chl",
+  "phyc",
+  "temp_" .* string.(1:2)...,
+  "velo_"  .* string.(1:4)...,
+  "longitude",
+  "latitude",
+  [x .* y for x in ["longitude", "latitude"], y in ["_velo", "_temp"]]...,
+]
+
+const FILENAMES = [
+  "nppv",
+  "chl",
+  "phyc",
+  "temp_" .* string.(1:2)...,
+  "velo_"  .* string.(1:4)...,
+  "nppv", "nppv",
+  "velo_1", "velo_1",
+  "temp_1", "temp_1",
+]
+
+const VARS = [
+  "nppv",
+  "chl",
+  "phyc",
+  "thetao",
+  "thetao",
+  "vo",
+  "vo",
+  "vo",
+  "vo",
+  "longitude",
+  "latitude",
+  "longitude",
+  "latitude",
+  "longitude",
+  "latitude",
 ]
 
 # Create a dictionary to write to
-dct = Dict()
-
-# Read nc files
-[dct[v[1]] = NetCDF.open("data/copernicus_$(v[2]).nc", v[3]) for v in vars];
-
-# x = NetCDF.open("data/copernicus_temp_1.nc")
-# x[:, :, :, :]
-# just calling x, dimension thetao seems to be "longitude latitude depth (??) time"
+dct = Dict{String,Any}(Pair.(KEYS, NetCDF.open.("data/copernicus_" .* FILENAMES .* ".nc", VARS)))
 
 # Calculate absolute values of all cells
-[dct[v[1]] = abs.(dct[v[1]]) for v in vars[collect(1:9)]]; # only nppv, chl, phyc
+[dct[k] = abs.(dct[k]) for k in KEYS[1:9]]; # only nppv, chl, phyc
 
 # Calculate mean of array slices
-[dct[v[1]] = mean(dct[v[1]], dims=4) for v in vars[collect(1:9)]]
+[dct[k] = mean(dct[k], dims=4) for k in KEYS[1:9]]
+
+# Temperature: Multiply by scale factor and add offset
+[dct[k] = dct[k] .* 0.0007324442267417908 .+ 21 for k in ["temp_1", "temp_2"]]
+
+# Velocity: Multiply by scale factor
+[dct[k] = dct[k] .* 0.0006103701889514923 for k in ["velo_1", "velo_2", "velo_3", "velo_4"]]
+
 
 for k in keys(dct)
   dct[k] = allowmissing(Float64.(dct[k]))
 end
 
-[map!(x -> isinf(x) ? missing : x, dct[v[1]], dct[v[1]]) for v in vars[collect(1:9)]];
+[map!(x -> isinf(x) ? missing : x, dct[k], dct[k]) for k in KEYS[1:9]];
 
 # Concatenate temp arrays on time axis
 dct["temp"] = @chain Base.cat(dct["temp_1"], dct["temp_2"], dims=3) begin
   mean(_, dims=3)
-  map(x -> x == 32767.0 ? missing : x, _)
+  map(x -> x == 45.0 ? missing : x, _) # 45 is the new missing after rescale
 end
 
 # Concatenate velo arrays on time axis
 dct["velo"] = @chain Base.cat(dct["velo_1"], dct["velo_2"], dct["velo_3"], dct["velo_4"], dims=3) begin
   mean(_, dims=3)
-  map(x -> x == 32767.0 ? missing : x, _)
+  map(x -> x == 20.0 ? missing : x, _) # 20 is the new missing after rescale
 end
 
 # Remove no longer necessary arrays from dictionary
@@ -97,12 +119,12 @@ end
 [dctdf[n] = writecp(dct, n, dct[string("longitude_", n)], dct[string("latitude_", n)]) for n in ["velo", "temp"]]
 
 # Join all dfs stored in dict to single df
-cp_df =
-  let v = collect(dctdf)
-    @chain [v[i][2] for i in eachindex(v)] begin
-      reduce((x, y) -> innerjoin(x, y, on=[:latitude, :longitude]), _)
-    end
-  end
+cp_df = @chain begin
+  get.(Ref(dctdf), ["nppv", "chl"], missing)
+  reduce((x, y) -> leftjoin(x, y, on=[:latitude, :longitude]), _)
+end
+
+# problem here might be (is!) that the longitude and latitude data are set to abs
 
 # Calculate outcome means for ± 1 long/lat around each atoll
 function extract(df, env_lat, env_long; tol=1)
