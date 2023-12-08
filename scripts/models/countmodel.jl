@@ -31,7 +31,6 @@ using Random
 
 # Load custom modules
 include("$ROOT/scripts/preprocessing/countvars.jl")
-include("$ROOT/src/postprocess.jl")
 include("$ROOT/src/utilities.jl")
 include("$ROOT/src/stats.jl")
 include("$ROOT/scripts/visualization/diagnosticplots.jl")
@@ -39,7 +38,6 @@ include("$ROOT/scripts/visualization/paramplots.jl")
 
 # Make custom modules available
 using .CountVariables
-using .Postprocess
 using .CustomUtilityFuns
 using .CustomStatsFuns
 using .DiagnosticPlots
@@ -52,7 +50,7 @@ Random.seed!(42)
 benchmark = false
 
 # Load saved chains?
-load = false
+load = true
 
 # Save the result?
 save = true
@@ -217,6 +215,8 @@ df_countpreds = DataFrame(
 
 CSV.write("$ROOT/data/countpreds_$PRIORSUFFIX.csv", df_countpreds)
 @info "Successfully saved predictions to `$ROOT/data/countpreds_$PRIORSUFFIX.csv`."
+
+cv_res = psis_loo(model, chain)
 
 # Posterior predictive checks
 post_preds = let

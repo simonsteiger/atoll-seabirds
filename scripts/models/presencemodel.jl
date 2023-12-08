@@ -16,7 +16,7 @@ PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[1]
 const ROOT = dirname(Base.active_project())
 
 # Probabilistic programming
-using Turing, TuringBenchmarking, ReverseDiff
+using Turing, TuringBenchmarking, ReverseDiff, ParetoSmooth
 # Model speed optimization
 using LazyArrays
 # Statistics
@@ -32,14 +32,12 @@ using Random
 
 # Load custom modules
 include("$ROOT/scripts/preprocessing/presencevars.jl")
-include("$ROOT/src/postprocess.jl")
 include("$ROOT/src/utilities.jl")
 include("$ROOT/scripts/visualization/diagnosticplots.jl")
 include("$ROOT/scripts/visualization/paramplots.jl")
 
 # Make custom modules available
 using .PresenceVariables
-using .Postprocess
 using .CustomUtilityFuns
 using .DiagnosticPlots
 using .ParamPlots
@@ -51,7 +49,7 @@ Random.seed!(42)
 benchmark = false
 
 # Load saved chains?
-load = false
+load = true
 
 # Save the result?
 save = true
@@ -140,7 +138,6 @@ end;
 
 θ = generated_quantities(model, chain)
 
-
 function predictpresence(α, β, idx_sn, s, r, X; idx_sr=idx(s, r))
     [rand.(BernoulliLogit.(α[i][idx_sr] .+ sum(β[i][idx_sn, :] .* X, dims=2))) for i in eachindex(α)]
 end
@@ -168,6 +165,13 @@ end
 
 save && CSV.write("$ROOT/data/presencepreds_$PRIORSUFFIX.csv", df_preds)
 isfile("$ROOT/data/presencepreds_$PRIORSUFFIX.csv") && @info "Successfully saved predictions to `$ROOT/data/presencepreds_$PRIORSUFFIX.csv`."
+
+cv_res = psis_loo(model, chain)
+# - no overfit
+# - out of sample performance near in-sample performance (gmpd 0.76)
+# - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))
+# - in line with posterior predictive check
+# - not sure how to interpret differences in naive_lpd and cv_elpd ... but they seem very low p_avg 0.02
 
 # Posterior predictive checks
 post_preds = let
