@@ -5,7 +5,9 @@ export num_atoll_known,
        num_region_known,
        num_region_unknown,
        num_species_known,
+       str_species_known,
        num_species_unknown,
+       str_species_unknown,
        nbirds,
        ppres,
        PC_known,
@@ -44,7 +46,9 @@ num_region_known = Int64.(denserank(pop_known.region))
 num_region_unknown = Int64.(denserank(pop_unknown.region))
 
 num_species_known = Int64.(denserank(pop_known.species))
+str_species_known = pop_known.species
 num_species_unknown = Int64.(denserank(pop_unknown.species))
+str_species_unknown = pop_unknown.species
 
 maximum(num_species_unknown), maximum(num_species_known)
 

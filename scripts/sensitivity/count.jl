@@ -3,12 +3,9 @@ using CSV, Serialization, DataFrames
 # Pathing
 const ROOT = dirname(Base.active_project())
 
-include("$ROOT/scripts/visualization/diagnosticplots.jl")
-using .DiagnosticPlots
-
-chain_narrow = deserialize("$ROOT/scripts/models/chains/chains_count_narrow.jls")
-chain_wide = deserialize("$ROOT/scripts/models/chains/chains_count_wide.jls")
-chain_default = deserialize("$ROOT/scripts/models/chains/chains_count_default.jls")
+chain_narrow = deserialize("$ROOT/chains/count_narrow.jls")
+chain_wide = deserialize("$ROOT/chains/count_wide.jls")
+chain_default = deserialize("$ROOT/chains/count_default.jls")
 
 preds_narrow = CSV.read("$ROOT/data/countpreds_narrow.csv", DataFrame)
 preds_wide = CSV.read("$ROOT/data/countpreds_wide.csv", DataFrame)

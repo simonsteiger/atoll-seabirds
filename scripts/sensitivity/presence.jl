@@ -6,9 +6,9 @@ const ROOT = dirname(Base.active_project())
 include("$ROOT/scripts/visualization/diagnosticplots.jl")
 using .DiagnosticPlots
 
-chain_narrow = deserialize("$ROOT/scripts/models/chains/chains_presence_narrow.jls")
-chain_wide = deserialize("$ROOT/scripts/models/chains/chains_presence_wide.jls")
-chain_default = deserialize("$ROOT/scripts/models/chains/chains_presence_default.jls")
+chain_narrow = deserialize("$ROOT/scripts/models/chains/presence_narrow.jls")
+chain_wide = deserialize("$ROOT/scripts/models/chains/presence_wide.jls")
+chain_default = deserialize("$ROOT/scripts/models/chains/presence_default.jls")
 
 preds_narrow = CSV.read("$ROOT/data/presencepreds_narrow.csv", DataFrame)
 preds_wide = CSV.read("$ROOT/data/presencepreds_wide.csv", DataFrame)

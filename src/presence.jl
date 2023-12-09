@@ -4,6 +4,7 @@ export num_atoll,
        num_atoll_unknown,
        str_atoll_unknown,
        num_species,
+       str_species,
        num_species_unknown,
        presence,
        PC,
@@ -50,6 +51,7 @@ num_region = Int64.(denserank(envs_known.region))
 num_region_unknown = Int64.(denserank(envs_unknown.region))
 
 num_species = Int64.(denserank(envs_known.species))
+str_species = envs_known.species
 num_species_unknown = df_species_unknown.num_species
 str_species_unknown = df_species_unknown.species
 

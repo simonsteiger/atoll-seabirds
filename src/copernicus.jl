@@ -1,11 +1,7 @@
 module Copernicus
 
-using NetCDF, CSV # read
-using Statistics, DataFrames, Compat, Chain, StatsFuns # wrangling
-
-# First element is key in dictionary
-# Second entry is csv file name
-# Third entry is variable name in nc file
+using NetCDF, CSV
+using Statistics, DataFrames, Compat, Chain, StatsFuns
 
 const KEYS = [
   "nppv", 

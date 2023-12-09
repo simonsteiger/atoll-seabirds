@@ -1,17 +1,3 @@
-# Prior settings can be set from command line
-σₚ, λₚ = 1, 1
-
-if isempty(ARGS) || ARGS[1] == "default"
-    @info "Fitting model with default priors: σₚ=$σₚ, λₚ=$λₚ."
-elseif all(ARGS[1] .!= ["narrow", "wide"])
-    throw("Unknown prior setting: '$(ARGS[1])'. Pass nothing or one of 'default', 'narrow', 'wide'.")
-else
-    σₚ, λₚ = ARGS[1] == "wide" ? [σₚ, λₚ] .* 3 : [σₚ, λₚ] .* 1 / 3
-    @info "Fitting model with $(ARGS[1]) priors: σₚ=$(round(σₚ, digits=2)), λₚ=$(round(λₚ, digits=2))."
-end
-
-PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[1]
-
 # Pathing
 const ROOT = dirname(Base.active_project())
 
@@ -31,16 +17,12 @@ using Serialization, CSV, Dates, Markdown
 using Random
 
 # Load custom modules
-include("$ROOT/scripts/preprocessing/presencevars.jl")
+include("$ROOT/src/presence.jl")
 include("$ROOT/src/utilities.jl")
-include("$ROOT/scripts/visualization/diagnosticplots.jl")
-include("$ROOT/scripts/visualization/paramplots.jl")
 
 # Make custom modules available
 using .PresenceVariables
 using .CustomUtilityFuns
-using .DiagnosticPlots
-using .ParamPlots
 
 # Set seed
 Random.seed!(42)
@@ -49,16 +31,28 @@ Random.seed!(42)
 benchmark = false
 
 # Load saved chains?
-load = true
-
-# Save the result?
-save = true
-!save && @warn "Samples will NOT be saved automatically."
-
-# If not loading a chain, save results to path below
-chainpath = "chains_presence_$PRIORSUFFIX.jls"
+run = isempty(ARGS) ? false : ARGS[1]
 
 ### MODEL SPECIFICATION ###
+
+# Prior settings can be set from command line
+σₚ, θₚ = 1, 0.1
+
+if !run
+    @info "Loading chain, no model fit."
+elseif isempty(ARGS) || ARGS[2] == "default"
+    @info "Fitting model with default priors: σₚ=$σₚ, θₚ=$θₚ."
+elseif all(ARGS[2] .!= ["narrow", "wide"])
+    throw("Unknown prior setting: '$(ARGS[2])'. Pass nothing or one of 'default', 'narrow', 'wide'.")
+else
+    σₚ, θₚ = ARGS[2] == "wide" ? [σₚ, θₚ] .* 3 : [σₚ, θₚ] .* 1 / 3
+    @info "Fitting model with $(ARGS[2]) priors: σₚ=$(round(σₚ, digits=2)), θₚ=$(round(θₚ, digits=2))."
+end
+
+PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[2]
+
+# Path to read or write chain from / to
+chainpath = "chains_presence_$PRIORSUFFIX.jls"
 
 lu(x) = length(unique(x))
 
@@ -73,7 +67,7 @@ lu(x) = length(unique(x))
 
     # Priors for nesting types × PCs
     μ_pxn ~ filldist(Normal(0, σₚ), Nn, NPC)
-    τ_pxn ~ filldist(Exponential(λₚ), Nn, NPC)
+    τ_pxn ~ filldist(InverseGamma(3, θₚ), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
@@ -110,8 +104,8 @@ let adbackends = [:forwarddiff, :reversediff, :reversediff_compiled]
 end
 
 # Sample from model unless a saved chain should be used
-if load
-    chain = deserialize("$ROOT/scripts/models/chains/$chainpath")
+if !run
+    chain = deserialize("$ROOT/results/chains/$chainpath")
 else
     # Set AD backend to :reversediff and compile with setrdcache(true)
     Turing.setadbackend(:reversediff)
@@ -132,8 +126,8 @@ else
     @info "🚀 Starting sampling: $(Dates.now())"
     chain = sample(model, sampler, MCMCThreads(), nsamples, nthreads; discard_initial=ndiscard)
 
-    save && serialize("$ROOT/scripts/models/chains/$chainpath", chain)
-    isfile("$ROOT/scripts/models/chains/$chainpath") && @info "💾 Chain saved to `$ROOT/scripts/models/chains/$chainpath`."
+    serialize("$ROOT/results/chains/$chainpath", chain)
+    @info "💾 Chain saved to `$ROOT/results/chains/$chainpath`."
 end;
 
 θ = generated_quantities(model, chain)
@@ -163,35 +157,23 @@ df_preds = @chain begin
     unstack(_, :species, :percent)
 end
 
-save && CSV.write("$ROOT/data/presencepreds_$PRIORSUFFIX.csv", df_preds)
-isfile("$ROOT/data/presencepreds_$PRIORSUFFIX.csv") && @info "Successfully saved predictions to `$ROOT/data/presencepreds_$PRIORSUFFIX.csv`."
+CSV.write("$ROOT/data/presencepreds_$PRIORSUFFIX.csv", df_preds)
+@info "Successfully saved predictions to `$ROOT/data/presencepreds_$PRIORSUFFIX.csv`."
 
+## Posterior predictive checks
+
+posteriorpreds = Matrix{Float64}(reduce(hcat, vec(predictpresence(α, β, num_region, num_species, num_nesting, PC));))
+
+histogram(presence, normalize=true, alpha=0.5)
+histogram(vec(posteriorpreds), normalize=true, alpha=0.5)
+#histogram!(vcat(check_posterior...), normalize=true, c=:white, lw=3)
+#histogram!(vcat(check_posterior...), normalize=true, c=2, lw=1.5, legend=:none)
+
+
+# LOO
 cv_res = psis_loo(model, chain)
 # - no overfit
 # - out of sample performance near in-sample performance (gmpd 0.76)
 # - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))
 # - in line with posterior predictive check
 # - not sure how to interpret differences in naive_lpd and cv_elpd ... but they seem very low p_avg 0.02
-
-# Posterior predictive checks
-post_preds = let
-    model_y_missing = modelpresence(
-        num_region,
-        num_species,
-        num_nesting,
-        PC,
-        missing,
-        num_species_within_nesting,
-        unique_nesting,
-        unique_species_within_nesting,
-        count_species_by_nesting...,
-    )
-
-    generated_quantities(model_y_missing, chain)
-end
-
-check_posterior = map(x -> x.y, vec(post_preds))
-
-histogram(presence, normalize=true, alpha=0.5)
-histogram!(vcat(check_posterior...), normalize=true, c=:white, lw=3)
-histogram!(vcat(check_posterior...), normalize=true, c=2, lw=1.5, legend=:none)

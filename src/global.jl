@@ -10,7 +10,7 @@ using CSV, DataFrames, Chain
 
 import StatsBase: denserank
 
-ARGS2 = isempty(ARGS) ? "default" : ARGS[2]
+ARGS2 = isempty(ARGS) ? "default" : ARGS[3]
 
 ROOT = dirname(Base.active_project())
 

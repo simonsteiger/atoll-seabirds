@@ -8,7 +8,7 @@ import StatsBase: denserank, mean
 
 const ROOT = dirname(Base.active_project())
 
-include("$ROOT/scripts/preprocessing/preprocess.jl")
+include("$ROOT/src/preprocess/global.jl")
 
 known = Preprocess.pop_known[:, [:atoll, :region, :species, :nbirds]]
 glob = CSV.read("$ROOT/data/atoll_seabird_global_popestimates.csv", DataFrame)
