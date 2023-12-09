@@ -34,27 +34,27 @@ Random.seed!(42)
 # Benchmark model?
 benchmark = false
 
-# Load saved chains?
-load = isempty(ARGS) ? true : ARGS[1]
+# Run the sampler?
+run = isempty(ARGS) ? false : ARGS[1] == "true"
 
 # Prior settings can be set from command line
-σₚ, θₚ = 1, 0.5
+σₚ, θₚ = 1, 1
 
-if load
+if !run
     @info "Loading chain, no model fit."
-elseif isempty(ARGS) || ARGS[1] == "default"
+elseif isempty(ARGS) || ARGS[2] == "default"
     @info "Fitting model with default priors: σₚ=$σₚ, θₚ=$θₚ."
-elseif all(ARGS[1] .!= ["narrow", "wide"])
-    throw("Unknown prior setting: '$(ARGS[1])'. Pass nothing or one of 'default', 'narrow', 'wide'.")
+elseif all(ARGS[2] .!= ["narrow", "wide"])
+    throw("Unknown prior setting: '$(ARGS[2])'. Pass nothing or one of 'default', 'narrow', 'wide'.")
 else
-    σₚ, θₚ = ARGS[1] == "wide" ? [σₚ, θₚ] .* 3 : [σₚ, θₚ] .* 1 / 3
-    @info "Fitting model with $(ARGS[1]) priors: σₚ=$(round(σₚ, digits=2)), θₚ=$(round(θₚ, digits=2))."
+    σₚ, θₚ = ARGS[2] == "wide" ? [σₚ, θₚ] .* 3 : [σₚ, θₚ] .* 1 / 3
+    @info "Fitting model with $(ARGS[2]) priors: σₚ=$(round(σₚ, digits=2)), θₚ=$(round(θₚ, digits=2))."
 end
 
-PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[1]
+PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[2]
 
 # If not loading a chain, save results to path below
-chainpath = "chains_count_$PRIORSUFFIX.jls"
+chainpath = "count_$PRIORSUFFIX.jls"
 
 # ---------------- #
 # HELPER FUNCTIONS #
@@ -63,7 +63,8 @@ chainpath = "chains_count_$PRIORSUFFIX.jls"
 function predictcount(α, β, σ2, idx_sn, s, r, X; idx_sr=idx(s, r))
     out = Vector(undef, length(α))
     for i in eachindex(α)
-        out[i] = rand.(Normal.(α[i][idx_sr] .+ sum(β[i][idx_sn, :] .* X, dims=2), σ2[i]))
+        μ = α[i][idx_sr] .+ sum(β[i][idx_sn, :] .* X, dims=2)
+        out[i] = rand.(Normal.(μ, σ2[i]))
     end
     return out
 end
@@ -77,7 +78,14 @@ function getsamples(θ, sym)
     end
 end
 
+# Shorthand helper for model
 lu(x) = length(unique(x))
+
+# generated_quantities doesn't like interal parameters
+function peaceful_generated_quantities(m, c)
+    chains_params = Turing.MCMCChains.get_sections(c, :parameters)
+    return generated_quantities(m, chains_params)
+end
 
 # ------------------- #
 # MODEL SPECIFICATION #
@@ -92,24 +100,26 @@ lu(x) = length(unique(x))
 
     # Priors for species × region
     μ_sxr ~ filldist(Normal(0, σₚ), Ns)
-    τ_sxr ~ filldist(InverseGamma(3, θₚ), Ns)
+    τ_sxr ~ filldist(InverseGamma(3, θₚ/3), Ns)
     z_sxr ~ filldist(Normal(), Ns, Nr)
     α_sxr = μ_sxr .+ τ_sxr .* z_sxr
 
     # Priors for nesting types × PCs
     μ_pxn ~ filldist(Normal(0, σₚ), Nn, NPC)
-    τ_pxn ~ filldist(InverseGamma(3, θₚ), Nn, NPC)
+    τ_pxn ~ filldist(InverseGamma(3, θₚ/3), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
     z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
     β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
 
+    # Prior for random error
     σ2 ~ InverseGamma(3, θₚ)
 
     # Likelihood
     μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
-    y ~ MvNormal(μ, σ2 * I)
+    Σ = σ2 * I
+    y ~ MvNormal(μ, Σ)
 
     # Generated quantities
     return (; y, α_sxr, β_pxn)
@@ -132,11 +142,14 @@ model = modelcount(
 # PRIOR PREDICTIVE CHECKS #
 # ----------------------- #
 prior_preds = let
+    @info "Sampling from prior."
+
     # Fit model and extract parameters
     prior_chain = sample(model, Prior(), 5000)
-    gqs = generated_quantities(model, prior_chain);
+    gqs = peaceful_generated_quantities(model, prior_chain);
     α, β = [getsamples(gqs, s) for s in [:α_sxr, :β_pxn]];
     σ2 = reduce(hcat, get_params(prior_chain).σ2)'
+    
     # Make prior predictions
     @chain begin
         predictcount(
@@ -157,6 +170,7 @@ hist_overall_priorpc = histogram(log.(nbirds), normalize=true, lw=0.5, lc=:white
 histogram!(vec(prior_preds), normalize=true, c=:white, lw=3, label=false)
 histogram!(vec(prior_preds), normalize=true, c=2, lw=1.5, label="Predicted")
 title!("Prior predictive check"); xlabel!("log(Count)"); ylabel!("Density")
+display(hist_overall_priorpc)
 # Prior predictive check is OK
 # but could be better considering that we know there's at least one bird per atoll
 
@@ -166,7 +180,7 @@ let adbackends = [:forwarddiff, :reversediff, :reversediff_compiled]
 end
 
 # Sample from model unless a saved chain should be used
-if load
+if !run
     chain = deserialize("$ROOT/results/chains/$chainpath")
 else
     # Set AD backend to :reversediff and compile with setrdcache(true)
@@ -192,7 +206,7 @@ else
     @info "💾 Chain saved to '$ROOT/results/chains/$chainpath'."
 end;
 
-gqs = generated_quantities(model, chain);
+gqs = peaceful_generated_quantities(model, chain);
 
 α, β = [getsamples(gqs, s) for s in [:α_sxr, :β_pxn]];
 σ2 = reduce(hcat, get_params(chain).σ2)'
@@ -249,11 +263,12 @@ hist_overall_postpc = histogram(log.(nbirds), normalize=true, lw=0.5, lc=:white,
 histogram!(vec(countpreds_known), normalize=true, c=:white, lw=3, label=false)
 histogram!(vec(countpreds_known), normalize=true, c=2, lw=1.5, label="Predicted")
 title!("Posterior predictive check"); xlabel!("log(Count)"); ylabel!("Density")
-xlims!(-30, 30)
 
 # Gather prior and posterior predictive checks into single plot
-plot(hist_overall_priorpc, hist_overall_postpc, size=(800, 500))
-savefig("$ROOT/results/svg/validation_count_priorpostpc.svg")
+grid_pppc = plot(hist_overall_priorpc, hist_overall_postpc, size=(800, 500))
+xlims!(-30, 30)
+display(grid_pppc)
+savefig("$ROOT/results/svg/validation_count_pppc.svg")
 
 # Species-specific checks
 hist_species_postpc = map(enumerate(unique(num_species_known))) do (index, species)
@@ -273,8 +288,53 @@ savefig("$ROOT/results/svg/validation_count_postpc_species.svg")
 # It seems that specifying the model as MvNormal breaks psis_loo ("1 data point")
 # Respecify the likelihood as vectorized Normals
 # y .~ Normal.(μ, σ)
+# Can still use the fit chain though because formulas are identical.
 
-# cv_res = psis_loo(model, chain)
+@model function loospecial(
+    r, s, n, PC, y,
+    idx_sn, u_n, u_sn, Nv, Ng, Nb;
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
+)
+
+    # Priors for species × region
+    μ_sxr ~ filldist(Normal(0, σₚ), Ns)
+    τ_sxr ~ filldist(InverseGamma(3, θₚ), Ns)
+    z_sxr ~ filldist(Normal(), Ns, Nr)
+    α_sxr = μ_sxr .+ τ_sxr .* z_sxr
+
+    # Priors for nesting types × PCs
+    μ_pxn ~ filldist(Normal(0, σₚ), Nn, NPC)
+    τ_pxn ~ filldist(InverseGamma(3, θₚ), Nn, NPC)
+    z_pxb ~ filldist(Normal(), Nb, NPC)
+    z_pxg ~ filldist(Normal(), Ng, NPC)
+    z_pxv ~ filldist(Normal(), Nv, NPC)
+    z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
+    β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
+
+    # Prior for random error
+    σ2 ~ InverseGamma(3, θₚ)
+
+    # Likelihood
+    μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
+    y .~ Normal.(μ, σ2)
+
+    # Generated quantities
+    return (; y, α_sxr, β_pxn)
+end;
+
+loomodel = loospecial(
+    num_region_known,
+    num_species_known,
+    num_nesting_known,
+    PC_known,
+    log.(nbirds),
+    num_species_within_nesting_known,
+    unique_nesting_known,
+    unique_species_within_nesting_known,
+    count_species_by_nesting...,
+);
+
+cv_res = psis_loo(loomodel, chain)
 
 # Variance priors: Exponential(1).^2  #
 # ----------------------------------- #

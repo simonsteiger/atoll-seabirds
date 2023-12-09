@@ -30,8 +30,8 @@ Random.seed!(42)
 # Benchmark model?
 benchmark = false
 
-# Load saved chains?
-run = isempty(ARGS) ? false : ARGS[1]
+# Run the sampler?
+run = isempty(ARGS) ? false : ARGS[1] == "true"
 
 ### MODEL SPECIFICATION ###
 
@@ -52,9 +52,14 @@ end
 PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[2]
 
 # Path to read or write chain from / to
-chainpath = "chains_presence_$PRIORSUFFIX.jls"
+chainpath = "presence_$PRIORSUFFIX.jls"
 
 lu(x) = length(unique(x))
+
+function peaceful_generated_quantities(m, c)
+    chains_params = Turing.MCMCChains.get_sections(c, :parameters)
+    return generated_quantities(m, chains_params)
+end
 
 @model function modelpresence(
     r, s, n, PC, y,
@@ -72,7 +77,7 @@ lu(x) = length(unique(x))
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
     z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
-    β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
+    β_pxn = @. μ_pxn[u_n, :] + τ_pxn[u_n, :] * z_pxn[u_sn, :]
 
     # Likelihood
     v = α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2)
@@ -130,7 +135,7 @@ else
     @info "💾 Chain saved to `$ROOT/results/chains/$chainpath`."
 end;
 
-θ = generated_quantities(model, chain)
+θ = peaceful_generated_quantities(model, chain)
 
 function predictpresence(α, β, idx_sn, s, r, X; idx_sr=idx(s, r))
     [rand.(BernoulliLogit.(α[i][idx_sr] .+ sum(β[i][idx_sn, :] .* X, dims=2))) for i in eachindex(α)]
@@ -157,21 +162,20 @@ df_preds = @chain begin
     unstack(_, :species, :percent)
 end
 
-CSV.write("$ROOT/data/presencepreds_$PRIORSUFFIX.csv", df_preds)
+CSV.write("$ROOT/results/data/presencepreds_$PRIORSUFFIX.csv", df_preds)
 @info "Successfully saved predictions to `$ROOT/data/presencepreds_$PRIORSUFFIX.csv`."
 
 ## Posterior predictive checks
 
 posteriorpreds = Matrix{Float64}(reduce(hcat, vec(predictpresence(α, β, num_region, num_species, num_nesting, PC));))
 
-histogram(presence, normalize=true, alpha=0.5)
-histogram(vec(posteriorpreds), normalize=true, alpha=0.5)
-#histogram!(vcat(check_posterior...), normalize=true, c=:white, lw=3)
-#histogram!(vcat(check_posterior...), normalize=true, c=2, lw=1.5, legend=:none)
+# how do we best visualize binary posterior predictions?
 
+scatter(mean.([presence, posteriorpreds]), yerror=std(presence))
 
 # LOO
-cv_res = psis_loo(model, chain)
+cv_res = psis_loo(model, chain);
+println(cv_res)
 # - no overfit
 # - out of sample performance near in-sample performance (gmpd 0.76)
 # - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))

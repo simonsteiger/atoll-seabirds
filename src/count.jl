@@ -22,7 +22,7 @@ export num_atoll_known,
        num_species_within_nesting_unknown,
        count_species_by_nesting
    
-include("preprocess.jl")
+include("global.jl")
 using .Preprocess
 
 using DataFrames, Chain, StatsBase

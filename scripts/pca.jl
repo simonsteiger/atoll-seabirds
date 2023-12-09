@@ -5,24 +5,11 @@ using Match
 
 const ROOT = dirname(Base.active_project())
 
-include("../../src/stats.jl")
-using .CustomStatsFuns
-
 const PC_NAMES = ["PC1", "PC2", "PC3", "PC4", "PC5", "PC6"]
 
 envs = CSV.read("$ROOT/data/envs_jicp.csv", DataFrame, missingstring="NA")
 
 DataFrames.transform!(envs, :human_population => ByRow(x -> ifelse(ismissing(x), round(median(skipmissing(envs.human_population)), digits=0), x)) => identity)
-
-
-# number of islets      => log
-# land area             => log
-# lagoon area           => log1p
-# tropical storms 50k   => log1p
-# hurricanes 50k        => log1p
-# dist nearest atol     => log
-# dist nearest high i   => log
-# human population      => log1p
 
 DataFrames.transform!(envs, [:number_islets, :land_area_sqkm, :distance_nearest_atoll_km, :distance_nearest_high_island_km] .=> ByRow(x -> log(x)) => identity)
 DataFrames.transform!(envs, [:lagoon_area_sqkm, :tropical_storms_50km, :hurricanes_50km, :human_population] .=> ByRow(x -> log1p(x)) => identity)
@@ -47,7 +34,7 @@ envscores = @chain predict(M, X_features)' begin
     outerjoin(_, seabirds, on=:atoll)
 end
 
-CSV.write("$ROOT/data/jl_envscores.csv", envscores)
+CSV.write("$ROOT/results/data/jl_envscores.csv", envscores)
 
 # Make a heatmap from PCA projections
 proj = MS.projection(M)

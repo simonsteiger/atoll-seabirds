@@ -1,9 +1,9 @@
 module Preprocess
 
 export envs_known,
-    envs_unknown,
-    pop_known,
-    pop_unknown
+       envs_unknown,
+       pop_known,
+       pop_unknown
 
 # Working with tabular data
 using CSV, DataFrames, Chain
@@ -15,7 +15,7 @@ ARGS2 = isempty(ARGS) ? "default" : ARGS[3]
 ROOT = dirname(Base.active_project())
 
 # Import the data
-envscores = CSV.read("$ROOT/data/jl_envscores.csv", DataFrame)
+envscores = CSV.read("$ROOT/results/data/jl_envscores.csv", DataFrame)
 pop = CSV.read("$ROOT/data/atoll_seabird_populations.csv", DataFrame)
 
 # Add data about nesting type
@@ -40,13 +40,13 @@ pop_known = @chain pop begin
 end
 
 # Check if prediction data frame for a given prior setting exists
-preds_exist = isfile("$ROOT/data/presencepreds_$ARGS2.csv")
+preds_exist = isfile("$ROOT/results/data/presencepreds_$ARGS2.csv")
 
 # Create pred data frame if this is the case
 if preds_exist
     @info "Joining envs_unknown onto predictions made using $ARGS2 priors."
     preds = @chain begin
-        CSV.read("$ROOT/data/presencepreds_$ARGS2.csv", DataFrame)
+        CSV.read("$ROOT/results/data/presencepreds_$ARGS2.csv", DataFrame)
         stack(_)
         select(_, :atoll, :variable => :species, :value => :nbirds)
         leftjoin(_, select(envs_unknown, r"PC|region|atoll"), on=:atoll)
