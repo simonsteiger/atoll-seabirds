@@ -2,7 +2,9 @@
 const ROOT = dirname(Base.active_project())
 
 # Probabilistic programming
-using Turing, TuringBenchmarking, ReverseDiff, ParetoSmooth
+using Turing, ReverseDiff, ParetoSmooth
+# Benchmarking
+using TuringBenchmarking, BenchmarkTools
 # Model speed optimization
 using LazyArrays
 # Statistics
@@ -19,98 +21,95 @@ using Random
 # Load custom modules
 include("$ROOT/src/presence.jl")
 include("$ROOT/src/utilities.jl")
+include("$ROOT/scripts/modelzoo.jl")
 
 # Make custom modules available
 using .PresenceVariables
 using .CustomUtilityFuns
+using .ModelZoo
 
 # Set seed
 Random.seed!(42)
+
+# --- SETTINGS --- #
 
 # Benchmark model?
 benchmark = false
 
 # Run the sampler?
-run = isempty(ARGS) ? false : ARGS[1] == "true"
+sample_model = isempty(ARGS) ? false : ARGS[1] == "run"
 
-### MODEL SPECIFICATION ###
-
-# Prior settings can be set from command line
-σₚ, θₚ = 1, 0.1
-
-if !run
-    @info "Loading chain, no model fit."
-elseif isempty(ARGS) || ARGS[2] == "default"
-    @info "Fitting model with default priors: σₚ=$σₚ, θₚ=$θₚ."
-elseif all(ARGS[2] .!= ["narrow", "wide"])
-    throw("Unknown prior setting: '$(ARGS[2])'. Pass nothing or one of 'default', 'narrow', 'wide'.")
-else
-    σₚ, θₚ = ARGS[2] == "wide" ? [σₚ, θₚ] .* 3 : [σₚ, θₚ] .* 1 / 3
-    @info "Fitting model with $(ARGS[2]) priors: σₚ=$(round(σₚ, digits=2)), θₚ=$(round(θₚ, digits=2))."
+if isempty(ARGS) || ARGS[2] == "4" # most complex model
+    model = mXp
+    # What does the auto named tuple notation (; ...) do with splatted vectors?
+    inputs = (num_region, num_species, num_nesting, PC, num_species_within_nesting, unique_nesting, unique_species_within_nesting, count_species_by_nesting...,)
+    simulate = mXp_predict
+elseif ARGS[2] == "1" # simplest model
+    model = m1p
+    inputs = (; num_region, num_species)
+    simulate = m1p_predict
 end
 
-PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[2]
+# Prior settings can be set from command line
+# σₚ, θₚ = 1, 1
+
+# if !sample_model
+#     @info "Loading chain, no model fit."
+# elseif isempty(ARGS) || ARGS[2] == "default"
+#     @info "Fitting model with default priors: σₚ=$σₚ, θₚ=$θₚ."
+# elseif all(ARGS[2] .!= ["narrow", "wide"])
+#     throw("Unknown prior setting: '$(ARGS[2])'. Pass nothing or one of 'default', 'narrow', 'wide'.")
+# else
+#     σₚ, θₚ = ARGS[2] == "wide" ? [σₚ, θₚ] .* 3 : [σₚ, θₚ] .* 1 / 3
+#     @info "Fitting model with $(ARGS[2]) priors: σₚ=$(round(σₚ, digits=2)), θₚ=$(round(θₚ, digits=2))."
+# end
+
+# PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[2]
 
 # Path to read or write chain from / to
-chainpath = "presence_$PRIORSUFFIX.jls"
-
-lu(x) = length(unique(x))
+chainpath = "presence.jls"
 
 function peaceful_generated_quantities(m, c)
     chains_params = Turing.MCMCChains.get_sections(c, :parameters)
     return generated_quantities(m, chains_params)
 end
 
-@model function modelpresence(
-    r, s, n, PC, y,
-    idx_sn, u_n, u_sn, Nv, Ng, Nb;
-    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
-)
+# --- PRIOR PREDICTIVE CHECK --- #
 
-    # Priors for species × region
-    α_sxr ~ filldist(Normal(0, σₚ), Ns * Nr)
+chain_prior = sample(model(inputs..., presence), Prior(), 5000);
 
-    # Priors for nesting types × PCs
-    μ_pxn ~ filldist(Normal(0, σₚ), Nn, NPC)
-    τ_pxn ~ filldist(InverseGamma(3, θₚ), Nn, NPC)
-    z_pxb ~ filldist(Normal(), Nb, NPC)
-    z_pxg ~ filldist(Normal(), Ng, NPC)
-    z_pxv ~ filldist(Normal(), Nv, NPC)
-    z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
-    β_pxn = @. μ_pxn[u_n, :] + τ_pxn[u_n, :] * z_pxn[u_sn, :]
+θ_prior = peaceful_generated_quantities(model(inputs..., presence), chain_prior);
 
-    # Likelihood
-    v = α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2)
-    y .~ BernoulliLogit.(v)
+params_prior = []
 
-    # Generated quantities
-    return (; y, α_sxr, β_pxn)
-end;
+for sym in [:α_sxr, :β_n, :β_pxn]
+    res = haskey(θ_prior[1], sym) && vec(map(x -> getfield(x, sym), θ_prior))
+    res != false && push!(params_prior, res)
+end
 
-# Create model
-model = modelpresence(
-    num_region,
-    num_species,
-    num_nesting,
-    PC,
-    presence,
-    num_species_within_nesting,
-    unique_nesting,
-    unique_species_within_nesting,
-    count_species_by_nesting...,
-);
+priorpc = @chain begin 
+    simulate(params_prior..., inputs...)
+    reduce(hcat, _)
+    Matrix{Float64}(_)
+    mean(_, dims=2)
+end
 
-# Prior predictive checks
-check_prior = sample(model, Prior(), 5000)
+histogram(mean.(priorpc))
 
 # Benchmark different backends to find out which is fastest
-let adbackends = [:forwarddiff, :reversediff, :reversediff_compiled]
-    benchmark && benchmark_model(model; check=true, adbackends=adbackends)
+if benchmark
+    backends = [
+           Turing.Essential.ForwardDiffAD{0}(),
+           Turing.Essential.ReverseDiffAD{false}(),
+           Turing.Essential.ReverseDiffAD{true}()
+       ];
+    
+    TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(model(inputs..., presence), adbackends=backends);)
 end
 
 # Sample from model unless a saved chain should be used
-if !run
-    chain = deserialize("$ROOT/results/chains/$chainpath")
+if !sample_model
+    # chain = deserialize("$ROOT/results/chains/$chainpath")
 else
     # Set AD backend to :reversediff and compile with setrdcache(true)
     Turing.setadbackend(:reversediff)
@@ -118,9 +117,9 @@ else
 
     # Configure sampling
     sampler = NUTS(1000, 0.95; max_depth=10)
-    nsamples = 5000
+    nsamples = 1000
     nthreads = 4
-    ndiscard = 500
+    ndiscard = 100
 
     @info """Sampler: $(string(sampler))
     Samples: $(nsamples)
@@ -129,20 +128,40 @@ else
     """
 
     @info "🚀 Starting sampling: $(Dates.now())"
-    chain = sample(model, sampler, MCMCThreads(), nsamples, nthreads; discard_initial=ndiscard)
+    chain = sample(model(inputs..., presence), sampler, MCMCThreads(), nsamples, nthreads; discard_initial=ndiscard)
 
-    serialize("$ROOT/results/chains/$chainpath", chain)
-    @info "💾 Chain saved to `$ROOT/results/chains/$chainpath`."
+    # serialize("$ROOT/results/chains/$chainpath", chain)
+    # @info "💾 Chain saved to `$ROOT/results/chains/$chainpath`."
 end;
 
-θ = peaceful_generated_quantities(model, chain)
+# --- POSTERIOR PREDICTIVE CHECK --- #
 
-function predictpresence(α, β, idx_sn, s, r, X; idx_sr=idx(s, r))
-    [rand.(BernoulliLogit.(α[i][idx_sr] .+ sum(β[i][idx_sn, :] .* X, dims=2))) for i in eachindex(α)]
+θ_post = peaceful_generated_quantities(model(inputs..., presence), chain)
+
+params_post = []
+
+for sym in [:α_sxr, :β_n, :β_pxn]
+    res = haskey(θ_post[1], sym) && vec(map(x -> getfield(x, sym), θ_post))
+    res != false && push!(params_post, res)
 end
 
-α = [θ[i].α_sxr for i in eachindex(θ[:, 1])]
-β = [θ[i].β_pxn for i in eachindex(θ[:, 1])]
+postpc = @chain begin
+    simulate(params_post..., inputs...)
+    reduce(hcat, _)
+    Matrix{Float64}(_)
+    mean(_, dims=2)
+end
+
+hist_species_postpc = map(enumerate(unique(num_species))) do (index, species)
+    pred_x = postpc[num_species.==species]
+    obs_x = presence[num_species.==species]
+    histogram(obs_x, normalize=true, alpha=0.5, lc=:transparent, bins=10, label="O")
+    histogram!(pred_x, normalize=true, alpha=0.5, bins=10, lc=:transparent, yticks=:none, label="P")
+    xticks!(0:0.5:1, string.(0:0.5:1)); 
+    title!(unique(str_species)[index], titlefontsize=8)
+end
+
+plot(hist_species_postpc..., size=(800,1200), layout=(8,5))
 
 nnu_long = [fill(num_species_within_nesting_unknown, length(num_region_unknown))...;]
 nru_long = [fill.(num_region_unknown, length(num_nesting_unknown))...;]

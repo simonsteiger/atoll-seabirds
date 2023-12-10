@@ -1,6 +1,4 @@
-# --------------- #
-# WORKSPACE SETUP #
-# --------------- #
+# --- WORKSPACE SETUP --- #
 
 # Probabilistic programming
 using Turing, TuringBenchmarking, ReverseDiff, ParetoSmooth
@@ -38,7 +36,7 @@ benchmark = false
 run = isempty(ARGS) ? false : ARGS[1] == "true"
 
 # Prior settings can be set from command line
-σₚ, θₚ = 1, 1
+σₚ, θₚ = 1, 2
 
 if !run
     @info "Loading chain, no model fit."
@@ -56,9 +54,8 @@ PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[2]
 # If not loading a chain, save results to path below
 chainpath = "count_$PRIORSUFFIX.jls"
 
-# ---------------- #
-# HELPER FUNCTIONS #
-# ---------------- #
+
+# --- HELPER FUNCTIONS --- #
 
 function predictcount(α, β, σ2, idx_sn, s, r, X; idx_sr=idx(s, r))
     out = Vector(undef, length(α))
@@ -87,10 +84,7 @@ function peaceful_generated_quantities(m, c)
     return generated_quantities(m, chains_params)
 end
 
-# ------------------- #
-# MODEL SPECIFICATION #
-# ------------------- #
-
+# --- MODEL SPECIFICATION --- #
 
 @model function modelcount(
     r, s, n, PC, y,
@@ -100,13 +94,13 @@ end
 
     # Priors for species × region
     μ_sxr ~ filldist(Normal(0, σₚ), Ns)
-    τ_sxr ~ filldist(InverseGamma(3, θₚ/3), Ns)
+    τ_sxr ~ filldist(InverseGamma(3, θₚ), Ns)
     z_sxr ~ filldist(Normal(), Ns, Nr)
     α_sxr = μ_sxr .+ τ_sxr .* z_sxr
 
     # Priors for nesting types × PCs
     μ_pxn ~ filldist(Normal(0, σₚ), Nn, NPC)
-    τ_pxn ~ filldist(InverseGamma(3, θₚ/3), Nn, NPC)
+    τ_pxn ~ filldist(InverseGamma(3, θₚ/2), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
@@ -138,9 +132,9 @@ model = modelcount(
     count_species_by_nesting...,
 );
 
-# ----------------------- #
-# PRIOR PREDICTIVE CHECKS #
-# ----------------------- #
+
+# --- PRIOR PREDICTIVE CHECKS --- #
+
 prior_preds = let
     @info "Sampling from prior."
 
@@ -282,9 +276,9 @@ end
 grid_species_ppc = plot(hist_species_postpc..., layout=(8,5), size=(1000, 1400), titlefontsize=9)
 savefig("$ROOT/results/svg/validation_count_postpc_species.svg")
 
-# ------ #
-# LOO CV #
-# ------ #
+
+# --- LOO CV --- #
+
 # It seems that specifying the model as MvNormal breaks psis_loo ("1 data point")
 # Respecify the likelihood as vectorized Normals
 # y .~ Normal.(μ, σ)
