@@ -1,38 +1,38 @@
-﻿species,filtercondition,nestingtype,group,bodymass
-Anous_stolidus,none,vegetation,tern,177.8
-Anous_minutus,"Melanesia, Micronesia, Polynesia",vegetation,tern,112.4
-Anous_tenuirostris,Indian_Ocean,vegetation,tern,112
-Anous_ceruleus,"Melanesia, Micronesia, Polynesia",ground,tern,53
-Gygis_alba,none,vegetation,tern,117
-Onychoprion_fuscatus,none,ground,tern,185.7
-Onychoprion_lunatus,"Melanesia, Micronesia, Polynesia",ground,tern,120
-Onychoprion_anaethetus,"Indian_Ocean, Melanesia",ground,tern,119.4
-Sternula_nereis,EXCLUDE,ground,tern,72.3
-Sternula_saundersi,EXCLUDE,ground,tern,42.5
-Hydroprogne_caspia,EXCLUDE,ground,tern,655
-Sterna_dougallii,"Indian_Ocean, Melanesia",ground,tern,112
-Sterna_sumatrana,"Indian_Ocean, Melanesia, Micronesia",ground,tern,106
-Thalasseus_bergii,none,ground,tern,328
-Thalasseus_bengalensis,Indian_Ocean,ground,tern,209
-Phaethon_lepturus,none,ground,tropicbird,328
-Phaethon_rubricauda,none,ground,tropicbird,671.9
-Phoebastria_immutabilis,EXCLUDE,ground,albatross,3145.9
-Phoebastria_nigripes,EXCLUDE,ground,albatross,3188.4
-Phoebastria_albatrus,EXCLUDE,ground,albatross,4411
-Nesofregetta_fuliginosa,EXCLUDE,burrow,petrel/shearwater,70
-Hydrobates_tristrami,EXCLUDE,burrow,petrel/shearwater,89.1
-Pterodroma_neglecta,EXCLUDE,ground,petrel/shearwater,501
-Pterodroma_heraldica,EXCLUDE,ground,petrel/shearwater,394
-Pterodroma_ultima,EXCLUDE,ground,petrel/shearwater,360
-Pterodroma_hypoleuca,EXCLUDE,burrow,petrel/shearwater,176
-Pterodroma_alba,EXCLUDE,ground,petrel/shearwater,259
-Bulweria_bulwerii,EXCLUDE,ground,petrel/shearwater,99
-Ardenna_pacifica,none,burrow,petrel/shearwater,388
-Puffinus_nativitatis,"Polynesia, Micronesia",burrow,petrel/shearwater,356
-Puffinus_bailloni,none,burrow,petrel/shearwater,214
-Fregata_ariel,none,ground,frigatebird,804.3
-Fregata_minor,none,vegetation,frigatebird,1274.7
-Sula_dactylatra,none,ground,booby,1732.1
-Sula_granti,EXCLUDE,ground,booby,1732.1
-Sula_leucogaster,none,ground,booby,1288.8
-Sula_sula,none,vegetation,booby,1031.1
+﻿species,filtercondition,nestingtype,group,bodymass,days_at_colony,time_at_colony
+Anous_stolidus,none,vegetation,tern,177.8,122,0.6
+Anous_minutus,"Melanesia, Micronesia, Polynesia",vegetation,tern,112.4,122,0.6
+Anous_tenuirostris,Indian_Ocean,vegetation,tern,112,122,0.6
+Anous_ceruleus,"Melanesia, Micronesia, Polynesia",ground,tern,53,122,0.6
+Gygis_alba,none,vegetation,tern,117,122,0.6
+Onychoprion_fuscatus,none,ground,tern,185.7,122,0.6
+Onychoprion_lunatus,"Melanesia, Micronesia, Polynesia",ground,tern,120,91,0.6
+Onychoprion_anaethetus,"Indian_Ocean, Melanesia",ground,tern,119.4,122,0.6
+Sternula_nereis,EXCLUDE,ground,tern,72.3,122,0.6
+Sternula_saundersi,EXCLUDE,ground,tern,42.5,122,0.6
+Hydroprogne_caspia,EXCLUDE,ground,tern,655,122,0.6
+Sterna_dougallii,"Indian_Ocean, Melanesia",ground,tern,112,91,0.6
+Sterna_sumatrana,"Indian_Ocean, Melanesia, Micronesia",ground,tern,106,122,0.6
+Thalasseus_bergii,none,ground,tern,328,122,0.6
+Thalasseus_bengalensis,Indian_Ocean,ground,tern,209,122,0.6
+Phaethon_lepturus,none,ground,tropicbird,328,243,0.6
+Phaethon_rubricauda,none,ground,tropicbird,671.9,183,0.6
+Phoebastria_immutabilis,EXCLUDE,ground,albatros,3145.9,274,0.6
+Phoebastria_nigripes,EXCLUDE,ground,albatros,3188.4,274,0.6
+Phoebastria_albatrus,EXCLUDE,ground,albatros,4411,243,0.6
+Nesofregetta_fuliginosa,EXCLUDE,burrow,tubenose,70,160,0.1
+Hydrobates_tristrami,EXCLUDE,burrow,tubenose,89.1,122,0.1
+Pterodroma_neglecta,EXCLUDE,ground,tubenose,501,122,0.6
+Pterodroma_heraldica,EXCLUDE,ground,tubenose,394,90,0.3
+Pterodroma_ultima,EXCLUDE,ground,tubenose,360,122,0.6
+Pterodroma_hypoleuca,EXCLUDE,burrow,tubenose,176,122,0.3
+Pterodroma_alba,EXCLUDE,ground,tubenose,259,122,0.3
+Bulweria_bulwerii,EXCLUDE,ground,tubenose,99,150,0.6
+Ardenna_pacifica,none,burrow,tubenose,388,122,0.1
+Puffinus_nativitatis,"Polynesia, Micronesia",burrow,tubenose,356,122,0.6
+Puffinus_bailloni,none,burrow,tubenose,214,122,0.1
+Fregata_ariel,none,ground,frigatebird,804.3,213,0.6
+Fregata_minor,none,vegetation,frigatebird,1274.7,213,0.6
+Sula_dactylatra,none,ground,booby,1732.1,274,0.6
+Sula_granti,EXCLUDE,ground,booby,1732.1,200,0.6
+Sula_leucogaster,none,ground,booby,1288.8,243,0.6
+Sula_sula,none,vegetation,booby,1031.1,243,0.6

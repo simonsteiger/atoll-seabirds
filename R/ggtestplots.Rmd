@@ -19,31 +19,21 @@ library("RColorBrewer")
 library("ggh4x")
 library("adespatial")
 library("scales")
-library("here")
+library("ggalluvial")
 
 ```
 
 ```{r load data}
 
-if (Sys.info()["sysname"] == "Darwin") {
-  preds <- read.csv(here("data/allpopulations.csv"))
-  est <- read.csv(here("data/atoll_seabird_global_popestimates.csv"))
-  envs <- read.csv(here("data/seabird_atolls_envs.csv"))
-  nest <- read.csv(here("data/seabird_filterconditions.csv"))
-  raw <- read.csv(here("data/atoll_seabird_populations.csv"))
-} else {
-  preds <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/allpopulations.csv")
-  est <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_global_popestimates.csv")
-  envs <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_atolls_envs.csv")
-  nest <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_filterconditions.csv")
-  # Don't load after allpop fix
-  raw <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_populations.csv")
-}
+preds <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/allpopulations.csv")
+est <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_global_popestimates.csv")
+envs <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_atolls_envs.csv")
+nest <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_filterconditions.csv")
 
 # turn into factors
 envs <- envs %>% select(atoll, region, lat, long) %>% mutate(across(1:2, as.factor))
 preds <- preds %>% select(atoll, species, nbirds) %>% mutate(across(1:2, as.factor))
-nest <- nest %>% select(species, nestingtype, group, bodymass) %>% mutate(across(1:3, as.factor))
+nest <- nest %>% select(!filtercondition) %>% mutate(across(1:3, as.factor))
 
 # turn predicted abundances into whole numbers
 preds$nbirds <- round(preds$nbirds,0)
@@ -51,35 +41,13 @@ preds$nbirds <- round(preds$nbirds,0)
 # convert longitudes for 'sf' format
 envs$long <- ifelse(envs$long < 0, envs$long+360, envs$long)
 
-
-###########################################################
-# --- IRRELEVANT ONCE ERROR IN ALLPOPULATIONS IS FIXED ----
-###########################################################
-
-raw$atoll <- as.factor(raw$atoll)
-
-# long format
-raw.long <- raw %>%  pivot_longer(cols = !atoll, names_to = "species", values_to = "nbirds", 
-                                  values_drop_na = TRUE) %>% 
-                    filter(nbirds > 0)
-
-# temp
-temp <- rbind(raw.long, preds) %>% distinct(atoll, species, .keep_all = TRUE) %>% as.data.frame()
-temp <- temp[order(temp$atoll),] # sort alphabetically by atolls
-
-rm(raw)
-rm(raw.long)
-
-#############################################################
 ```
 
 
 ```{r prepare data frames for plotting}
 
 # add 'empty' atolls to count pred data frame
-
-# replace temp here with preds once error fixes
-dat <- left_join(envs, temp, by = "atoll") %>% mutate(nbirds = replace_na(nbirds, 0))
+dat <- left_join(envs, preds, by = "atoll") %>% mutate(nbirds = replace_na(nbirds, 0))
 
 # convert long format into atoll x species matrix for beta-diversity computation
 matrix <- dat %>% pivot_wider(names_from = species, values_from = nbirds, values_fill = 0) %>% 
@@ -107,18 +75,32 @@ comb <- comb %>% left_join(., nest, by = "species") %>% as.data.frame()
 comb$biomass <- comb$nbirds*comb$bodymass
 comb <- comb %>% select(!c(bodymass,nestingtype))
 
+# calculate total N and P input in g per year and per seabird species and atoll using 
+# https://doi.org/10.1038/s41467-017-02446-8
+
+F_nc <- 0.036 #average N content of seabird diet in g N g^-1
+F_pc <- 0.006 #average P content of seabird diet in g P g^-1
+F_ec <- 6.5 #average energy content of seabird diet kJ g^-1
+A_eff <- 0.8 #kJ obtained by the bird per kJ consumed
+
+comb$excretedN <- ((9.2*comb$biomass^0.774)/(F_ec*A_eff))*F_nc*comb$days_at_colony*comb$time_at_colony
+comb$excretedP <- ((9.2*comb$biomass^0.774)/(F_ec*A_eff))*F_pc*comb$days_at_colony*comb$time_at_colony
 
 # summarize atoll-wise
 atoll <- comb %>% group_by(atoll, region, lat, long) %>% summarise(nspec = sum(nbirds > 0),
                                                          nbirds = sum(nbirds),
-                                                         totbiomass = sum(biomass)) %>% as.data.frame()
+                                                         totbiomass = sum(biomass),
+                                                         totN = sum(excretedN),
+                                                         totP = sum(excretedP)) %>% as.data.frame()
 
 atoll <- atoll %>% left_join(., beta, by = "atoll") %>% mutate(lcbd = replace_na(lcbd, 0))
 
 
 # summarize species-wise
 spec <- comb %>% group_by(species, group) %>% summarise(nbirds = sum(nbirds),
-                                                 totbiomass = sum(biomass)) %>% as.data.frame() 
+                                                 totbiomass = sum(biomass),
+                                                 totN = sum(excretedN),
+                                                 totP = sum(excretedP)) %>% as.data.frame() 
 
 # calculate proportion contribution to global population
 spec <- left_join(spec, est, by = "species")
@@ -130,11 +112,6 @@ spec$ratios <- ifelse(is.na(spec$Callaghan) == FALSE, spec$nbirds*1/spec$Callagh
 
 spec <- spec %>% select(c(species, group, nbirds, totbiomass, ratios))
 spec$species <- as.factor(spec$species)
-
-########################################################################### 
-############## --- TEMPORARY!!! NEED FIX IN DATA --- ######################
-spec[which(spec$species == "Nesofregetta_fuliginosa"),]$ratios  <- 0.99
-###########################################################################
 
 ```
 
@@ -261,7 +238,28 @@ p3b <- ggplot(data = atoll[which(atoll$nbirds > 0), ], aes(x = "identity", y = l
 
 pmapbox <- p1a+p1b+p2a+p2b+p3a+p3b+plot_layout(widths = c(3,1,3,1,3,1), nrow = 3, ncol = 2)
 
-ggsave(pmapbox, filename = "fig_pop-ric-lcbd.svg", dpi = 300, width = 210, height = 170, units = "mm")
+#ggsave(pmapbox, filename = "fig_pop-ric-lcbd.svg", dpi = 300, width = 210, height = 170, units = "mm")
+
+```
+
+````{r nutrient inputs}
+ggplot(data = atoll[which(atoll$nbirds > 0),], aes(x = "identity", y = totN/1000)) +
+  geom_violin(alpha = 0.5) +
+  geom_jitter(aes(colour = totN), width = 0.15, size = 1.5) +
+  geom_boxplot(width = 0.1, alpha = 0.5, outlier.shape = NA) +
+  scale_y_continuous(trans = "log10", labels = scales::comma) +
+  ylab("total excreted P [kg P / year]") +
+  boxplotaesth
+
+map + 
+  geom_point(data = spat.1a,
+             aes(x = coords.1a[,1], y = coords.1a[,2], colour = log10(totN+1)), 
+             size = 1.1, shape = 21, alpha = 0.9, stroke = 1.9) +
+  scale_colour_gradientn(colours = c("#fbe725", "#3dbc74", "#306b84","black"),
+                         values = c(1.0, 0.5, 0.1, 0),
+                         name = "log(total N [kg/year])") +
+  ggtitle("Nitrogen input per atoll") +
+  theme(legend.position = "none")
 
 ```
 
@@ -316,10 +314,10 @@ spec <- left_join(spec, seabirdnames, by = "species")
 
 p11 <- ggplot(data = spec, aes(x = ratios*100, y = reorder(common.names, ratios), fill = group)) +
             geom_bar(stat = "identity", color = "black", width = 0.8, linewidth = 0.5) +
-            annotate("rect", xmin = 25, xmax = 50, ymin = 0, ymax = 36, fill = "#eeeeee") +
-            annotate("rect", xmin = 50, xmax = 75, ymin = 0, ymax = 36, fill = "#dddddd") +
-            annotate("rect", xmin = 75, xmax = 95, ymin = 0, ymax = 36, fill = "#cccccc") +
-            annotate("rect", xmin = 95, xmax = 100, ymin = 0, ymax = 36, fill = "#bbbbbb") +
+            annotate("rect", xmin = 25, xmax = 50, ymin = 0, ymax = 37, fill = "#eeeeee") +
+            annotate("rect", xmin = 50, xmax = 75, ymin = 0, ymax = 37, fill = "#dddddd") +
+            annotate("rect", xmin = 75, xmax = 95, ymin = 0, ymax = 37, fill = "#cccccc") +
+            annotate("rect", xmin = 95, xmax = 100, ymin = 0, ymax = 37, fill = "#bbbbbb") +
             geom_bar(stat = "identity", color = "black", width = 0.8, linewidth = 0.5) +
             scale_fill_viridis_d(aesthetics = "fill", option = "mako") +
               guides(x = "axis_truncated", y = "axis_truncated", 
@@ -339,7 +337,7 @@ p11 <- ggplot(data = spec, aes(x = ratios*100, y = reorder(common.names, ratios)
               legend.spacing.y = unit(1, "mm"))
 
   
-ggsave(p11, filename = "fig_proportion_species_global.svg", dpi = 300, width = 105, height = 150, units = "mm")
+#ggsave(p11, filename = "fig_proportion_species_global.svg", dpi = 300, width = 105, height = 150, units = "mm")
 
 ```
 
@@ -398,18 +396,18 @@ ggplot(data = atoll, aes(x = region, y = nspec)) +
 
 atollw <- left_join(comb, est, by = "species")
 
-atollw$ratios <- ifelse(is.na(atollw$Callaghan) == FALSE, atollw$nbirds*1/atollw$Callaghan,
-            ifelse(is.na(atollw$HBW) == FALSE, atollw$nbirds*1/atollw$HBW, 
-              ifelse(is.na(atollw$birdlife_max) == TRUE, atollw$nbirds*1/atollw$birdlife_min,
-                      atollw$nbirds*1/atollw$birdlife_max)))
+atollw$atoll.ratios <- ifelse(is.na(atollw$Callaghan) == FALSE, atollw$nbirds*1/atollw$Callaghan,
+                          ifelse(is.na(atollw$HBW) == FALSE, atollw$nbirds*1/atollw$HBW, 
+                            ifelse(is.na(atollw$birdlife_max) == TRUE, atollw$nbirds*1/atollw$birdlife_min,
+                              atollw$nbirds*1/atollw$birdlife_max)))
 
 atollw$species <- as.factor(atollw$species)
 
 atollw <- atollw %>% select(!c(biomass, birdlife_min, birdlife_max, HBW, Callaghan))
 
 # subset only for largest value per atoll
-atollmax <- atollw %>% group_by(atoll, lat, long) %>% summarise(ratios = max(ratios)) %>% as.data.frame()
-atollmax$cuts <- cut(atollmax$ratios,
+atollmax <- atollw %>% group_by(atoll, lat, long) %>% summarise(atoll.ratios = max(atoll.ratios)) %>% as.data.frame()
+atollmax$cuts <- cut(atollmax$atoll.ratios,
                    breaks = c(0, 0.01, 0.10, 0.25, 0.50, 0.70, 1),
                    labels = c("<1%", "1-10%", "10-25%", "25-50%", "50-70%", ">70%"))
 
@@ -418,7 +416,6 @@ atollmax[is.na(atollmax$cuts),]$cuts <- "<1%"
 atollmax <- atollmax %>% arrange(cuts)
 
 spatw <- st_as_sf(atollmax, coords = c("long", "lat"), crs = 4326)
-
 coordsw <- spatw %>% st_coordinates(extract())
 
 p10 <- map +
@@ -430,8 +427,8 @@ p10 <- map +
   theme(
     legend.title = element_blank())
 
-ggsave(p10, filename = "fig_atollwise_contribution_atoll_glob_NO-ICONS.svg",
-       dpi = 300, width = 210, height = 100, units = "mm")
+# ggsave(p10, filename = "fig_atollwise_contribution_atoll_glob_NO-ICONS.svg",
+#       dpi = 300, width = 210, height = 100, units = "mm")
 
 ```
 
@@ -527,13 +524,163 @@ decay.exp <- decay.model(y = dissim.atoll, x = spat.dist,
 
 ```{r atoll contribution to individual species}
 
-topatolls <- left_join(atollw, spec[,c(1:2)], by = "species")
+top3 <- atollw %>% group_by(species) %>% arrange(desc(atoll.ratios)) %>% slice(1:3) %>% as.data.frame()
 
-topatolls$contr <- topatolls$nbirds.x/topatolls$nbirds.y
-
-top5 <- topatolls %>% group_by(species) %>% arrange(desc(ratios)) %>% slice(1:3) %>% as.data.frame()
-
-top5 %>% count(atoll, sort = TRUE)
+top3 %>% count(atoll, sort = TRUE)
 
 ``` 
+
+
+```{r alluvial plot}
+
+# get species with more than 60% of global population on atolls
+key.spec <- spec %>% filter(ratios > 0.6) %>% select(species) %>% pull(species) %>% as.vector()
+
+key.atolls <- atollw %>% filter(species %in% c(key.spec)) %>% filter(species != "Nesofregetta_fuliginosa")
+
+key.atolls <- key.atolls %>% group_by(species) %>% arrange(desc(atoll.ratios)) %>% slice(1:4) %>% as.data.frame()
+
+# add total atoll population size per species and global ratio
+key.atolls <- key.atolls %>% left_join(., spec[c(1,3,5)], by = "species")
+colnames(key.atolls)[6] <- "nbirds"
+colnames(key.atolls)[9] <- "total.atoll.pop"
+colnames(key.atolls)[10] <- "global.ratios"
+
+# calculate combined contribution of all other (not key) atolls to seabird population size
+others <- key.atolls %>% group_by(species, total.atoll.pop) %>% summarise(combined = sum(nbirds)) %>% 
+            mutate(nbirds = total.atoll.pop - combined) %>% mutate(atoll.ratios = nbirds*1/total.atoll.pop) %>%   
+            as.data.frame()
+
+others$atoll <- "rest"
+others <- others %>% select(c(species, nbirds, atoll.ratios, atoll))
+others$atoll <- as.factor(others$atoll)
+
+# add global proportion 
+others <- others %>% left_join(., spec[,c(1:2,5)], by = "species")
+colnames(others)[6] <- "global.ratios"
+
+# add other atolls to key atolls for alluvium plot
+key.atolls <- key.atolls %>% bind_rows(., others)
+
+# get common names
+key.atolls <- key.atolls %>% left_join(., spec[,c(1,6)], by = "species")
+
+
+p12 <- ggplot(data = key.atolls, aes(axis1 = reorder(common.names, 1/global.ratios), axis2 = atoll, y = atoll.ratios)) +
+  geom_alluvium(aes(fill = common.names)) +
+  geom_stratum() +
+  geom_text(stat = "stratum",
+            aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("species", "atoll"),
+                   expand = c(0.1, 0.05)) +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_fill_viridis_d(option = "mako") +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.text = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank()
+  ) +
+  annotate(geom = "text", x = 2, y = 7.2, label = "n = 19 key atolls", size = 4.2) +
+  annotate(geom = "text", x = 1, y = 7.2, label = "seabirds >60% of \n global population on atolls", size = 4.2)
+
+ggsave(p12, filename = "fig_keyatolls.svg", dpi = 300, width = 210, height = 160, units = "mm")
+
+```
+
+
+
+```{r foraging space}
+
+library("EnvStats")
+library("fields")
+library("ggdensity")
+
+
+km2d <- function(km, base.latitude) {
+  out <- NULL
+  for (i in 1:length(base.latitude)) {
+    one.degree.dist <- fields::rdist.earth(matrix(c(0, base.latitude[i]), ncol = 2), 
+                                           matrix(c(1, base.latitude[i]), ncol = 2), miles = FALSE) %>% as.integer()
+    temp <- km[i] / one.degree.dist
+    out <- rbind(out, temp)
+  }
+    return(out)
+}
+
+meanmaxdist <- 1000 #km
+sdmaxdist <- 50 # km
+
+
+dist <- rgevd(n = 280, location = meanmaxdist-sdmaxdist, scale = sdmaxdist, shape = 0.8) %>% as.vector()
+direct <- runif(280, 0, 360) %>% as.vector()
+
+plot(density(dist))
+
+scatter <- as.data.frame(cbind(dist, direct))
+scatter$lat <- envs$lat
+scatter$long <- envs$long
+
+# calculate km lat and km long dist
+scatter$add.lat.km <- cos((scatter$direct*pi)/180) * scatter$dist # latitude, 
+scatter$add.long.km <- sin((scatter$direct*pi)/180) * scatter$dist # longitude
+
+# convert km into decimal degree lat and long distance
+scatter$add.lat.deg <- km2d(scatter$add.lat.km, base.latitude = scatter$lat) %>% as.vector()
+scatter$add.long.deg <- km2d(scatter$add.long.km, base.latitude = scatter$lat) %>% as.vector()
+
+scatter$latscat <- scatter$lat + scatter$add.lat.deg
+scatter$longscat <- scatter$long + scatter$add.long.deg
+
+scatter.sf <- scatter %>% st_as_sf(., coords = c("long", "lat"), crs = 4326)
+coords.scatter <- scatter.sf %>% st_coordinates(extract())
+
+scatter.sf2 <- scatter %>% st_as_sf(., coords = c("longscat", "latscat"), crs = 4326)
+coords.scatter2 <- scatter.sf2 %>% st_coordinates(extract())
+
+ggplot() +
+  geom_hdr(data = scatter.sf2, aes(x = coords.scatter2[,1], y = coords.scatter2[,2]),
+           xlim = c(0,250),
+           method = "kde",
+           probs = seq(from = 0.1, to = 0.95, length.out = 8)) +
+  geom_point(data = scatter.sf,
+             aes(x = coords.scatter[,1], y = coords.scatter[,2]), 
+             size = 1.1, shape = 21, alpha = 0.9, stroke = 1.9) +
+  geom_point(data = scatter.sf2,
+             aes(x = coords.scatter2[,1], y = coords.scatter2[,2]), 
+             size = 1.1, shape = 21, alpha = 0.9, stroke = 1.9, colour = "red") +
+  geom_sf(data = mapWorld, fill = "#EBE3D5", color = NA) +
+  geom_sf(data = mapCoast, linewidth = 0.15) +
+  coord_sf(xlim = c(46.5, 255),
+           ylim = c(-30, 30)) +
+  theme_classic() +
+  geom_segment(aes(x = 36.2, xend = 36.2, y = -30.1, yend = 30.1), linewidth = 0.8) +
+  geom_segment(aes(x = 49.9, xend = 250.1, y = -33, yend = -33), linewidth = 0.8) +
+  theme(
+    axis.title = element_blank(),
+    axis.line = element_blank(),
+    axis.text = element_text(size = 11),
+    axis.ticks = element_line(linewidth = 0.8),
+    title = element_text(size = 13),
+    legend.position = "none")
+
+
+
+
+
+heatmap <- comb %>% filter(nbirds > 0)
+
+out <- NULL
+
+for (i in 1:nrow(heatmap)){
+  dist <- rgevd(n = heatmap$nbirds[i], location = meanmaxdist-sdmaxdist, scale = sdmaxdist, shape = 0.8) %>% as.vector()
+  direct <- runif(n = heatmap$nbirds[i], 0, 360) %>% as.vector()
+  temp <- as.data.frame(cbind(dist, direct))
+  out <- rbind(out, temp)
+}
+
+
+```
 
