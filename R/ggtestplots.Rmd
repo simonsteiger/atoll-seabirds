@@ -681,6 +681,28 @@ for (i in 1:nrow(heatmap)){
   out <- rbind(out, temp)
 }
 
-
+# using Turing, CSV, DataFrames, Chain
+# 
+# const ROOT = dirname(Base.active_project())
+# 
+# df = CSV.read("$ROOT/data/allpopulations.csv", DataFrame)
+# 
+# df.Δ = rand(Uniform(15, 1000), nrow(df))
+# df.nbirds = Int64.(round.(df.nbirds))
+# 
+# 
+# distance = @chain df begin
+#     [fill(Weibull(8, _.Δ[i]), _.nbirds[i]) for i in eachindex(_.Δ)]
+#     [rand.(W) for W in _]
+#     reduce(vcat, _)
+# end
+# 
+# direction = @chain df begin
+#     [fill(Uniform(0, 360), _.nbirds[i]) for i in eachindex(_.Δ)]
+#     [rand.(U) for U in _]
+#     reduce(vcat, _)
+# end
+# 
+# out = DataFrame([distance, direction], [:distance, :direction])
 ```
 
