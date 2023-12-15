@@ -29,17 +29,20 @@ preds <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/
 est <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_global_popestimates.csv")
 envs <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_atolls_envs.csv")
 nest <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_filterconditions.csv")
+mpa <- read.csv("C:/Users/sebas/OneDrive/Dokumente/Github/atoll-seabirds/data/atoll_seabird_conservation/mpa_polygons.csv")
 
 # turn into factors
 envs <- envs %>% select(atoll, region, lat, long) %>% mutate(across(1:2, as.factor))
 preds <- preds %>% select(atoll, species, nbirds) %>% mutate(across(1:2, as.factor))
 nest <- nest %>% select(!filtercondition) %>% mutate(across(1:3, as.factor))
+mpa$mpa <- as.factor(mpa$mpa)
 
 # turn predicted abundances into whole numbers
 preds$nbirds <- round(preds$nbirds,0)
 
 # convert longitudes for 'sf' format
 envs$long <- ifelse(envs$long < 0, envs$long+360, envs$long)
+mpa$long <- ifelse(mpa$long < 0, mpa$long+360, mpa$long)
 
 ```
 
@@ -120,6 +123,9 @@ spec$species <- as.factor(spec$species)
 mapWorld <- ne_countries(scale = "medium", returnclass = "sf")
 mapCoast <- ne_coastline(scale = "medium", returnclass = "sf")
 
+spat.mpa <- mpa %>% st_as_sf(., coords = c("long", "lat"), crs = 4326)
+coords.mpa <- spat.mpa %>% st_coordinates(extract())
+
 # create map layer
 map <- ggplot() + 
   geom_sf(data = mapWorld, fill = "#EBE3D5", color = NA) +
@@ -129,6 +135,9 @@ map <- ggplot() +
   theme_classic() +
   geom_segment(aes(x = 36.2, xend = 36.2, y = -30.1, yend = 30.1), linewidth = 0.8) +
   geom_segment(aes(x = 49.9, xend = 250.1, y = -33, yend = -33), linewidth = 0.8) +
+  geom_polygon(data = spat.mpa, 
+               aes(x = coords.mpa[,1], y = coords.mpa[,2], colour = mpa),
+               linewidth = 1, fill = NA) +
   theme(
     axis.title = element_blank(),
     axis.line = element_blank(),
@@ -681,28 +690,6 @@ for (i in 1:nrow(heatmap)){
   out <- rbind(out, temp)
 }
 
-# using Turing, CSV, DataFrames, Chain
-# 
-# const ROOT = dirname(Base.active_project())
-# 
-# df = CSV.read("$ROOT/data/allpopulations.csv", DataFrame)
-# 
-# df.Δ = rand(Uniform(15, 1000), nrow(df))
-# df.nbirds = Int64.(round.(df.nbirds))
-# 
-# 
-# distance = @chain df begin
-#     [fill(Weibull(8, _.Δ[i]), _.nbirds[i]) for i in eachindex(_.Δ)]
-#     [rand.(W) for W in _]
-#     reduce(vcat, _)
-# end
-# 
-# direction = @chain df begin
-#     [fill(Uniform(0, 360), _.nbirds[i]) for i in eachindex(_.Δ)]
-#     [rand.(U) for U in _]
-#     reduce(vcat, _)
-# end
-# 
-# out = DataFrame([distance, direction], [:distance, :direction])
+
 ```
 
