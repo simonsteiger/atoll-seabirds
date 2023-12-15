@@ -5,7 +5,8 @@ export showall,
        pct,
        safelogistic,
        idx,
-       sdim
+       sdim,
+       rdistearth
 
 using Turing, DataFrames
 
@@ -51,5 +52,21 @@ safelogistic(x::T) where {T} = logistic(x) * (1 - 2 * eps(T)) + eps(T)
 
 # Slice a dimension?
 sdim(n) = (a) -> map(d -> d[n], a)
+
+function rdistearth(x1; x2=nothing, miles=false, R=nothing)
+    isnothing(R) && begin R = miles ? 3963.34 : 6378.388 end
+    coslat1, sinlat1 = [@. f((x1[:, 2] * π) / 180) for f in [cos, sin]]
+    coslon1, sinlon1 = [@. f((x1[:, 1] * π) / 180) for f in [cos, sin]]
+    
+    if isnothing(x2)
+        pp = [coslat1 .* coslon1 coslat1 .* sinlon1 sinlat1] * [coslat1 .* coslon1 coslat1 .* sinlon1 sinlat1]'
+        return @. R * acos([abs(x > 1 ? 1 * sign(x) : x for x in pp)])
+    else
+        coslat2, sinlat2 = [@. f((x2[:, 2] * π) / 180) for f in [cos, sin]]
+        coslon2, sinlon2 = [@. f((x2[:, 1] * π) / 180) for f in [cos, sin]]
+        pp = [coslat1 .* coslon1 coslat1 .* sinlon1 sinlat1] * [coslat2 .* coslon2 coslat2 .* sinlon2 sinlat2]'
+        return @. R * acos([abs(x > 1 ? 1 * sign(x) : x for x in pp)])
+    end
+end
 
 end

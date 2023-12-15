@@ -6,3 +6,4 @@ fits/_*
 data/copernicus_*
 *.jls
 .DS_Store
+results/data/foraging.fst
