@@ -5,7 +5,8 @@ using Turing, TuringBenchmarking, ReverseDiff, ParetoSmooth
 # Model speed optimization
 using LazyArrays
 # Statistics
-using StatsFuns, LinearAlgebra
+using StatsFuns
+import LinearAlgebra: I
 # Working with tabular data
 using Chain, DataFrames
 # Plotting
@@ -53,7 +54,6 @@ PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[2]
 
 # If not loading a chain, save results to path below
 chainpath = "count_$PRIORSUFFIX.jls"
-
 
 # --- HELPER FUNCTIONS --- #
 
@@ -131,7 +131,6 @@ model = modelcount(
     unique_species_within_nesting_known,
     count_species_by_nesting...,
 );
-
 
 # --- PRIOR PREDICTIVE CHECKS --- #
 
@@ -221,6 +220,28 @@ countpreds_unknown = @chain begin
     reduce(hcat, _)
     Matrix{Float64}(_)
 end
+
+between(x, lower, upper) = lower ≤ x && x ≤ upper
+
+countpreds_oos = @chain begin
+    predictcount(
+        α,
+        β,
+        σ2,
+        num_species_within_nesting_oos,
+        num_species_oos,
+        num_region_oos,
+        PC_oos,
+    )
+    reduce(hcat, _)
+    Matrix{Float64}(_)
+    mean(_, dims=2)
+    exp.(_)
+    #[between(_[i], oos_lims[i][1], oos_lims[i][2]) for i in eachindex(_)]
+    [_ oos_lims [between(_[i], oos_lims[i][1], oos_lims[i][2]) for i in eachindex(_)] sort(unique(str_species_known))[num_species_oos]]
+end
+
+
 
 countpreds_known = @chain begin
     predictcount(
