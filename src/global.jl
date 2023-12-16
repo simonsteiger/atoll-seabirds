@@ -34,7 +34,7 @@ pop_known = @chain pop begin
     DataFrames.transform(_, All() .=> ByRow(x -> ismissing(x) ? 0 : x) => identity)
     stack(_, Not(:atoll), variable_name=:species, value_name=:nbirds)
     subset(_, :nbirds => ByRow(x -> x != -1))
-    subset(_, :nbirds => ByRow(x -> x != 0))
+    #subset(_, :nbirds => ByRow(x -> x != 0))
     leftjoin(_, envs_known, on=[:atoll, :species])
     select(_, Not(:presence))
 end
