@@ -158,23 +158,24 @@ using Turing, LazyArrays, StatsFuns, LinearAlgebra
 include("../src/utilities.jl")
 import .CustomUtilityFuns: lu, idx
 
-export mLc, simulate
+export mMc, simulate
 
-@model function mLc(
-    r, s, n, PC, y,
-    idx_sn, u_n, u_sn, Nv, Ng, Nb;
+@model function mMc(
+    r, s, n, PC,
+    idx_sn, u_n, u_sn, Nv, Ng, Nb,
+    y;
     Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
 )
 
     # Priors for species × region
-    μ_sxr ~ filldist(Normal(0, σₚ), Ns)
-    τ_sxr ~ filldist(InverseGamma(3, θₚ), Ns)
+    μ_sxr ~ filldist(Normal(0, 0.5), Ns)
+    τ_sxr ~ filldist(InverseGamma(3, 0.5), Ns)
     z_sxr ~ filldist(Normal(), Ns, Nr)
     α_sxr = μ_sxr .+ τ_sxr .* z_sxr
 
     # Priors for nesting types × PCs
-    μ_pxn ~ filldist(Normal(0, σₚ), Nn, NPC)
-    τ_pxn ~ filldist(InverseGamma(3, θₚ/2), Nn, NPC)
+    μ_pxn ~ filldist(Normal(0, 0.2), Nn, NPC)
+    τ_pxn ~ filldist(InverseGamma(3, 0.2), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
@@ -182,7 +183,7 @@ export mLc, simulate
     β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
 
     # Prior for random error
-    σ2 ~ InverseGamma(3, θₚ)
+    σ2 ~ InverseGamma(3, 0.5)
 
     # Likelihood
     μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
@@ -190,16 +191,14 @@ export mLc, simulate
     y ~ MvNormal(μ, Σ)
 
     # Generated quantities
-    return (; y, α_sxr, β_pxn)
+    return (; y, α_sxr, β_pxn, σ2)
 end;
-
-function simulate(α, β, σ2, idx_sn, s, r, X; idx_sr=idx(s, r))
-    out = Vector(undef, length(α))
-    for i in eachindex(α)
-        μ = α[i][idx_sr] .+ sum(β[i][idx_sn, :] .* X, dims=2)
-        out[i] = rand.(Normal.(μ, σ2[i]))
+   
+function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
+    map(params) do param
+        μ = param.α_sxr[idx_sr] + sum(param.β_pxn[idx_sn, :] .* X, dims=2)
+        rand.(Normal.(μ, param.σ2))
     end
-    return out
 end
-    
+
 end

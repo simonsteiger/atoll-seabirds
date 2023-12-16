@@ -75,11 +75,6 @@ end
 # Path to read or write chain from / to
 chainpath = "presence.jls"
 
-function peaceful_generated_quantities(m, c)
-    chains_params = Turing.MCMCChains.get_sections(c, :parameters)
-    return generated_quantities(m, chains_params)
-end
-
 # --- PRIOR PREDICTIVE CHECK --- #
 
 chain_prior = sample(model(inputs..., presence), Prior(), 1000);

@@ -39,106 +39,63 @@ benchmark = false
 run = isempty(ARGS) ? false : ARGS[1] == "true"
 
 # Prior settings can be set from command line
-σₚ, θₚ = 1, 2
+# σₚ, θₚ = 1, 2
 
-if !run
-    @info "Loading chain, no model fit."
-elseif isempty(ARGS) || ARGS[2] == "default"
-    @info "Fitting model with default priors: σₚ=$σₚ, θₚ=$θₚ."
-elseif all(ARGS[2] .!= ["narrow", "wide"])
-    throw("Unknown prior setting: '$(ARGS[2])'. Pass nothing or one of 'default', 'narrow', 'wide'.")
-else
-    σₚ, θₚ = ARGS[2] == "wide" ? [σₚ, θₚ] .* 3 : [σₚ, θₚ] .* 1 / 3
-    @info "Fitting model with $(ARGS[2]) priors: σₚ=$(round(σₚ, digits=2)), θₚ=$(round(θₚ, digits=2))."
+# if !run
+#     @info "Loading chain, no model fit."
+# elseif isempty(ARGS) || ARGS[2] == "default"
+#     @info "Fitting model with default priors: σₚ=$σₚ, θₚ=$θₚ."
+# elseif all(ARGS[2] .!= ["narrow", "wide"])
+#     throw("Unknown prior setting: '$(ARGS[2])'. Pass nothing or one of 'default', 'narrow', 'wide'.")
+# else
+#     σₚ, θₚ = ARGS[2] == "wide" ? [σₚ, θₚ] .* 3 : [σₚ, θₚ] .* 1 / 3
+#     @info "Fitting model with $(ARGS[2]) priors: σₚ=$(round(σₚ, digits=2)), θₚ=$(round(θₚ, digits=2))."
+# end
+
+if ARGS[2] == "S" # simplest model
+    # model = m1p
+    # inputs = (; num_region, num_species)
+elseif isempty(ARGS) || ARGS[2] == "M" # most complex model
+    model = mMc
+    # What does the auto named tuple notation (; ...) do with splatted vectors?
+    inputs = (num_region_known, num_species_known, num_nesting_known, PC_known, num_species_within_nesting_known, unique_nesting_known, unique_species_within_nesting_known, count_species_by_nesting...,)
+elseif isempty(ARGS) || ARGS[2] == "L" # large model
+    # model = mLp
+    # What does the auto named tuple notation (; ...) do with splatted vectors?
+    # inputs = (num_region, num_species, num_nesting, PC, num_species_within_nesting, unique_nesting, unique_species_within_nesting, count_species_by_nesting...,)
+elseif ARGS[2] == "XL"
+    # model = mXLp
+    # What does the auto named tuple notation (; ...) do with splatted vectors?
+    # inputs = (num_atoll, num_region, num_species, num_nesting, PC, num_species_within_nesting, unique_nesting, unique_species_within_nesting, count_species_by_nesting...,)
 end
 
 PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[2]
 
 # If not loading a chain, save results to path below
-chainpath = "count_$PRIORSUFFIX.jls"
+chainpath = "count.jls"
 
-# --- MODEL SPECIFICATION --- #
+standardise(x) = (x .- mean(x)) ./ std(x)
 
-@model function modelcount(
-    r, s, n, PC, y,
-    idx_sn, u_n, u_sn, Nv, Ng, Nb;
-    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
-)
-
-    # Priors for species × region
-    μ_sxr ~ filldist(Normal(0, σₚ), Ns)
-    τ_sxr ~ filldist(InverseGamma(3, θₚ), Ns)
-    z_sxr ~ filldist(Normal(), Ns, Nr)
-    α_sxr = μ_sxr .+ τ_sxr .* z_sxr
-
-    # Priors for nesting types × PCs
-    μ_pxn ~ filldist(Normal(0, σₚ), Nn, NPC)
-    τ_pxn ~ filldist(InverseGamma(3, θₚ/2), Nn, NPC)
-    z_pxb ~ filldist(Normal(), Nb, NPC)
-    z_pxg ~ filldist(Normal(), Ng, NPC)
-    z_pxv ~ filldist(Normal(), Nv, NPC)
-    z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
-    β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
-
-    # Prior for random error
-    σ2 ~ InverseGamma(3, θₚ)
-
-    # Likelihood
-    μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
-    Σ = σ2 * I
-    y ~ MvNormal(μ, Σ)
-
-    # Generated quantities
-    return (; y, α_sxr, β_pxn)
-end;
-
-# Create model
-model = modelcount(
-    num_region_known,
-    num_species_known,
-    num_nesting_known,
-    PC_known,
-    log.(nbirds),
-    num_species_within_nesting_known,
-    unique_nesting_known,
-    unique_species_within_nesting_known,
-    count_species_by_nesting...,
-);
+zlogn = standardise(log.(nbirds))
 
 # --- PRIOR PREDICTIVE CHECKS --- #
 
-prior_preds = let
-    @info "Sampling from prior."
+chain_prior = sample(model(inputs..., zlogn), Prior(), 1000);
 
-    # Fit model and extract parameters
-    prior_chain = sample(model, Prior(), 5000)
-    gqs = peaceful_generated_quantities(model, prior_chain);
-    α, β = [getsamples(gqs, s) for s in [:α_sxr, :β_pxn]];
-    σ2 = reduce(hcat, get_params(prior_chain).σ2)'
-    
-    # Make prior predictions
-    @chain begin
-        predictcount(
-            α,
-            β,
-            σ2,
-            num_species_within_nesting_known,
-            num_species_known,
-            num_region_known,
-            PC_known,
-        )
-        reduce(hcat, _)
-        Matrix{Float64}(_)
-    end
-end;
+θ_prior = let
+    peaceful_generated_quantities(model(inputs..., zlogn), chain_prior);
+    k = keys(θ_prior[1])
+    vec(getsamples(θ_prior, k...))
+end
 
-hist_overall_priorpc = histogram(log.(nbirds), normalize=true, lw=0.5, lc=:white, label="Observed")
-histogram!(vec(prior_preds), normalize=true, c=:white, lw=3, label=false)
-histogram!(vec(prior_preds), normalize=true, c=2, lw=1.5, label="Predicted")
-title!("Prior predictive check"); xlabel!("log(Count)"); ylabel!("Density")
-display(hist_overall_priorpc)
-# Prior predictive check is OK
-# but could be better considering that we know there's at least one bird per atoll
+let 
+    priorsamples = reduce(vcat, simulate(θ_prior, inputs...))
+    histogram(zlogn, normalize=true, c=1)
+    density!(priorsamples, normalize=true, c=:white, lw=3)
+    density!(priorsamples, normalize=true, c=2, fillrange=0, lw=1.5, fillalpha=0.2, legend=false)
+end 
+# not sure if necessary to show both observed and prior for prior predictive check
+# I guess it's not bad on a second thought though – we don't want probability mass in useless places
 
 # Benchmark different backends to find out which is fastest
 let adbackends = [:forwarddiff, :reversediff, :reversediff_compiled]
@@ -166,19 +123,48 @@ else
     """
 
     @info "🚀 Starting sampling: $(Dates.now())"
-    chain = sample(model, sampler, MCMCThreads(), nsamples, nchains; discard_initial=ndiscard)
+    chain = sample(model(inputs..., zlogn), sampler, MCMCThreads(), nsamples, nchains; discard_initial=ndiscard)
 
     serialize("$ROOT/results/chains/$chainpath", chain)
     @info "💾 Chain saved to '$ROOT/results/chains/$chainpath'."
 end;
 
-gqs = peaceful_generated_quantities(model, chain);
+# --- POSTERIOR PREDICTIVE CHECK --- #
 
-α, β = [getsamples(gqs, s) for s in [:α_sxr, :β_pxn]];
-σ2 = reduce(hcat, get_params(chain).σ2)'
+θ_post = let
+    gqs = peaceful_generated_quantities(model(inputs..., zlogn), chain)
+    k = keys(θ_post[1])
+    vec(getsamples(gqs, k...))
+end
 
-# TODO use [0.75, 0.80, 0.85]
-threshold = ppres .> 0.8
+let 
+    postsamples = reduce(hcat, simulate(θ_post, inputs...))
+
+    plots = map(enumerate(unique(num_species_known))) do (index, species)
+        pred_x = vec(mean(postsamples[num_species_known.==species, :], dims=2))
+        obs_x = zlogn[num_species_known.==species]
+        scatter(obs_x, markersize=2.5, msc=1, label="O")
+        scatter!(pred_x, markersize=2.5, msc=2, yticks=:none, label="P")
+        #title!(unique(str_species)[index], titlefontsize=8)
+    end
+
+    plot(plots..., titlefontsize=9, size=(800,1200), layout=(8,5))
+end
+
+# Goal here is scatter plots that also show uncertainty in estimates – maybe even violins? Too busy...
+
+predictions = 
+    let thresholds = 0.75:0.05:0.85 
+        @chain thresholds begin
+            map(_) do threshold
+                pass = ppres .> threshold
+                unknown_inputs = (num_region_unknown[pass], num_species_unknown[pass], num_nesting_known, PC_unknown[pass, :], num_species_within_nesting_unknown[pass], unique_nesting_known, unique_species_within_nesting_known, count_species_by_nesting...,)
+                samples = reduce(hcat, simulate(θ_post, unknown_inputs...))
+            end
+        Dict(Pair.(thresholds, _))
+    end
+end
+
 
 countpreds_unknown = @chain begin
     predictcount(

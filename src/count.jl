@@ -79,9 +79,9 @@ maximum(num_species_unknown), maximum(num_species_known)
 
 nbirds = Float64.(pop_known.nbirds)
 ppres = Float64.(pop_unknown.ppres)
-PC_known = Matrix(pop_known[:, FEATURES])
-PC_unknown = Matrix(pop_unknown[:, FEATURES])
-PC_oos = Matrix(df_oos[:, FEATURES])
+PC_known = Matrix{Float64}(pop_known[:, FEATURES])
+PC_unknown = Matrix{Float64}(pop_unknown[:, FEATURES])
+PC_oos = Matrix{Float64}(df_oos[:, FEATURES])
 
 # Nestingtype
 dict_nesting = Dict(Pair.(pop_known.nestingtype, Int64.(denserank(pop_known.nestingtype))))
