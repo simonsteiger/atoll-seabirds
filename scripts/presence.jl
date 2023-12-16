@@ -26,7 +26,7 @@ include("$ROOT/scripts/modelzoo.jl")
 # Make custom modules available
 using .PresenceVariables
 using .CustomUtilityFuns
-using .ModelZoo
+using .PresenceModels
 
 # Set seed
 Random.seed!(42)
@@ -39,15 +39,21 @@ benchmark = false
 # Run the sampler?
 sample_model = isempty(ARGS) ? false : ARGS[1] == "run"
 
-if isempty(ARGS) || ARGS[2] == "4" # most complex model
-    model = mXp
-    # What does the auto named tuple notation (; ...) do with splatted vectors?
-    inputs = (num_region, num_species, num_nesting, PC, num_species_within_nesting, unique_nesting, unique_species_within_nesting, count_species_by_nesting...,)
-    simulate = mXp_predict
-elseif ARGS[2] == "1" # simplest model
+if ARGS[2] == "S" # simplest model
     model = m1p
     inputs = (; num_region, num_species)
-    simulate = m1p_predict
+elseif isempty(ARGS) || ARGS[2] == "M" # most complex model
+    model = mMp
+    # What does the auto named tuple notation (; ...) do with splatted vectors?
+    inputs = (num_region, num_species, num_nesting, PC, num_species_within_nesting, unique_nesting, unique_species_within_nesting, count_species_by_nesting...,)
+elseif isempty(ARGS) || ARGS[2] == "L" # large model
+    model = mLp
+    # What does the auto named tuple notation (; ...) do with splatted vectors?
+    inputs = (num_region, num_species, num_nesting, PC, num_species_within_nesting, unique_nesting, unique_species_within_nesting, count_species_by_nesting...,)
+elseif ARGS[2] == "XL"
+    model = mXLp
+    # What does the auto named tuple notation (; ...) do with splatted vectors?
+    inputs = (num_atoll, num_region, num_species, num_nesting, PC, num_species_within_nesting, unique_nesting, unique_species_within_nesting, count_species_by_nesting...,)
 end
 
 # Prior settings can be set from command line
@@ -76,25 +82,15 @@ end
 
 # --- PRIOR PREDICTIVE CHECK --- #
 
-chain_prior = sample(model(inputs..., presence), Prior(), 5000);
+chain_prior = sample(model(inputs..., presence), Prior(), 1000);
 
 θ_prior = peaceful_generated_quantities(model(inputs..., presence), chain_prior);
 
-params_prior = []
-
-for sym in [:α_sxr, :β_n, :β_pxn]
-    res = haskey(θ_prior[1], sym) && vec(map(x -> getfield(x, sym), θ_prior))
-    res != false && push!(params_prior, res)
+let k = keys(θ_prior[1])
+    params = vec(getsamples(θ_prior, k...))
+    priorsamples = reduce(vcat, simulate(params, inputs...))
+    density(priorsamples, fillrange=0, fillalpha=0.2, legend=false)
 end
-
-priorpc = @chain begin 
-    simulate(params_prior..., inputs...)
-    reduce(hcat, _)
-    Matrix{Float64}(_)
-    mean(_, dims=2)
-end
-
-histogram(mean.(priorpc))
 
 # Benchmark different backends to find out which is fastest
 if benchmark
@@ -117,9 +113,9 @@ else
 
     # Configure sampling
     sampler = NUTS(1000, 0.95; max_depth=10)
-    nsamples = 1000
+    nsamples = 2000
     nthreads = 4
-    ndiscard = 100
+    ndiscard = 200
 
     @info """Sampler: $(string(sampler))
     Samples: $(nsamples)
@@ -137,6 +133,25 @@ end;
 # --- POSTERIOR PREDICTIVE CHECK --- #
 
 θ_post = peaceful_generated_quantities(model(inputs..., presence), chain)
+
+postpcplots = let k = keys(θ_post[1])
+    params = vec(getsamples(θ_post, k...))
+    postsamples = reduce(hcat, simulate(params, inputs...))
+
+    map(enumerate(unique(num_species))) do (index, species)
+        pred_x = vec(postsamples[num_species.==species, :])
+        obs_x = presence[num_species.==species]
+        histogram(obs_x, normalize=true, alpha=0.5, lc=:transparent, bins=10, label="O")
+        density!(pred_x, fillrange=0, fillalpha=0.2, normalize=true, alpha=0.5, bins=10, lc=:transparent, yticks=:none, label="P")
+        xticks!(0:0.5:1, string.(0:0.5:1)); 
+        title!(unique(str_species)[index], titlefontsize=8)
+        vline!([0.8], c=:black, ls=:dash, label=:none)
+    end
+end
+
+plot(postpcplots..., titlefontsize=9, size=(800,1200), layout=(8,5))
+savefig("results/svg/postpreds_L.svg")
+
 
 params_post = []
 

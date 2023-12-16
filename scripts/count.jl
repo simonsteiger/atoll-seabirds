@@ -20,11 +20,13 @@ using Random
 const ROOT = dirname(Base.active_project())
 
 # Load custom modules
+include("$ROOT/scripts/modelzoo.jl")
 include("$ROOT/src/count.jl")
 include("$ROOT/src/utilities.jl")
 
 # Make custom modules available
 using .CountVariables
+using .CountModels
 using .CustomUtilityFuns
 
 # Set seed
@@ -54,35 +56,6 @@ PRIORSUFFIX = isempty(ARGS) ? "default" : ARGS[2]
 
 # If not loading a chain, save results to path below
 chainpath = "count_$PRIORSUFFIX.jls"
-
-# --- HELPER FUNCTIONS --- #
-
-function predictcount(α, β, σ2, idx_sn, s, r, X; idx_sr=idx(s, r))
-    out = Vector(undef, length(α))
-    for i in eachindex(α)
-        μ = α[i][idx_sr] .+ sum(β[i][idx_sn, :] .* X, dims=2)
-        out[i] = rand.(Normal.(μ, σ2[i]))
-    end
-    return out
-end
-
-function getsamples(θ, sym)
-    @chain begin
-        map(1:size(θ, 2)) do j
-            [θ[i][sym] for i in eachindex(θ[:, j])]
-        end
-        reduce(vcat, _)
-    end
-end
-
-# Shorthand helper for model
-lu(x) = length(unique(x))
-
-# generated_quantities doesn't like interal parameters
-function peaceful_generated_quantities(m, c)
-    chains_params = Turing.MCMCChains.get_sections(c, :parameters)
-    return generated_quantities(m, chains_params)
-end
 
 # --- MODEL SPECIFICATION --- #
 
