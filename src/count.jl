@@ -1,6 +1,6 @@
 module CountVariables
 
-export dict_region, dict_species, dict_nesting,
+export odict_region, odict_species, odict_nesting,
        num_region_known, num_region_unknown, num_region_oos,
        num_species_known, str_species_known, num_species_unknown, str_species_unknown, num_species_oos, str_species_oos,
        nbirds,
@@ -16,7 +16,7 @@ export dict_region, dict_species, dict_nesting,
 include("global.jl")
 using .Preprocess
 
-using DataFrames, Chain, StatsBase, CSV
+using DataFrames, Chain, StatsBase, CSV, OrderedCollections
 
 const FEATURES = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]
 
@@ -56,26 +56,24 @@ num_atoll_known = Int64.(denserank(pop_known.atoll))
 num_atoll_unknown = Int64.(denserank(pop_unknown.atoll))
 
 # Region
-dict_region = Dict(Pair.(pop_known.region, Int64.(denserank(pop_known.region))))
+odict_region = sort(Dict(Pair.(pop_known.region, Int64.(denserank(pop_known.region)))))
 
 num_region_known, num_region_unknown, num_region_oos = 
     map([pop_known, pop_unknown, df_oos]) do df
-        [haskey(dict_region, x) ? dict_region[x] : x for x in df.region]
+        [haskey(odict_region, x) ? odict_region[x] : x for x in df.region]
     end
 
 # Species
-dict_species = Dict(Pair.(pop_known.species, Int64.(denserank(pop_known.species))))
+odict_species = sort(Dict(Pair.(pop_known.species, Int64.(denserank(pop_known.species)))))
 
 num_species_known, num_species_unknown, num_species_oos = 
     map([pop_known, pop_unknown, df_oos]) do df
-        [haskey(dict_species, x) ? dict_species[x] : x for x in df.species]
+        [haskey(odict_species, x) ? odict_species[x] : x for x in df.species]
     end
 
 str_species_known = pop_known.species
 str_species_unknown = pop_unknown.species
 str_species_oos = df_oos.species
-
-maximum(num_species_unknown), maximum(num_species_known)
 
 nbirds = Float64.(pop_known.nbirds)
 ppres = Float64.(pop_unknown.ppres)
@@ -84,11 +82,11 @@ PC_unknown = Matrix{Float64}(pop_unknown[:, FEATURES])
 PC_oos = Matrix{Float64}(df_oos[:, FEATURES])
 
 # Nestingtype
-dict_nesting = Dict(Pair.(pop_known.nestingtype, Int64.(denserank(pop_known.nestingtype))))
+odict_nesting = sort(Dict(Pair.(pop_known.nestingtype, Int64.(denserank(pop_known.nestingtype)))))
 
 num_nesting_known, num_nesting_unknown, num_nesting_oos = 
     map([pop_known, pop_unknown, df_oos]) do df
-        [haskey(dict_nesting, x) ? dict_nesting[x] : x for x in df.nestingtype]
+        [haskey(odict_nesting, x) ? odict_nesting[x] : x for x in df.nestingtype]
     end
 
 num_nesting_known = Int64.(denserank(pop_known.nestingtype))

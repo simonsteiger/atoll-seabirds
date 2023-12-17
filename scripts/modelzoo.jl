@@ -201,4 +201,36 @@ function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(
     end
 end
 
+@model function loospecial(
+    r, s, n, PC, y,
+    idx_sn, u_n, u_sn, Nv, Ng, Nb;
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
+)
+
+    # Priors for species × region
+    μ_sxr ~ filldist(Normal(0, σₚ), Ns)
+    τ_sxr ~ filldist(InverseGamma(3, θₚ), Ns)
+    z_sxr ~ filldist(Normal(), Ns, Nr)
+    α_sxr = μ_sxr .+ τ_sxr .* z_sxr
+
+    # Priors for nesting types × PCs
+    μ_pxn ~ filldist(Normal(0, σₚ), Nn, NPC)
+    τ_pxn ~ filldist(InverseGamma(3, θₚ), Nn, NPC)
+    z_pxb ~ filldist(Normal(), Nb, NPC)
+    z_pxg ~ filldist(Normal(), Ng, NPC)
+    z_pxv ~ filldist(Normal(), Nv, NPC)
+    z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
+    β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
+
+    # Prior for random error
+    σ2 ~ InverseGamma(3, θₚ)
+
+    # Likelihood
+    μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
+    y .~ Normal.(μ, σ2)
+
+    # Generated quantities
+    return (; y, α_sxr, β_pxn)
+end;
+
 end
