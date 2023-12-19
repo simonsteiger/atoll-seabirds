@@ -6,9 +6,10 @@ using Turing, TuringBenchmarking, ReverseDiff, ParetoSmooth
 using LazyArrays
 # Statistics
 using StatsFuns
+# Covariance matrices
 import LinearAlgebra: I
-# Working with tabular data
-using Chain, DataFrames
+# Storing and working with data
+using Chain, DataFrames, OrderedCollections
 # Plotting
 using StatsPlots
 # Saving results and logging
@@ -29,16 +30,17 @@ using .CountVariables
 using .CountModels
 using .CustomUtilityFuns
 
-# Set seed
-Random.seed!(42)
-
 # Benchmark model?
 benchmark = false
 
 # Run the sampler?
-run = isempty(ARGS) ? false : ARGS[1] == "true"
+run = isempty(ARGS) ? true : ARGS[1] == "true"
 
+# Pick model from ModelZoo 
+# We might as well paste the model here at the end and just reference the model zoo for what we tried?
 model = mMc
+simulate = simulate_Mc
+# Set inputs
 odict_inputs = OrderedDict(
     "region" => num_region_known,
     "species" => num_species_known,
@@ -53,26 +55,11 @@ odict_inputs = OrderedDict(
 )
 
 # If not loading a chain, save results to path below
-chainpath = "count_default.jls"
-
-standardise(x) = (x .- mean(x)) ./ std(x)
+chainpath = "count.jls"
 
 zlogn = standardise(log.(nbirds))
 
 # --- PRIOR PREDICTIVE CHECKS --- #
-
-struct ModelSummary{T}
-    model::T
-    chains::Chains
-    θ
-    samples
-    function ModelSummary(model, chains)
-        quantities = peaceful_generated_quantities(model, chains)
-        θ = keys(quantities[1])
-        samples = vec(getsamples(quantities, θ...))
-        return new{typeof(model)}(model, chains, θ, samples)
-    end
-end
 
 m = model(values(odict_inputs)..., zlogn)
 
@@ -99,7 +86,7 @@ benchmark && let
         Turing.Essential.ReverseDiffAD{true}()
     ]
 
-    TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(model(inputs..., presence), adbackends=backends);)
+    TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
 end
 
 # Sample from model unless a saved chain should be used
@@ -116,10 +103,14 @@ else
     nchains = 4
     config = (sampler, MCMCThreads(), nsamples, nchains)
 
+    # Notify user about sampling configuration
     @info """Sampler: $(string(sampler))
     Samples: $(nsamples)
     Chains: $(nchains)
     """
+
+    # Set seed
+    Random.seed!(42)
 
     # Discarding samples is unnecessary after NUTS tuning
     @info "🚀 Starting sampling: $(Dates.now())"
@@ -143,32 +134,39 @@ let preds = reduce(vcat, posteriorpreds)
     xlims!(-5, 5)
 end
 
+unstandardise(z, v) = z .* std(v) .+ mean(v)
+
 # Create dictionary of species-wise posterior prediction plot
 dict_postpred_plot = let
+    # Index vector I sorts other vectors to match region order
+    I = sortperm(num_region_known)
     # Create matrix of posterior predictions, rows X is species X
-    preds = reduce(hcat, posteriorpreds)
+    # Unstandardised and on count scale
+    preds = exp.(unstandardise(reduce(hcat, posteriorpreds), log.(nbirds)))
     # Enumerate species keys to create one plot per species
     plots = map(enumerate(keys(odict_species))) do (index, species)
+        # Index for subsetting to species S in current iteration
+        S = num_species_known[I].==index
         # Get observed values for species X
-        obs = zlogn[num_species_known.==index]
+        obs = nbirds[I][S]
         # Calculate mean of predicted values for species X
-        pred = vec(mean(preds[num_species_known.==index, :], dims=2))
+        pred = vec(mean(preds[I, :][S, :], dims=2))
         # Calculate quantile of predicted values for species X
-        qlims = @chain preds[num_species_known.==index, :] begin
-            map(x -> quantile(x, [0.05, 0.95]), eachslice(_, dims=1))
-            map(i -> preds[i] .- _[i], eachindex(_))
+        qlims = @chain preds[I, :][S, :] begin
+            map(x -> quantile(x, [0.025, 0.975]), eachslice(_, dims=1))
+            map(i -> _[i] .- pred[i], eachindex(_))
             transpose(reduce(hcat, _))
         end
         # Assemble plot for species X
-        scatter(pred, yerror=qlims, markersize=2.5, msc=1, label="P")
-        scatter!(obs, markersize=2.5, msc=2, label="O", xticks=:none)
-        title!(species, titlefontsize=12)
+        scatter(str_atoll_known[I][S], pred, yerror=qlims, markersize=2.5, msc=1, label="P", permute=(:y, :x))
+        scatter!(str_atoll_known[I][S], obs, markersize=2.5, msc=2, label="O", permute=(:y, :x))
+        title!(replace(species, "_" => " "), titlefontsize=12)
     end
     # Collect all plots in a dictionary (plotting all at once is a bit busy, maybe by nesting type or genus?)
     Dict(Pair.(keys(odict_species), plots))
 end
 
-# TODO add atoll names as x label, then flip xy
+# TODO what's up with A minutus? Can we tweak the model to make it work better?
 
 predictions =
     let thresholds = 0.75:0.05:0.85
@@ -182,9 +180,6 @@ predictions =
         end
         Dict(Pair.(thresholds, preds))
     end
-
-# TODO move to utils
-between(x, lower, upper) = lower ≤ x && x ≤ upper
 
 # TODO create input dict, change input dict here with oos vals, go
 countpreds_oos = @chain begin
@@ -226,6 +221,9 @@ CSV.write("$ROOT/results/data/countpreds_$PRIORSUFFIX.csv", df_countpreds)
 # It seems that specifying the model as MvNormal confuses psis_loo ("1 data point")
 # Respecify the likelihood as vectorized Normals
 # y .~ Normal.(μ, σ)
+
+# Regarding the "let's just put the model back into this script" ... 
+# Not a big issue at all, but spelling out loospecial again seems nasty
 
 loomodel = loospecial(inputs..., zlogn);
 

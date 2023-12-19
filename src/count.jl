@@ -2,6 +2,7 @@ module CountVariables
 
 export odict_region, odict_species, odict_nesting,
        num_region_known, num_region_unknown, num_region_oos,
+       num_atoll_known, num_atoll_unknown, str_atoll_known,
        num_species_known, str_species_known, num_species_unknown, str_species_unknown, num_species_oos, str_species_oos,
        nbirds,
        ppres,
@@ -53,7 +54,9 @@ end
 
 # Atolls. ...
 num_atoll_known = Int64.(denserank(pop_known.atoll))
+str_atoll_known = pop_known.atoll
 num_atoll_unknown = Int64.(denserank(pop_unknown.atoll))
+str_atoll_unknown = pop_unknown.atoll
 
 # Region
 odict_region = sort(Dict(Pair.(pop_known.region, Int64.(denserank(pop_known.region)))))

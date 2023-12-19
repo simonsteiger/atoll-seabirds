@@ -63,7 +63,7 @@ end;
 end;
 
 # Same inputs as main model allows us to pass the same vector
-function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
+function simulate_Mp(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
     map(params) do p
         β = sum(p.β_pxn[idx_sn, :] .* X, dims=2)
         @. logistic(p.α_sxr[idx_sr] + β)
@@ -102,7 +102,7 @@ end
 end;
 
 # Same inputs as main model allows us to pass the same vector
-function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
+function simulate_Lp(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
     map(params) do p
         β = sum(p.β_pxn[idx_sn, :] .* X, dims=2)
         @. logistic(p.α_s[s] + p.α_r[r] + p.α_sxr[idx_sr] + β)
@@ -152,13 +152,14 @@ end
 
 end
 
+
 module CountModels
 
 using Turing, LazyArrays, StatsFuns, LinearAlgebra
 include("../src/utilities.jl")
 import .CustomUtilityFuns: lu, idx
 
-export mMc, simulate
+export mMc, mLc, mXLc, simulate_Mc, simulate_Lc, simulate_XLc
 
 @model function mMc(
     r, s, n, PC,
@@ -193,10 +194,103 @@ export mMc, simulate
     # Generated quantities
     return (; y, α_sxr, β_pxn, σ2)
 end;
-   
-function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
+
+function simulate_Mc(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
     map(params) do param
         μ = param.α_sxr[idx_sr] + sum(param.β_pxn[idx_sn, :] .* X, dims=2)
+        rand.(Normal.(μ, param.σ2))
+    end
+end
+
+# THIS ONE IS WORSE THAN M (overestimates a bunch)
+@model function mLc(
+    r, s, n, PC,
+    idx_sn, u_n, u_sn, Nv, Ng, Nb,
+    y;
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
+)
+
+    # Species prior
+    α_s ~ filldist(Normal(0, 0.5), Ns)
+    # Region prior
+    α_r ~ filldist(Normal(0, 0.5), Nr)
+    # Priors for species × region
+    α_sxr ~ filldist(Normal(0, 0.5), Ns * Nr)
+
+    # Priors for nesting types × PCs
+    μ_pxn ~ filldist(Normal(0, 0.2), Nn, NPC)
+    τ_pxn ~ filldist(InverseGamma(3, 0.2), Nn, NPC)
+    z_pxb ~ filldist(Normal(), Nb, NPC)
+    z_pxg ~ filldist(Normal(), Ng, NPC)
+    z_pxv ~ filldist(Normal(), Nv, NPC)
+    z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
+    β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
+
+    # Prior for random error
+    σ2 ~ InverseGamma(3, 0.5)
+
+    # Likelihood
+    μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
+    Σ = σ2 * I
+    y ~ MvNormal(μ, Σ)
+
+    # Generated quantities
+    return (; y, α_s, α_r, α_sxr, β_pxn, σ2)
+end;
+
+function simulate_Lc(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
+    map(params) do param
+        μ = param.α_s[s] .+ param.α_r[r] .+ param.α_sxr[idx_sr] .+ sum(param.β_pxn[idx_sn, :] .* X, dims=2)
+        rand.(Normal.(μ, param.σ2))
+    end
+end
+
+@model function mXLc(
+    r, s, n, PC,
+    idx_sn, u_n, u_sn, Nv, Ng, Nb,
+    y;
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
+)
+
+    # Priors for species × region
+    μ_sxr ~ filldist(Normal(0, 0.5), Ns)
+    τ_sxr ~ filldist(InverseGamma(3, 0.5), Ns)
+    z_sxr ~ filldist(Normal(), Ns, Nr)
+    α_sxr = μ_sxr .+ τ_sxr .* z_sxr
+
+    # Priors for nesting × species
+    μ_nxs ~ filldist(Normal(0, 0.5), Nn)
+    τ_nxs ~ filldist(InverseGamma(3, 0.5), Nn)
+    z_bxs ~ filldist(Normal(), Nb, Nn)
+    z_gxs ~ filldist(Normal(), Ng, Nn)
+    z_vxs ~ filldist(Normal(), Nv, Nn)
+    z_nxs = ApplyArray(vcat, z_bxs, z_gxs, z_vxs)
+    α_nxs = μ_nxs[u_n] .+ τ_nxs[u_n] .* z_nxs[u_sn, :]
+
+    # Priors for nesting types × PCs
+    μ_pxn ~ filldist(Normal(0, 0.2), Nn, NPC)
+    τ_pxn ~ filldist(InverseGamma(3, 0.2), Nn, NPC)
+    z_pxb ~ filldist(Normal(), Nb, NPC)
+    z_pxg ~ filldist(Normal(), Ng, NPC)
+    z_pxv ~ filldist(Normal(), Nv, NPC)
+    z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
+    β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
+
+    # Prior for random error
+    σ2 ~ InverseGamma(3, 0.5)
+
+    # Likelihood
+    μ = vec(α_sxr[idx_sr] .+ α_nxs[idx_sn] .+ sum(β_pxn[idx_sn, :] .* PC, dims=2))
+    Σ = σ2 * I
+    y ~ MvNormal(μ, Σ)
+
+    # Generated quantities
+    return (; y, α_sxr, α_nxs, β_pxn, σ2)
+end;
+
+function simulate_XLc(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
+    map(params) do param
+        μ = param.α_sxr[idx_sr] .+ param.α_nxs[idx_sn] .+ sum(param.β_pxn[idx_sn, :] .* X, dims=2)
         rand.(Normal.(μ, param.σ2))
     end
 end

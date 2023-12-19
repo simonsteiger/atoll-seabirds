@@ -210,3 +210,5 @@ println(cv_res)
 # - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))
 # - in line with posterior predictive check
 # - not sure how to interpret differences in naive_lpd and cv_elpd ... but they seem very low p_avg 0.02
+
+# TODO compare model L and model X - X looks better from the posterior predicitve plots, what does PSIS LOO say?

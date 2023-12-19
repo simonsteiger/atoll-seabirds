@@ -1,43 +1,48 @@
 module CustomUtilityFuns
 
-export showall,
-       getsamples,
+using Turing, DataFrames
+
+export getsamples,
        peaceful_generated_quantities,
        idx,
        lu,
-       rdistearth
+       between,
+       standardise, unstandardise,
+       ModelSummary
 
-using Turing, DataFrames
-
-# TODO split this into modeling related utilities like idx, lu (not included yet), getsamples...
-# and others like ... ? rdistearth, showall? But showall isn't really very important in the final version :thinking:
-
-# Default method for printing all entries of an object
-function showall(x)
-    show(stdout, "text/plain", x)
-end
-
+# Shorthand length unique
 lu(x) = length(unique(x))
-
-# Method for printing all entries of the parameter panel of chains
-function showall(x::Chains; table="parameters")
-    idx = table == "parameters" ? 1 : 2
-    x = describe(x)[idx]
-    show(DataFrame(x), allrows=true)
-end
-
-function peaceful_generated_quantities(m, c)
-    chains_params = Turing.MCMCChains.get_sections(c, :parameters)
-    return generated_quantities(m, chains_params)
-end
-
-getsamples(θ, fields...) = map(x -> NamedTuple{fields}(getfield.(Ref(x), fields)), θ)
 
 # Convert matrix indexing to vector indexing
 idx(i, j) = i .+ (j .- 1) * maximum(i)
 
-# This version of logistic should not underflow
-safelogistic(x::T) where {T} = logistic(x) * (1 - 2 * eps(T)) + eps(T)
+# Z standardise
+standardise(v) = (v .- mean(v)) ./ std(v)
+# Revert Z standardisation
+unstandardise(z, v) = z .* std(v) .+ mean(v)
+
+# Get samples from a generated quantities object
+getsamples(θ, fields...) = map(x -> NamedTuple{fields}(getfield.(Ref(x), fields)), θ)
+# TODO make a generated quantities struct?
+
+# Get generated quantities from model / chain and avoid warning for model internals
+peaceful_generated_quantities(m, c) = generated_quantities(m, Turing.MCMCChains.get_sections(c, :parameters))
+
+# Summarise a DynamicPPL Model
+struct ModelSummary{T}
+    model::T
+    chains::Chains
+    θ
+    samples
+    function ModelSummary(model, chains)
+        quantities = peaceful_generated_quantities(model, chains)
+        θ = keys(quantities[1])
+        samples = vec(getsamples(quantities, θ...))
+        return new{typeof(model)}(model, chains, θ, samples)
+    end
+end
+
+between(x, lower, upper) = lower ≤ x && x ≤ upper
 
 function rdistearth(x1; x2=nothing, miles=false, R=nothing)
     isnothing(R) && begin R = miles ? 3963.34 : 6378.388 end
@@ -54,5 +59,5 @@ function rdistearth(x1; x2=nothing, miles=false, R=nothing)
         return @. R * acos([abs(x > 1 ? 1 * sign(x) : x for x in pp)])
     end
 end
-
+    
 end
