@@ -29,10 +29,10 @@ preds <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/
 est <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_global_popestimates.csv")
 envs <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_atolls_envs.csv")
 nest <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_filterconditions.csv")
-mpa <- read.csv("C:/Users/sebas/OneDrive/Dokumente/Github/atoll-seabirds/data/atoll_seabird_conservation/mpa_polygons.csv")
+mpa <- read.csv("C:/Users/sebas/OneDrive/Dokumente/Github/atoll-seabirds/data/mpa_polygons.csv")
 
 # turn into factors
-envs <- envs %>% select(atoll, region, lat, long) %>% mutate(across(1:2, as.factor))
+envs <- envs %>% select(atoll, region, lat, long, land_area_sqkm) %>% mutate(across(1:2, as.factor))
 preds <- preds %>% select(atoll, species, nbirds) %>% mutate(across(1:2, as.factor))
 nest <- nest %>% select(!filtercondition) %>% mutate(across(1:3, as.factor))
 mpa$mpa <- as.factor(mpa$mpa)
@@ -59,19 +59,19 @@ rm(dat) # no longer needed, keep tidy
 
 
 # calculate local contribution to beta diversity (LCBD) [and species contribution to beta diversity (SCBD)]
-beta.atoll <- matrix[c(which(rowMeans(matrix[,-c(1:4)]) > 0)),-c(1:4)] %>% 
+beta.atoll <- matrix[c(which(rowMeans(matrix[,-c(1:5)]) > 0)),-c(1:5)] %>% 
                 beta.div(., method = "percentdiff", sqrt.D = TRUE, samp = FALSE)
 beta <- beta.atoll$LCBD %>% as.data.frame()
-beta$atoll <- matrix[c(which(rowMeans(matrix[,-c(1:4)]) > 0)),]$atoll
+beta$atoll <- matrix[c(which(rowMeans(matrix[,-c(1:5)]) > 0)),]$atoll
 colnames(beta)[1] <- "lcbd"
 rm(beta.atoll) # no longer needed, keep tidy
 
 # Richness differences and species turnover
-comp.atoll <- matrix[c(which(rowMeans(matrix[,-c(1:4)]) > 0)),-c(1:4)] %>% beta.div.comp(., coef = "J", quant = FALSE)
+comp.atoll <- matrix[c(which(rowMeans(matrix[,-c(1:5)]) > 0)),-c(1:5)] %>% beta.div.comp(., coef = "J", quant = FALSE)
 
 
 # add seabird metadata and calculate atoll-wise biomass per species
-comb <- matrix %>% pivot_longer(!c(atoll, region, lat, long), names_to = "species", values_to = "nbirds")
+comb <- matrix %>% pivot_longer(!c(atoll, region, lat, long, land_area_sqkm), names_to = "species", values_to = "nbirds")
 comb$species <- as.factor(comb$species)
 comb <- comb %>% left_join(., nest, by = "species") %>% as.data.frame()
 
@@ -89,12 +89,17 @@ A_eff <- 0.8 #kJ obtained by the bird per kJ consumed
 comb$excretedN <- ((9.2*comb$biomass^0.774)/(F_ec*A_eff))*F_nc*comb$days_at_colony*comb$time_at_colony
 comb$excretedP <- ((9.2*comb$biomass^0.774)/(F_ec*A_eff))*F_pc*comb$days_at_colony*comb$time_at_colony
 
+# standardize by land area [ha]
+comb$excretedN <- comb$excretedN/(comb$land_area_sqkm*100)
+comb$excretedP <- comb$excretedP/(comb$land_area_sqkm*100)
+
 # summarize atoll-wise
-atoll <- comb %>% group_by(atoll, region, lat, long) %>% summarise(nspec = sum(nbirds > 0),
-                                                         nbirds = sum(nbirds),
-                                                         totbiomass = sum(biomass),
-                                                         totN = sum(excretedN),
-                                                         totP = sum(excretedP)) %>% as.data.frame()
+atoll <- comb %>% group_by(atoll, region, lat, long, land_area_sqkm) %>% summarise(nspec = sum(nbirds > 0),
+                                                                                  nbirds = sum(nbirds),
+                                                                                  totbiomass = sum(biomass),
+                                                                                  totN = sum(excretedN),
+                                                                                  totP = sum(excretedP)) %>%
+                                                                                                as.data.frame()
 
 atoll <- atoll %>% left_join(., beta, by = "atoll") %>% mutate(lcbd = replace_na(lcbd, 0))
 
@@ -113,7 +118,7 @@ spec$ratios <- ifelse(is.na(spec$Callaghan) == FALSE, spec$nbirds*1/spec$Callagh
               ifelse(is.na(spec$birdlife_max) == TRUE, spec$nbirds*1/spec$birdlife_min,
                       spec$nbirds*1/spec$birdlife_max)))
 
-spec <- spec %>% select(c(species, group, nbirds, totbiomass, ratios))
+spec <- spec %>% select(c(species, group, nbirds, totbiomass, totN, totP, ratios))
 spec$species <- as.factor(spec$species)
 
 ```
@@ -126,6 +131,10 @@ mapCoast <- ne_coastline(scale = "medium", returnclass = "sf")
 spat.mpa <- mpa %>% st_as_sf(., coords = c("long", "lat"), crs = 4326)
 coords.mpa <- spat.mpa %>% st_coordinates(extract())
 
+mpa.areas <-  geom_polygon(inherit.aes = FALSE, data = spat.mpa, 
+                aes(x = coords.mpa[,1], y = coords.mpa[,2], colour = mpa),
+                linewidth = 1, fill = NA)
+
 # create map layer
 map <- ggplot() + 
   geom_sf(data = mapWorld, fill = "#EBE3D5", color = NA) +
@@ -135,9 +144,6 @@ map <- ggplot() +
   theme_classic() +
   geom_segment(aes(x = 36.2, xend = 36.2, y = -30.1, yend = 30.1), linewidth = 0.8) +
   geom_segment(aes(x = 49.9, xend = 250.1, y = -33, yend = -33), linewidth = 0.8) +
-  geom_polygon(data = spat.mpa, 
-               aes(x = coords.mpa[,1], y = coords.mpa[,2], colour = mpa),
-               linewidth = 1, fill = NA) +
   theme(
     axis.title = element_blank(),
     axis.line = element_blank(),
@@ -251,27 +257,6 @@ pmapbox <- p1a+p1b+p2a+p2b+p3a+p3b+plot_layout(widths = c(3,1,3,1,3,1), nrow = 3
 
 ```
 
-````{r nutrient inputs}
-ggplot(data = atoll[which(atoll$nbirds > 0),], aes(x = "identity", y = totN/1000)) +
-  geom_violin(alpha = 0.5) +
-  geom_jitter(aes(colour = totN), width = 0.15, size = 1.5) +
-  geom_boxplot(width = 0.1, alpha = 0.5, outlier.shape = NA) +
-  scale_y_continuous(trans = "log10", labels = scales::comma) +
-  ylab("total excreted P [kg P / year]") +
-  boxplotaesth
-
-map + 
-  geom_point(data = spat.1a,
-             aes(x = coords.1a[,1], y = coords.1a[,2], colour = log10(totN+1)), 
-             size = 1.1, shape = 21, alpha = 0.9, stroke = 1.9) +
-  scale_colour_gradientn(colours = c("#fbe725", "#3dbc74", "#306b84","black"),
-                         values = c(1.0, 0.5, 0.1, 0),
-                         name = "log(total N [kg/year])") +
-  ggtitle("Nitrogen input per atoll") +
-  theme(legend.position = "none")
-
-```
-
 
 ```{r heatmap}
 # heatmap
@@ -315,8 +300,8 @@ seabirdnames$common.names <- c("Blue-grey Noddy", "Black Noddy", "Brown Noddy", 
                                "Black-footed Albatross", "Phoenix Petrel", "Herald Petrel", "Bonin Petrel",
                                "Kermadec Petrel", "Murphy's Petrel", "Tropical Shearwater", "Christmas Shearwater",
                                "Roseate Tern", "Black-naped Tern","Australian Fairy Tern", "Saunder's Tern",
-                               "Masked Booby", "Nazca Booby", "Brown Booby", "Red-footed Booby", "Great Crested Tern",
-                               "Lesser Crested Tern") %>%   
+                               "Masked Booby", "Nazca Booby", "Brown Booby", "Red-footed Booby", "Lesser Crested Tern",
+                               "Greater Crested Tern") %>%   
                                   as.factor()
   
 spec <- left_join(spec, seabirdnames, by = "species")
@@ -347,6 +332,109 @@ p11 <- ggplot(data = spec, aes(x = ratios*100, y = reorder(common.names, ratios)
 
   
 #ggsave(p11, filename = "fig_proportion_species_global.svg", dpi = 300, width = 105, height = 150, units = "mm")
+
+```
+
+
+
+````{r nutrient inputs}
+
+pnut.a <- ggplot(data = atoll[which(atoll$nbirds > 0),], aes(x = "identity", y = totN)) +
+            geom_violin(fill = "#EBEBEB", alpha = 0.5) +
+            geom_jitter(aes(colour = totN), width = 0.15, size = 1.5) +
+            geom_boxplot(fill = "#EBEBEB", width = 0.1, alpha = 0.5, outlier.shape = NA) +
+            scale_y_continuous(trans = "log10", labels = scales::comma,
+                               breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000)) +
+            scale_colour_gradientn(colours = c("#fbe725", "#3dbc74", "#306b84", "black"),
+                                   values = c(1, 0.001, 0.0001, 0)) +
+            ylab(expression(paste("imported nitrogen [kg N ", ha^-1, " ", year^-1,"]"))) +
+            ggtitle("a. atoll-wise import") +
+            guides(y = guide_axis_truncated(trunc_lower = 1, trunc_upper = 1000000)) +
+            boxplotaesth +
+            theme(axis.line.x = element_blank())
+
+pnut.c <- ggplot(data = atoll[which(atoll$nbirds > 0),], aes(x = "identity", y = totP)) +
+            geom_violin(fill = "#EBEBEB", alpha = 0.5) +
+            geom_jitter(aes(colour = totP), width = 0.15, size = 1.5) +
+            geom_boxplot(fill = "#EBEBEB", width = 0.1, alpha = 0.5, outlier.shape = NA) +
+            scale_y_continuous(trans = "log10", labels = scales::comma,
+                               breaks = c(1, 10, 100, 1000, 10000, 100000, 100000)) +
+            scale_colour_gradientn(colours = c("#fbe725", "#3dbc74", "#306b84", "black"),
+                                   values = c(1, 0.001, 0.0001, 0)) +
+            ylab(expression(paste("imported phosphorous [kg P ", ha^-1, " ", year^-1,"]"))) +
+            ggtitle("a. phosphorous import") +
+            guides(y = guide_axis_truncated(trunc_lower = 1, trunc_upper = 100000)) +
+            boxplotaesth +
+            theme(axis.line.x = element_blank())
+
+
+nutrientinput <- comb[comb$species %in% c("Onychoprion_fuscatus", "Sula_sula", "Sula_leucogaster",
+                                          "Fregata_ariel", "Thalasseus_bergii", "Sula_dactylatra",
+                                          "Anous_minutus", "Anous_stolidus", "Fregata_minor", "Phaethon_rubricauda",
+                                          "Gygis_alba", "Onychoprion_lunatus", "Sterna_sumatrana", "Anous_tenuirostris",
+                                          "Phaethon_lepturus"),]
+
+nutrientinput <- left_join(nutrientinput, seabirdnames, by = "species")
+
+pnut.b <- ggplot(data = nutrientinput[which(nutrientinput$nbirds > 0),],
+                 aes(y = reorder(common.names, excretedN), x = excretedN, fill = group)) +
+            geom_boxplot() +
+            scale_x_continuous(trans = "log10", labels = scales::comma) + 
+            scale_fill_viridis_d(aesthetics = "fill", option = "mako") +
+            theme_classic() +
+            xlab(expression(paste("imported nitrogen per atoll [kg N ",ha^-1, " ", year^-1,"]"))) +
+            guides(x = guide_axis_truncated(trunc_lower = 1, trunc_upper = 1000000), y = "axis_truncated") +
+            ggtitle("b. keystone importers") +
+            theme(
+                  legend.position = "none",
+                  axis.text = element_text(size = 11),
+                  axis.title.x = element_text(size = 12),
+                  axis.title.y = element_blank()
+                  )
+
+pnut.d <- ggplot(data = nutrientinput[which(nutrientinput$nbirds > 0),],
+                 aes(y = reorder(common.names, excretedP), x = excretedP, fill = group)) +
+            geom_boxplot() +
+            scale_x_continuous(trans = "log10", labels = scales::comma,
+                               breaks = c(1, 100, 1000, 100000)) + 
+            scale_fill_viridis_d(aesthetics = "fill", option = "mako") +
+            theme_classic() +
+            xlab(expression(paste("imported phosphorous per atoll [kg P ",ha^-1, " ", year^-1,"]"))) +
+            guides(x = guide_axis_truncated(trunc_lower = 1, trunc_upper = 100000), y = "axis_truncated") +
+            ggtitle("b. keystone importers") +
+            theme(
+                  legend.position = "none",
+                  axis.text = element_text(size = 11),
+                  axis.title.x = element_text(size = 12),
+                  axis.title.y = element_blank()
+                  )
+
+pnut.e <- ggplot(data = comb[which(comb$excretedN > 0.09),],
+                 aes(y = reorder(group, excretedN), x = excretedN, fill = group)) +
+              geom_boxplot() +
+              scale_x_continuous(trans = "log10",
+                                 breaks = c(0.1, 1, 10, 100, 1000, 10000, 100000, 1000000),
+                                 labels =  ~ ifelse(.x < 1, label_number(accuracy = .1)(.x),
+                                                            label_number(accuracy = 1)(.x))) + 
+              scale_y_discrete(
+                labels = c("Tropicbirds","Frigatebirds" , "Terns", "Petrels &\n Shearwater", "Boobies", "Albatros")) +
+              scale_fill_manual(values = c("#0B0405FF", "#382A54FF", "#395D9CFF", "#60CEACFF", "#DEF5e5FF", "#3497a9FF")) +
+              theme_classic() +
+              xlab(expression(paste("imported nitrogen per atoll [kg N ",ha^-1, " ", year^-1,"]"))) +
+              guides(x = guide_axis_truncated(trunc_lower = 0.1, trunc_upper = 1000000), y = "axis_truncated") +
+              ggtitle("b. keystone importers") +
+              theme(
+                    legend.position = "none",
+                    axis.text.x = element_text(size = 11, angle = 30, vjust = 0.8),
+                    axis.text.y = element_text(size = 11),
+                    axis.title.x = element_text(size = 12),
+                    axis.title.y = element_blank()
+                    )
+
+pnutrientsN <- pnut.a + pnut.e + plot_layout(widths = c(1, 1.3))
+pnutrientsP <- pnut.c+pnut.d
+
+#ggsave(pnutrientsN, filename = "fig_nutrient_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
 
 ```
 
