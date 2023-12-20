@@ -633,15 +633,18 @@ top3 %>% count(atoll, sort = TRUE)
 # get species with more than 60% of global population on atolls
 key.spec <- spec %>% filter(ratios > 0.6) %>% select(species) %>% pull(species) %>% as.vector()
 
-key.atolls <- atollw %>% filter(species %in% c(key.spec)) %>% filter(species != "Nesofregetta_fuliginosa")
-
-key.atolls <- key.atolls %>% group_by(species) %>% arrange(desc(atoll.ratios)) %>% slice(1:4) %>% as.data.frame()
+# subset for each species the four atolls with the largest colony sizes
+key.atolls <- atollw %>% group_by(species) %>% arrange(desc(atoll.ratios)) %>% slice(1:4) %>% as.data.frame()
 
 # add total atoll population size per species and global ratio
-key.atolls <- key.atolls %>% left_join(., spec[c(1,3,5)], by = "species")
-colnames(key.atolls)[6] <- "nbirds"
-colnames(key.atolls)[9] <- "total.atoll.pop"
-colnames(key.atolls)[10] <- "global.ratios"
+key.atolls <- key.atolls %>% left_join(., spec %>% select(species, nbirds, ratios), by = "species")
+
+key.atolls <- rename(key.atolls, nbirds = nbirds.x)
+key.atolls <- rename(key.atolls, total.atoll.pop = nbirds.y)
+key.atolls <- rename(key.atolls, global.ratios = ratios)
+
+# select only key species (i.e., with >60% global population on atolls)
+key.atolls <- key.atolls %>% filter(species %in% key.spec)
 
 # calculate combined contribution of all other (not key) atolls to seabird population size
 others <- key.atolls %>% group_by(species, total.atoll.pop) %>% summarise(combined = sum(nbirds)) %>% 
@@ -653,14 +656,14 @@ others <- others %>% select(c(species, nbirds, atoll.ratios, atoll))
 others$atoll <- as.factor(others$atoll)
 
 # add global proportion 
-others <- others %>% left_join(., spec[,c(1:2,5)], by = "species")
-colnames(others)[6] <- "global.ratios"
+others <- others %>% left_join(., spec %>% select(species, group, ratios), by = "species")
+others <- rename(others, global.ratios = ratios)
 
 # add other atolls to key atolls for alluvium plot
 key.atolls <- key.atolls %>% bind_rows(., others)
 
 # get common names
-key.atolls <- key.atolls %>% left_join(., spec[,c(1,6)], by = "species")
+key.atolls <- key.atolls %>% left_join(., spec %>% select(species, common.names), by = "species")
 
 
 p12 <- ggplot(data = key.atolls, aes(axis1 = reorder(common.names, 1/global.ratios), axis2 = atoll, y = atoll.ratios)) +
@@ -683,7 +686,7 @@ p12 <- ggplot(data = key.atolls, aes(axis1 = reorder(common.names, 1/global.rati
   annotate(geom = "text", x = 2, y = 7.2, label = "n = 19 key atolls", size = 4.2) +
   annotate(geom = "text", x = 1, y = 7.2, label = "seabirds >60% of \n global population on atolls", size = 4.2)
 
-ggsave(p12, filename = "fig_keyatolls.svg", dpi = 300, width = 210, height = 160, units = "mm")
+#ggsave(p12, filename = "fig_keyatolls.svg", dpi = 300, width = 210, height = 160, units = "mm")
 
 ```
 
@@ -707,8 +710,8 @@ km2d <- function(km, base.latitude) {
     return(out)
 }
 
-meanmaxdist <- 1000 #km
-sdmaxdist <- 50 # km
+meanmaxdist <- 240 #km
+sdmaxdist <- 30 # km
 
 
 dist <- rgevd(n = 280, location = meanmaxdist-sdmaxdist, scale = sdmaxdist, shape = 0.8) %>% as.vector()
@@ -764,10 +767,7 @@ ggplot() +
     legend.position = "none")
 
 
-
-
-
-heatmap <- comb %>% filter(nbirds > 0)
+'heatmap <- comb %>% filter(nbirds > 0)
 
 out <- NULL
 
@@ -777,7 +777,7 @@ for (i in 1:nrow(heatmap)){
   temp <- as.data.frame(cbind(dist, direct))
   out <- rbind(out, temp)
 }
-
+'
 
 ```
 
