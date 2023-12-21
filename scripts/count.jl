@@ -79,49 +79,47 @@ end
 # I guess it's not bad on a second thought though – we don't want probability mass in useless places
 
 # Benchmark different backends to find out which is fastest
-benchmark && let
-    backends = [
-        Turing.Essential.ForwardDiffAD{0}(),
-        Turing.Essential.ReverseDiffAD{false}(),
-        Turing.Essential.ReverseDiffAD{true}()
-    ]
 
-    TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
+backends = [
+    Turing.Essential.ForwardDiffAD{0}(),
+    Turing.Essential.ReverseDiffAD{false}(),
+    Turing.Essential.ReverseDiffAD{true}()
+]
+
+TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
+@info "ReverseDiff{true} is the fastest AD backend."
+
+# Set AD backend to :reversediff and compile with setrdcache(true)
+Turing.setadbackend(:reversediff)
+Turing.setrdcache(true)
+
+# Configure sampling
+sampler = NUTS(1000, 0.95; max_depth=10)
+nsamples = 2000
+nchains = 4
+config = (sampler, MCMCThreads(), nsamples, nchains)
+
+# Notify user about sampling configuration
+@info """Sampler: $(string(sampler))
+Samples: $(nsamples)
+Chains: $(nchains)
+"""
+
+# Set seed
+Random.seed!(42)
+
+# Discarding samples is unnecessary after NUTS tuning
+@info "🚀 Starting sampling: $(Dates.now())"
+posterior = @chain begin
+    sample(m, config...)
+    ModelSummary(m, _)
 end
 
-# Sample from model unless a saved chain should be used
-if !run
-    chain = deserialize("$ROOT/results/chains/$chainpath")
-else
-    # Set AD backend to :reversediff and compile with setrdcache(true)
-    Turing.setadbackend(:reversediff)
-    Turing.setrdcache(true)
-
-    # Configure sampling
-    sampler = NUTS(1000, 0.95; max_depth=10)
-    nsamples = 2000
-    nchains = 4
-    config = (sampler, MCMCThreads(), nsamples, nchains)
-
-    # Notify user about sampling configuration
-    @info """Sampler: $(string(sampler))
-    Samples: $(nsamples)
-    Chains: $(nchains)
-    """
-
-    # Set seed
-    Random.seed!(42)
-
-    # Discarding samples is unnecessary after NUTS tuning
-    @info "🚀 Starting sampling: $(Dates.now())"
-    posterior = @chain begin
-        sample(m, config...)
-        ModelSummary(m, _)
-    end
-
-    serialize("$ROOT/results/chains/$chainpath", chain)
-    @info "💾 Chain saved to '$ROOT/results/chains/$chainpath'."
-end;
+try
+    serialize("$ROOT/results/chains/$chainpath", posterior.chains); @info "💾 Chain saved to `$ROOT/results/chains/$chainpath`."
+catch error
+    @warn "Writing failed with an $error."
+end
 
 # --- POSTERIOR PREDICTIVE CHECK --- #
 
@@ -134,8 +132,6 @@ let preds = reduce(vcat, posteriorpreds)
     xlims!(-5, 5)
 end
 
-unstandardise(z, v) = z .* std(v) .+ mean(v)
-
 # Create dictionary of species-wise posterior prediction plot
 dict_postpred_plot = let
     # Index vector I sorts other vectors to match region order
@@ -146,7 +142,7 @@ dict_postpred_plot = let
     # Enumerate species keys to create one plot per species
     plots = map(enumerate(keys(odict_species))) do (index, species)
         # Index for subsetting to species S in current iteration
-        S = num_species_known[I].==index
+        S = num_species_known[I] .== index
         # Get observed values for species X
         obs = nbirds[I][S]
         # Calculate mean of predicted values for species X
@@ -154,11 +150,11 @@ dict_postpred_plot = let
         # Calculate quantile of predicted values for species X
         qlims = @chain preds[I, :][S, :] begin
             map(x -> quantile(x, [0.025, 0.975]), eachslice(_, dims=1))
-            map(i -> _[i] .- pred[i], eachindex(_))
-            transpose(reduce(hcat, _))
+            map(i -> abs.(_[i] .- pred[i]), eachindex(_))
+            reduce(hcat, _)
         end
         # Assemble plot for species X
-        scatter(str_atoll_known[I][S], pred, yerror=qlims, markersize=2.5, msc=1, label="P", permute=(:y, :x))
+        scatter(str_atoll_known[I][S], pred, yerror=(qlims[1, :], qlims[2, :]), markersize=2.5, msc=1, label="P", permute=(:y, :x))
         scatter!(str_atoll_known[I][S], obs, markersize=2.5, msc=2, label="O", permute=(:y, :x))
         title!(replace(species, "_" => " "), titlefontsize=12)
     end

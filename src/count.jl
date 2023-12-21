@@ -26,8 +26,7 @@ ROOT = dirname(Base.active_project())
 # Import the outofsample validation data
 df_oos = @chain "$ROOT/data/atoll_seabird_populations_outofsample-validation.csv" begin
     # Three columns formatted as date in original file, make sure to read as String
-    CSV.read(_, DataFrame, missingstring="NA", types=Union{String, Missing}) 
-    select(_, Not(:Column1))
+    CSV.read(_, DataFrame, types=Union{String, Missing}) 
     stack(_, Not(:atoll), variable_name=:species)
     dropmissing(_, :value)
     transform(_, :value => ByRow(x -> split(string(x), "-")) => :substrings)
@@ -38,7 +37,6 @@ df_oos = @chain "$ROOT/data/atoll_seabird_populations_outofsample-validation.csv
     leftjoin(_, unique(vcat(envs_known[:, [:atoll, FEATURES...]], envs_unknown[:, [:atoll, FEATURES...]])), on=:atoll)
     leftjoin(_, unique(pop_unknown[:, [:atoll, :region]]), on=:atoll)
     leftjoin(_, unique(pop_known[:, [:species, :nestingtype]], :species), on=:species)
-    dropmissing(_) # This should be obsolete once we have environmental parameters for Takatoto
 end
 
 oos_lims = df_oos.lims

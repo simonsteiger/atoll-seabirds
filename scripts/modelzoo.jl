@@ -4,7 +4,7 @@ using Turing, LazyArrays, StatsFuns
 include("../src/utilities.jl")
 using .CustomUtilityFuns
 
-export mSp, mMp, mLp, mXLp, simulate
+export mSp, mMp, mLp, mXLp, simulate_Mp, simulate_Lp
 
 # Helper for model declaration
 lu(x) = length(unique(x))
@@ -70,45 +70,6 @@ function simulate_Mp(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=i
     end
 end
 
-@model function mLp(
-    r, s, n, PC, # inputs
-    idx_sn, u_n, u_sn, Nv, Ng, Nb, # indexes, lengths, etc
-    y; # outcome
-    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
-)
-
-    # Species prior
-    α_s ~ filldist(Normal(0, 0.5), Ns)
-    # Region prior
-    α_r ~ filldist(Normal(0, 0.5), Nr)
-    # Priors for species × region
-    α_sxr ~ filldist(Normal(0, 0.5), Ns * Nr)
-
-    # Priors for nesting types × PCs
-    μ_pxn ~ filldist(Normal(0, 0.2), Nn, NPC)
-    σ_pxn ~ filldist(InverseGamma(3, 0.5), Nn, NPC)
-    z_pxb ~ filldist(Normal(), Nb, NPC)
-    z_pxg ~ filldist(Normal(), Ng, NPC)
-    z_pxv ~ filldist(Normal(), Nv, NPC)
-    z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
-    β_pxn = @. μ_pxn[u_n, :] + σ_pxn[u_n, :] * z_pxn[u_sn, :]
-
-    # Likelihood
-    β = sum(β_pxn[idx_sn, :] .* PC, dims=2)
-    y ~ arraydist(LazyArray(@~ BernoulliLogit.(α_s[s] + α_r[r] + α_sxr[idx_sr] + β)))
-
-    # Generated quantities
-    return (; y, α_s, α_r, α_sxr, β_pxn)
-end;
-
-# Same inputs as main model allows us to pass the same vector
-function simulate_Lp(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
-    map(params) do p
-        β = sum(p.β_pxn[idx_sn, :] .* X, dims=2)
-        @. logistic(p.α_s[s] + p.α_r[r] + p.α_sxr[idx_sr] + β)
-    end
-end
-
 @model function mXLp(
     a, r, s, n, PC, # inputs
     idx_sn, u_n, u_sn, Nv, Ng, Nb, # indexes, lengths, etc
@@ -143,7 +104,7 @@ end
 end;
 
 # Same inputs as main model allows us to pass the same vector
-function simulate(params, a, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
+function simulate_XL(params, a, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
     map(params) do p
         β = sum(p.β_pxn[idx_sn, :] .* X, dims=2)
         @. logistic(p.α_a[a] + p.α_s[s] + p.α_r[r] + p.α_sxr[idx_sr] + β)
