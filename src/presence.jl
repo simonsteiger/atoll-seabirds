@@ -20,7 +20,8 @@ export num_atoll,
        num_species_within_nesting_unknown
 
 include("global.jl")
-using .Preprocess
+using .GlobalVariables
+
 using DataFrames, Chain, StatsBase
 
 const FEATURES = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]

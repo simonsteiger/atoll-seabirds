@@ -20,12 +20,10 @@ using Random
 
 # Load custom modules
 include("$ROOT/src/presence.jl")
-include("$ROOT/src/utilities.jl")
-include("$ROOT/scripts/modelzoo.jl")
-
-# Make custom modules available
 using .PresenceVariables
+include("$ROOT/src/utilities.jl")
 using .CustomUtilityFuns
+include("$ROOT/scripts/modelzoo.jl")
 using .PresenceModels
 
 # Set seed
@@ -72,9 +70,9 @@ backends = [
 ];
 
 TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
-@info "ReverseDiff{true} is the fastest AD backend."
+@info "TuringBenchmark shows that ReverseDiff{true} is the fastest AD backend."
 
-# Set AD backend to :reversediff and compile with setrdcache(true)
+# Use ReverseDiffAD and enable caching
 Turing.setadbackend(:reversediff)
 Turing.setrdcache(true)
 
@@ -96,9 +94,11 @@ posterior = @chain begin
 end
 
 try
-    serialize("$ROOT/results/chains/$chainpath", posterior.chains); @info "💾 Chain saved to `$ROOT/results/chains/$chainpath`."
+    path = "$ROOT/results/chains/$chainpath"
+    serialize(tmp_path, posterior.chains)
+    @info "Saved chains to `$path`."
 catch error
-    @warn "Writing failed with an $error."
+    @warn "Writing chains failed with an $error."
 end
 
 # --- POSTERIOR PREDICTIVE CHECK --- #
@@ -127,6 +127,7 @@ nsu_long = [fill(num_species_unknown, length(num_region_unknown))...;]
 nnu_long = [fill(num_species_within_nesting_unknown, length(num_region_unknown))...;]
 PCu_long = reduce(vcat, [permutedims(hcat(fill(s, length(num_nesting_unknown))...)) for s in eachslice(PC_unknown, dims=1)])
 
+# Create predictions for unknown atolls
 predictions = let odict_unknown_inputs = copy(odict_inputs)
     names = ["region", "species", "PC", "species_within_nesting"]
     vals = [nru_long, nsu_long, PCu_long, nnu_long]
@@ -135,43 +136,42 @@ predictions = let odict_unknown_inputs = copy(odict_inputs)
     reduce(hcat, preds)
 end
 
-df_preds = let 
+# Wrap predictions and quantile in DataFrame with inputs
+df_preds = let
     μs = vec(mean(predictions, dims=2))
     qs = reduce(hcat, [quantile(slice, [0.05, 0.95]) for slice in eachslice(predictions, dims=1)])
     DataFrame([nau_long, nru_long, nsu_long, μs, qs[1, :], qs[2, :]], [:atoll, :region, :species, :mean, :lower005, :upper095])
 end
 
 
-unknown_pred_plots = let df = df_preds
+# Plot predictions for unknown atolls and store results in Dict
+dict_unknown_pred_plots = let df = df_preds
     plots = map(enumerate(unique(df.species))) do (index, species)
-        I = df.species.==species
-        scatter(df.mean[I], df.atoll[I], ms=2, msc=1, xerror=(abs.(df.lower005[I].-df.mean[I]), abs.(df.upper095[I].-df.mean[I])))
+        I = df.species .== species
+        scatter(df.mean[I], df.atoll[I], ms=2, msc=1, xerror=(abs.(df.lower005[I] .- df.mean[I]), abs.(df.upper095[I] .- df.mean[I])))
         title!(unique(str_species)[index], titlefontsize=8)
-        xlims!(0, 1); vline!([0.8], c=:black, ls=:dash, legend=:none)
+        xlims!(0, 1)
+        vline!([0.8], c=:black, ls=:dash, legend=:none)
     end
     Dict(Pair.(unique(str_species), plots))
 end
 
-plot(unknown_pred_plots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
+plot(dict_unknown_pred_plots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
+# TODO plot by nesting type or genus
 
-CSV.write("$ROOT/results/data/presencepreds_$PRIORSUFFIX.csv", df_preds)
-@info "Successfully saved predictions to `$ROOT/data/presencepreds_$PRIORSUFFIX.csv`."
-
-## Posterior predictive checks
-
-posteriorpreds = Matrix{Float64}(reduce(hcat, vec(predictpresence(α, β, num_region, num_species, num_nesting, PC));))
-
-# how do we best visualize binary posterior predictions?
-
-scatter(mean.([presence, posteriorpreds]), yerror=std(presence))
+# Save predictions for unknown atolls to CSV
+try
+    path = "$ROOT/results/data/presencepreds.csv"
+    CSV.write(path, df_preds); @info "Saved predictions to `$path`."
+catch error
+    @warn "Writing predictions failed with an $error."
+end
 
 # LOO
-cv_res = psis_loo(model, chain);
-println(cv_res)
+cv_res = psis_loo(m, posterior.chains);
+cv_res
 # - no overfit
 # - out of sample performance near in-sample performance (gmpd 0.76)
 # - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))
 # - in line with posterior predictive check
 # - not sure how to interpret differences in naive_lpd and cv_elpd ... but they seem very low p_avg 0.02
-
-# TODO compare model L and model X - X looks better from the posterior predicitve plots, what does PSIS LOO say?

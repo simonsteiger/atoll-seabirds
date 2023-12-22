@@ -20,16 +20,18 @@ library("ggh4x")
 library("adespatial")
 library("scales")
 library("ggalluvial")
+library("here")
+library("fst")
 
 ```
 
 ```{r load data}
 
-preds <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/allpopulations.csv")
-est <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_global_popestimates.csv")
-envs <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_atolls_envs.csv")
-nest <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_filterconditions.csv")
-mpa <- read.csv("C:/Users/sebas/OneDrive/Dokumente/Github/atoll-seabirds/data/mpa_polygons.csv")
+preds <- read.csv(here("data/allpopulations.csv"))
+est <- read.csv(here("data/atoll_seabird_global_popestimates.csv"))
+envs <- read.csv(here("data/seabird_atolls_envs.csv"))
+nest <- read.csv(here("data/seabird_filterconditions.csv"))
+mpa <- read.csv(here("data/mpa_polygons.csv"))
 
 # turn into factors
 envs <- envs %>% select(atoll, region, lat, long, land_area_sqkm) %>% mutate(across(1:2, as.factor))
@@ -43,7 +45,6 @@ preds$nbirds <- round(preds$nbirds,0)
 # convert longitudes for 'sf' format
 envs$long <- ifelse(envs$long < 0, envs$long+360, envs$long)
 mpa$long <- ifelse(mpa$long < 0, mpa$long+360, mpa$long)
-
 ```
 
 
@@ -500,27 +501,35 @@ p10 <- map +
 
 ```{r species heatmaps}
 
-spatspec <- st_as_sf(atollw, coords = c("long", "lat"), crs = 4326)
+library("ggdensity")
+
+foraging <- read_fst(here("results/data/foraging.fst"))
+
+spatspec <- st_as_sf(foraging, coords = c("adjlong", "adjlat"), crs = 4326)
 
 coordspec <- spatspec %>% st_coordinates(extract())
 
-palette <- c("transparent", brewer.pal(n = 9, "YlOrRd"))
-
-targetspec <- c("Anous_ceruleus")
-
-map +
-  geom_density_2d_filled(data = spatspec[which(spatspec$species == targetspec),],
-                         aes(x = coordspec[which(spatspec$species == targetspec),1], 
-                             y = coordspec[which(spatspec$species == targetspec),2]),
-                         bins = 10) +
-    geom_point(data = spatspec[which(spatspec$species == targetspec),],
-                         aes(x = coordspec[which(spatspec$species == targetspec),1], 
-                             y = coordspec[which(spatspec$species == targetspec),2]),
-             size = 2.5, alpha = 0.5) +
-  scale_fill_manual(values = palette) +
-  ggtitle(targetspec) +
-  theme(legend.position = "none")
-
+map + 
+  geom_hdr(data = spatspec, aes(x = coordspec[,1], y = coordspec[,2]),
+           xlim = c(0,250),
+           method = "kde",
+           probs = seq(from = 0.1, to = 0.95, length.out = 8)) +
+  #geom_point(data = spatspec, aes(x = coordspec[,1], y = coordspec[,2]), alpha=0.2) +
+  #geom_raster(data = spatspec, aes(x = coordspec[,1], y = coordspec[,2], fill = dens)) +
+  geom_sf(data = mapWorld, fill = "#EBE3D5", color = NA) +
+  geom_sf(data = mapCoast, linewidth = 0.15) +
+  coord_sf(xlim = c(46.5, 255),
+           ylim = c(-30, 30)) +
+  theme_classic() +
+  geom_segment(aes(x = 36.2, xend = 36.2, y = -30.1, yend = 30.1), linewidth = 0.8) +
+  geom_segment(aes(x = 49.9, xend = 250.1, y = -33, yend = -33), linewidth = 0.8) +
+  theme(
+    axis.title = element_blank(),
+    axis.line = element_blank(),
+    axis.text = element_text(size = 11),
+    axis.ticks = element_line(linewidth = 0.8),
+    title = element_text(size = 13),
+    legend.position = "none")
 ```
 
 ```{r nmds}
@@ -665,7 +674,6 @@ p12 <- ggplot(data = key.atolls, aes(axis1 = reorder(common.names, 1/global.rati
 
 library("EnvStats")
 library("fields")
-library("ggdensity")
 
 
 km2d <- function(km, base.latitude) {

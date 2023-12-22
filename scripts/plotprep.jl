@@ -23,11 +23,11 @@ function rdistearth(x1::AbstractArray{Float64}, x2::AbstractArray{Float64}, R=63
     return R .* acos.(pp)
 end
 
-km2d(km, baselat) = rdistearth([0.0 baselat], [1.0 baselat]) / km
+km2d(km, baselat) = km ./ rdistearth([0.0 baselat], [1.0 baselat])
 
-@time km2d.([-1.4, -1.2], [-2.3, -2.2])
+km2d.([-1.4, -1.2], [-2.3, -2.2])
 
-preds.Δ = rand(Uniform(15, 1000), nrow(preds))
+preds.Δ = rand(Uniform(15, 150), nrow(preds))
 
 preds.nbirds = Int64.(round.(preds.nbirds))
 
@@ -39,14 +39,31 @@ atolls = reduce(vcat, [fill(preds.atoll[i], preds.nbirds[i]) for i in eachindex(
 
 out = DataFrame([atolls, distance, direction], [:atoll, :distance, :direction])
 
-DataFrames.transform!(out, [:direction, :distance] => ByRow((dir, dis) -> (alakm=cos(dir * π) / 180 * dis, alokm=cos(dir * π) / 180 * dis)) => AsTable)
+DataFrames.transform!(out, [:direction, :distance] => ByRow((dir, dis) -> (addlatkm=cos((dir * π) / 180) * dis, addlongkm=sin((dir * π) / 180) * dis)) => AsTable)
 
 leftjoin!(out, select(envs, :atoll, :lat, :long), on=:atoll)
 
-out.aladeg = vec(reduce(vcat, km2d.(out.alakm, out.lat)))
-out.alodeg = vec(reduce(vcat, km2d.(out.alokm, out.long)))
+out.long = [long < 0 ? long + 360 : long for long in out.long]
 
-select!(out, :lat, :long, :aladeg, :alodeg)
+out.addlatdeg = vec(reduce(vcat, km2d.(out.addlatkm, out.lat)))
+out.addlongdeg = vec(reduce(vcat, km2d.(out.addlongkm, out.long)))
+
+select!(out, :lat, :long, :addlatdeg => :addlat, :addlongdeg => :addlong)
+
+transform!(out, [[:lat, :addlat], [:long, :addlong]] .=> ByRow((x,y) -> round(x + y, digits=1)) .=> [:adjlat, :adjlong])
+select!(out, r"adj")
+
+subset_size = round(Int, 0.1 * nrow(out))
+random_rows = sample(eachindex(out.adjlat), subset_size, replace = false)
+
+sub_out = out[random_rows, :]
+
+#out = @chain out begin
+#    groupby(_, [:adjlat, :adjlong])
+#    combine(_, nrow)
+#    transform(_, :nrow => ByRow(log) => :dens)
+#    select(_, Not(:nrow))
+#end
 
 using RCall
 

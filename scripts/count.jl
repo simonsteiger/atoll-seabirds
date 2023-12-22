@@ -21,13 +21,11 @@ using Random
 const ROOT = dirname(Base.active_project())
 
 # Load custom modules
-include("$ROOT/scripts/modelzoo.jl")
 include("$ROOT/src/count.jl")
-include("$ROOT/src/utilities.jl")
-
-# Make custom modules available
 using .CountVariables
+include("$ROOT/scripts/modelzoo.jl")
 using .CountModels
+include("$ROOT/src/utilities.jl")
 using .CustomUtilityFuns
 
 # Benchmark model?
@@ -123,9 +121,9 @@ end
 
 # --- POSTERIOR PREDICTIVE CHECK --- #
 
-posteriorpreds = simulate(posterior.samples, values(odict_inputs)...)
+preds_train = simulate(posterior.samples, values(odict_inputs)...)
 
-let preds = reduce(vcat, posteriorpreds)
+let preds = reduce(vcat, preds_train)
     histogram(zlogn, normalize=true, c=1)
     density!(preds, normalize=true, c=:white, lw=3)
     density!(preds, normalize=true, c=2, fillrange=0, fillalpha=0.2, legend=false)
@@ -138,7 +136,7 @@ dict_postpred_plot = let
     I = sortperm(num_region_known)
     # Create matrix of posterior predictions, rows X is species X
     # Unstandardised and on count scale
-    preds = exp.(unstandardise(reduce(hcat, posteriorpreds), log.(nbirds)))
+    preds = exp.(unstandardise(reduce(hcat, preds_train), log.(nbirds)))
     # Enumerate species keys to create one plot per species
     plots = map(enumerate(keys(odict_species))) do (index, species)
         # Index for subsetting to species S in current iteration
@@ -164,7 +162,29 @@ end
 
 # TODO what's up with A minutus? Can we tweak the model to make it work better?
 
-predictions =
+preds_validation = let odict_oos_inputs = copy(odict_inputs)
+    names = ["region", "species", "PC", "species_within_nesting"]
+    vals = [num_region_oos, num_species_oos, PC_oos, num_species_within_nesting_oos]
+    setindex!.(Ref(odict_oos_inputs), vals, names)
+    @chain simulate(posterior.samples, values(odict_oos_inputs)...) begin
+        reduce(hcat, _)
+        exp.(unstandardise(_, log.(nbirds)))
+        #[between.(val, oos_lims[i][1], oos_lims[i][2]) for (i, val) in enumerate(eachslice(_, dims=1))]
+        #DataFrame([str_species_oos, mean.(_)], [:species, :overlap])
+        #plot([histogram(subset(_, :species => ByRow(x -> x == s)).overlap, title=s, bins=10) for s in unique(_.species)]..., size=(800,1000), titlefontsize=9, legend=false)
+        #xlims!(0, 1)
+    end
+end
+
+xi = findall(i -> (i≤oos_lims[3][1]) & (i≤oos_lims[3][1]), preds_validation[3, :])
+histogram(preds_validation[3, :]); xlims!(0, 1500)
+vline!(oos_lims[3], lw=2, c=:red)
+
+
+# TODO instead shade are within oos lims from top ... 99% ? samples (restrict to kick craziness)
+
+# Predict counts on unknown atolls
+preds_target =
     let thresholds = 0.75:0.05:0.85
         odict_unknown_inputs = copy(odict_inputs)
         names = ["region", "species", "PC", "species_within_nesting"]
@@ -173,8 +193,9 @@ predictions =
             vals = [num_region_unknown[pass], num_species_unknown[pass], PC_unknown[pass, :], num_species_within_nesting_unknown[pass]]
             setindex!.(Ref(odict_unknown_inputs), vals, names)
             samples = reduce(hcat, simulate(posterior.samples, values(odict_unknown_inputs)...))
+            # mean, quantile, unstandardise, exponentiate (or reverse order of chunks)
         end
-        Dict(Pair.(thresholds, preds))
+        Dict(Pair.(string.(thresholds), preds))
     end
 
 # TODO create input dict, change input dict here with oos vals, go

@@ -15,7 +15,7 @@ export odict_region, odict_species, odict_nesting,
        count_species_by_nesting
    
 include("global.jl")
-using .Preprocess
+using .GlobalVariables
 
 using DataFrames, Chain, StatsBase, CSV, OrderedCollections
 
