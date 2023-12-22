@@ -22,6 +22,8 @@ library("scales")
 library("ggalluvial")
 library("here")
 library("fst")
+library("ggdensity")
+library("JuliaCall")
 
 ```
 
@@ -501,7 +503,28 @@ p10 <- map +
 
 ```{r species heatmaps}
 
-library("ggdensity")
+method_julia <- function(h = NULL, adjust = c(1, 1)) {
+    julia_setup()
+    julia_command("using KernelDensity")
+    function(data, n, rangex, rangey) {
+        if (is.null(h)) {
+            h <- c(MASS::bandwidth.nrd(data$x), MASS::bandwidth.nrd(data$y))
+        }
+        h <- h * adjust
+        julia_assign("data", data)
+        julia_assign("h", h)
+        julia_assign("n", as.integer(n))
+        julia_assign("rangex", rangex)
+        julia_assign("rangey", rangey)
+        julia_command("kdeout = kde((data.x, data.y); npoints=(n,n), boundary=((rangex[1], rangex[2]), (rangey[1], rangey[2])), bandwidth=(h[1],h[2]))")
+        x <- julia_eval("kdeout.x")
+        y <- julia_eval("kdeout.y")
+        fhat <- julia_eval("kdeout.density")
+        df <- expand.grid(x = x, y = y)
+        df$fhat <- as.vector(fhat)
+        df
+    }
+}
 
 foraging <- read_fst(here("results/data/foraging.fst"))
 
@@ -510,10 +533,10 @@ spatspec <- st_as_sf(foraging, coords = c("adjlong", "adjlat"), crs = 4326)
 coordspec <- spatspec %>% st_coordinates(extract())
 
 map + 
-  geom_hdr(data = spatspec, aes(x = coordspec[,1], y = coordspec[,2]),
+  geom_hdr(aes(x = coordspec[,1], y = coordspec[,2]),
            xlim = c(0,250),
-           method = "kde",
-           probs = seq(from = 0.1, to = 0.95, length.out = 8)) +
+           method = method_julia(),
+           probs = seq(from = 0.005, to = 0.99, length.out = 8)) +
   #geom_point(data = spatspec, aes(x = coordspec[,1], y = coordspec[,2]), alpha=0.2) +
   #geom_raster(data = spatspec, aes(x = coordspec[,1], y = coordspec[,2], fill = dens)) +
   geom_sf(data = mapWorld, fill = "#EBE3D5", color = NA) +
