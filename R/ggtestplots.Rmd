@@ -75,25 +75,60 @@ comb <- matrix %>% pivot_longer(!c(atoll, region, lat, long, land_area_sqkm), na
 comb$species <- as.factor(comb$species)
 comb <- comb %>% left_join(., nest, by = "species") %>% as.data.frame()
 
-comb$biomass <- comb$nbirds*comb$bodymass
-comb <- comb %>% select(!c(bodymass,nestingtype))
-
-# calculate total N and P input in g per year and per seabird species and atoll using 
-# https://doi.org/10.1038/s41467-017-02446-8
+# calculate total N and P input in per year and per seabird and atoll using 
+# https://doi.org/10.1038/s41467-017-02446-8 and https://doi.org/0.1016/j.envpol.2004.02.008
 
 F_nc <- 0.036 #average N content of seabird diet in g N g^-1
 F_pc <- 0.006 #average P content of seabird diet in g P g^-1
 F_ec <- 6.5 #average energy content of seabird diet kJ g^-1
 A_eff <- 0.8 #kJ obtained by the bird per kJ consumed
 
-comb$excretedN <- ((9.2*comb$biomass^0.774)/(F_ec*A_eff))*F_nc*comb$days_at_colony*comb$time_at_colony
-comb$excretedP <- ((9.2*comb$biomass^0.774)/(F_ec*A_eff))*F_pc*comb$days_at_colony*comb$time_at_colony
+# ADULTS:
+# calculate basal metabolic rate for adults (kJ bird^-1 day^-1)
+comb$BMR <- 2.3*comb$bodymass^0.774
 
-# standardize by land area [ha]
-comb$excretedN <- comb$excretedN/(comb$land_area_sqkm*100)
-comb$excretedP <- comb$excretedP/(comb$land_area_sqkm*100)
+# calculate field metabolic rate for adults (kJ bird^-1 day^-1)
+comb$AMR <- 4*comb$BMR
 
-# summarize atoll-wise
+# calculate total daily N and P excreted (g N or g P bird^-1 day^-1)
+comb$dailyN <- (comb$AMR*F_nc)/(F_ec*A_eff)
+comb$dailyP <- (comb$AMR*F_pc)/(F_ec*A_eff)
+  
+# extrapolate for breeding season and colony attendance
+comb$seasonalN <- comb$dailyN * comb$days_at_colony * comb$time_at_colony
+comb$seasonalP <- comb$dailyP * comb$days_at_colony * comb$time_at_colony
+
+# extrapolate for colony size
+comb$adultN <- comb$seasonalN*comb$nbirds
+comb$adultP <- comb$seasonalP*comb$nbirds
+
+# CHICKS:
+# calculate metabolic rate for chicks (kJ bird^-1 year^-1)
+comb$E_rearing <- 28.43*comb$fledgling_mass^1.06
+
+comb$chickN <- ((comb$E_rearing*F_nc)/(F_ec*A_eff))*(comb$prod_per_pair/2)
+comb$chickP <- ((comb$E_rearing*F_pc)/(F_ec*A_eff))*(comb$prod_per_pair/2)
+
+comb$chickN <- comb$chickN*comb$nbirds
+comb$chickP <- comb$chickP*comb$nbirds
+
+# Add up adult and chick excretion
+comb$excretedN <- comb$adultN + comb$chickN
+comb$excretedP <- comb$adultP + comb$chickP
+
+# convert g to kg
+comb$excretedN <- comb$excretedN/1000
+comb$excretedP <- comb$excretedP/1000
+
+# calculate total bird biomass
+comb$biomass <- comb$nbirds*comb$bodymass
+
+# drop unneeded columns after computation
+comb <- comb %>% select(!c(bodymass, nestingtype, BMR, AMR, dailyN, dailyP, seasonalN, seasonalP,
+                           adultN, adultP, chickN, chickP, E_rearing, prod_per_pair, fledgling_mass))
+
+
+# summarize atoll-wise,
 atoll <- comb %>% group_by(atoll, region, lat, long, land_area_sqkm) %>% summarise(nspec = sum(nbirds > 0),
                                                                                   nbirds = sum(nbirds),
                                                                                   totbiomass = sum(biomass),
@@ -113,7 +148,7 @@ spec <- comb %>% group_by(species, group) %>% summarise(nbirds = sum(nbirds),
 # calculate proportion contribution to global population
 spec <- left_join(spec, est, by = "species")
 
-spec$ratios <- ifelse(is.na(spec$Callaghan) == FALSE, spec$nbirds*1/spec$Callaghan,
+spec$ratios <- ifelse(is.na(spec$Otero) == FALSE, spec$nbirds*1/spec$Otero,
             ifelse(is.na(spec$HBW) == FALSE, spec$nbirds*1/spec$HBW, 
               ifelse(is.na(spec$birdlife_max) == TRUE, spec$nbirds*1/spec$birdlife_min,
                       spec$nbirds*1/spec$birdlife_max)))
@@ -134,6 +169,11 @@ coords.mpa <- spat.mpa %>% st_coordinates(extract())
 mpa.areas <-  geom_polygon(inherit.aes = FALSE, data = spat.mpa, 
                 aes(x = coords.mpa[,1], y = coords.mpa[,2], colour = mpa),
                 linewidth = 1, fill = NA)
+
+mpa.areas <- geom_polygon(aes(x = coords.mpa[which(spat.mpa$mpa == levels(spat.mpa$mpa)[1:3]),1],
+                              y = coords.mpa[which(spat.mpa$mpa == levels(spat.mpa$mpa)[1:3]),2]),
+                          linewidth = 0.8, fill = NA, colour = "black")
+
 
 # create map layer
 map <- ggplot() + 
@@ -258,37 +298,6 @@ pmapbox <- p1a+p1b+p2a+p2b+p3a+p3b+plot_layout(widths = c(3,1,3,1,3,1), nrow = 3
 ```
 
 
-```{r heatmap}
-# heatmap
-n <- atoll$nspec
-
-temp <- data.frame()
-long <- data.frame()
-
-for (i in seq_along(n)) {
-  temp <- atoll[rep(i, n[i]),]
-  long <- rbind(long, temp)
-}
-
-long.spat <- st_as_sf(long, coords = c("long", "lat"), crs = 4326)
-long.coords <- long.spat %>% st_coordinates(extract())
-
-palette <- c("transparent", brewer.pal(n = 9, "YlOrRd"))
-
-map +
-  geom_density_2d_filled(data = long.spat,
-                         aes(x = long.coords[,1], y = long.coords[,2]),
-                         bins = 10) +
-    geom_point(data = long.spat,
-             aes(x = long.coords[,1], y = long.coords[,2]), 
-             size = 1.5, alpha = 0.5) +
-  scale_fill_manual(values = palette) +
-  ggtitle("Heatmap seabird species richness") +
-  theme(legend.position = "none")
-
-```
-
-
 ```{r bird populations}
 seabirdnames <- spec[,1] %>% as.data.frame()
 colnames(seabirdnames) <- "species"
@@ -306,6 +315,8 @@ seabirdnames$common.names <- c("Blue-grey Noddy", "Black Noddy", "Brown Noddy", 
   
 spec <- left_join(spec, seabirdnames, by = "species")
 
+spec$group <- factor(spec$group, levels = c("albatros", "booby", "frigatebird", "tubenose", "tern", "tropicbird"))
+
 p11 <- ggplot(data = spec, aes(x = ratios*100, y = reorder(common.names, ratios), fill = group)) +
             geom_bar(stat = "identity", color = "black", width = 0.8, linewidth = 0.5) +
             annotate("rect", xmin = 25, xmax = 50, ymin = 0, ymax = 37, fill = "#eeeeee") +
@@ -313,7 +324,9 @@ p11 <- ggplot(data = spec, aes(x = ratios*100, y = reorder(common.names, ratios)
             annotate("rect", xmin = 75, xmax = 95, ymin = 0, ymax = 37, fill = "#cccccc") +
             annotate("rect", xmin = 95, xmax = 100, ymin = 0, ymax = 37, fill = "#bbbbbb") +
             geom_bar(stat = "identity", color = "black", width = 0.8, linewidth = 0.5) +
-            scale_fill_viridis_d(aesthetics = "fill", option = "mako") +
+            scale_fill_viridis_d(aesthetics = "fill", option = "mako",
+                                 labels = c("Albatross", "Booby", "Frigatebird", "Petrel/Shearwater", "Tern", "Tropicbird")
+            ) +
               guides(x = "axis_truncated", y = "axis_truncated", 
                    fill = guide_legend(byrow = TRUE)) +
             xlab("% of global population") +
@@ -347,7 +360,7 @@ pnut.a <- ggplot(data = atoll[which(atoll$nbirds > 0),], aes(x = "identity", y =
                                breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000)) +
             scale_colour_gradientn(colours = c("#fbe725", "#3dbc74", "#306b84", "black"),
                                    values = c(1, 0.001, 0.0001, 0)) +
-            ylab(expression(paste("imported nitrogen [kg N ", ha^-1, " ", year^-1,"]"))) +
+            ylab(expression(paste("imported nitrogen per atoll [kg N  ", year^-1,"]"))) +
             ggtitle("a. atoll-wise import") +
             guides(y = guide_axis_truncated(trunc_lower = 1, trunc_upper = 1000000)) +
             boxplotaesth +
@@ -361,7 +374,7 @@ pnut.c <- ggplot(data = atoll[which(atoll$nbirds > 0),], aes(x = "identity", y =
                                breaks = c(1, 10, 100, 1000, 10000, 100000, 100000)) +
             scale_colour_gradientn(colours = c("#fbe725", "#3dbc74", "#306b84", "black"),
                                    values = c(1, 0.001, 0.0001, 0)) +
-            ylab(expression(paste("imported phosphorous [kg P ", ha^-1, " ", year^-1,"]"))) +
+            ylab(expression(paste("imported phosphorous per atoll [kg P ", year^-1,"]"))) +
             ggtitle("a. phosphorous import") +
             guides(y = guide_axis_truncated(trunc_lower = 1, trunc_upper = 100000)) +
             boxplotaesth +
@@ -382,7 +395,7 @@ pnut.b <- ggplot(data = nutrientinput[which(nutrientinput$nbirds > 0),],
             scale_x_continuous(trans = "log10", labels = scales::comma) + 
             scale_fill_viridis_d(aesthetics = "fill", option = "mako") +
             theme_classic() +
-            xlab(expression(paste("imported nitrogen per atoll [kg N ",ha^-1, " ", year^-1,"]"))) +
+            xlab(expression(paste("imported nitrogen per colony [kg N ", year^-1,"]"))) +
             guides(x = guide_axis_truncated(trunc_lower = 1, trunc_upper = 1000000), y = "axis_truncated") +
             ggtitle("b. keystone importers") +
             theme(
@@ -399,7 +412,7 @@ pnut.d <- ggplot(data = nutrientinput[which(nutrientinput$nbirds > 0),],
                                breaks = c(1, 100, 1000, 100000)) + 
             scale_fill_viridis_d(aesthetics = "fill", option = "mako") +
             theme_classic() +
-            xlab(expression(paste("imported phosphorous per atoll [kg P ",ha^-1, " ", year^-1,"]"))) +
+            xlab(expression(paste("imported phosphorous per colony [kg P ", year^-1,"]"))) +
             guides(x = guide_axis_truncated(trunc_lower = 1, trunc_upper = 100000), y = "axis_truncated") +
             ggtitle("b. keystone importers") +
             theme(
@@ -409,18 +422,24 @@ pnut.d <- ggplot(data = nutrientinput[which(nutrientinput$nbirds > 0),],
                   axis.title.y = element_blank()
                   )
 
-pnut.e <- ggplot(data = comb[which(comb$excretedN > 0.09),],
-                 aes(y = reorder(group, excretedN), x = excretedN, fill = group)) +
+colonywise <- comb %>% group_by(atoll, group) %>% summarise(totN = sum(excretedN),
+                                                            totP = sum(excretedP)) %>% as.data.frame()
+colonywise$group <- factor(colonywise$group,
+                           levels = c("tropicbird", "tubenose", "frigatebird", "tern", "booby", "albatros"))
+
+
+pnut.e <- ggplot(data = colonywise[which(colonywise$totN > 0), ], 
+                 aes(y = group, x = totN, fill = group)) +
               geom_boxplot() +
               scale_x_continuous(trans = "log10",
                                  breaks = c(0.1, 1, 10, 100, 1000, 10000, 100000, 1000000),
                                  labels =  ~ ifelse(.x < 1, label_number(accuracy = .1)(.x),
                                                             label_number(accuracy = 1)(.x))) + 
               scale_y_discrete(
-                labels = c("Tropicbirds","Frigatebirds" , "Terns", "Petrels &\n Shearwater", "Boobies", "Albatros")) +
-              scale_fill_manual(values = c("#0B0405FF", "#382A54FF", "#395D9CFF", "#60CEACFF", "#DEF5e5FF", "#3497a9FF")) +
+              labels = c("Tropicbirds", "Petrels &\n Shearwater", "Frigatebirds" , "Terns", "Boobies", "Albatross")) +
+              scale_fill_manual(values = c("#DEF5E5FF", "#3497A9FF", "#395D9CFF", "#60CEACFF", "#382A54FF", "#0B0404FF"))+
               theme_classic() +
-              xlab(expression(paste("imported nitrogen per atoll [kg N ",ha^-1, " ", year^-1,"]"))) +
+              xlab(expression(paste("imported nitrogen per atoll-colony [kg N ", year^-1,"]"))) +
               guides(x = guide_axis_truncated(trunc_lower = 0.1, trunc_upper = 1000000), y = "axis_truncated") +
               ggtitle("b. keystone importers") +
               theme(
@@ -432,75 +451,25 @@ pnut.e <- ggplot(data = comb[which(comb$excretedN > 0.09),],
                     )
 
 pnutrientsN <- pnut.a + pnut.e + plot_layout(widths = c(1, 1.3))
-pnutrientsP <- pnut.c+pnut.d
+pnutrientsP <- pnut.c + pnut.d + plot_layout(widths = c(1, 1.3))
 
-#ggsave(pnutrientsN, filename = "fig_nutrient_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
+ggsave(pnutrientsN, filename = "fig_nutrient_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
 
 ```
 
-
-```{r atoll properties region stratified}
-
-ggplot(data = atoll[which(atoll$nbirds > 0), ], aes(x = region, y = nbirds)) +
-  geom_violin(aes(fill = region)) +
-  geom_boxplot(aes(fill = region), width = 0.1) +
-  geom_jitter(width = 0.15, size = 1.5) +
-  scale_y_continuous(trans = "log",
-                     breaks = c(10, 100, 1000, 10000, 100000, 1000000, 10000000),
-                     labels = scales::comma) +
-  scale_x_discrete(labels = c("Indian Ocean", 
-                              "Melanesia",
-                              "Micronesia",
-                              "Polynesia")) +
-  scale_fill_manual(values = c("#B5D5C5", "#B08BBB", "#ECA869", "#F5F5DC")) +
-  guides(x = "axis_truncated", y = guide_axis_truncated(trunc_lower = 10, trunc_upper = 1000000)) +
-  ggtitle("Population size per atoll") +
-  ylab("no. of seabirds") +
-  geom_hline(yintercept = 13200, linetype = "dashed", linewidth = 0.8) + 
-  annotate("text", label = "B3b (A4iii) threshold)", x = 4.35, y = 18500, size = 5, fontface = "italic") +
-  theme_classic() +
-  theme(
-    legend.position = "none",
-    axis.title.x = element_blank(),
-    axis.text = element_text(size = 13),
-    axis.title.y = element_text(size = 15),
-    title = element_text(size = 17))
-
-
-ggplot(data = atoll, aes(x = region, y = nspec)) +
-  geom_violin(aes(fill = region)) +
-  geom_boxplot(aes(fill = region), width = 0.1) +
-  geom_jitter(width = 0.15, size = 1.5) +
-  scale_x_discrete(labels = c("Indian Ocean", 
-                              "Melanesia",
-                              "Micronesia",
-                              "Polynesia")) +
-  scale_fill_manual(values = c("#B5D5C5", "#B08BBB", "#ECA869", "#F5F5DC")) +
-  guides(x = "axis_truncated", y = "axis_truncated") +
-  ggtitle("Diversity of atolls") +
-  ylab("no. of seabirds species") +
-  theme_classic() +
-  theme(
-    legend.position = "none",
-    axis.title.x = element_blank(),
-    axis.text = element_text(size = 13),
-    axis.title.y = element_text(size = 15),
-    title = element_text(size = 17))
-  
-```
 
 ```{r significant breeding sites}
 
 atollw <- left_join(comb, est, by = "species")
 
-atollw$atoll.ratios <- ifelse(is.na(atollw$Callaghan) == FALSE, atollw$nbirds*1/atollw$Callaghan,
+atollw$atoll.ratios <- ifelse(is.na(atollw$Otero) == FALSE, atollw$nbirds*1/atollw$Otero,
                           ifelse(is.na(atollw$HBW) == FALSE, atollw$nbirds*1/atollw$HBW, 
                             ifelse(is.na(atollw$birdlife_max) == TRUE, atollw$nbirds*1/atollw$birdlife_min,
                               atollw$nbirds*1/atollw$birdlife_max)))
 
 atollw$species <- as.factor(atollw$species)
 
-atollw <- atollw %>% select(!c(biomass, birdlife_min, birdlife_max, HBW, Callaghan))
+atollw <- atollw %>% select(!c(biomass, birdlife_min, birdlife_max, HBW, Otero))
 
 # subset only for largest value per atoll
 atollmax <- atollw %>% group_by(atoll, lat, long) %>% summarise(atoll.ratios = max(atoll.ratios)) %>% as.data.frame()
@@ -731,8 +700,12 @@ scatter$add.long.km <- sin((scatter$direct*pi)/180) * scatter$dist # longitude
 scatter$add.lat.deg <- km2d(scatter$add.lat.km, base.latitude = scatter$lat) %>% as.vector()
 scatter$add.long.deg <- km2d(scatter$add.long.km, base.latitude = scatter$lat) %>% as.vector()
 
-scatter$latscat <- scatter$lat + scatter$add.lat.deg
+scatter$latscat <- scatter$lat + scatter$add.lat.deg 
 scatter$longscat <- scatter$long + scatter$add.long.deg
+
+# round
+scatter$latscat <- round(scatter$latscat, 1)
+scatter$longscat <- round(scatter$longscat, 1)
 
 scatter.sf <- scatter %>% st_as_sf(., coords = c("long", "lat"), crs = 4326)
 coords.scatter <- scatter.sf %>% st_coordinates(extract())
@@ -767,17 +740,26 @@ ggplot() +
     legend.position = "none")
 
 
-'heatmap <- comb %>% filter(nbirds > 0)
 
-out <- NULL
+grid <- data.frame(matrix(ncol = length(seq(from = 46.5, to = 255, by = 0.1)),
+                          nrow = length(seq(from = -30, to = 30, by = 0.1))))
 
-for (i in 1:nrow(heatmap)){
-  dist <- rgevd(n = heatmap$nbirds[i], location = meanmaxdist-sdmaxdist, scale = sdmaxdist, shape = 0.8) %>% as.vector()
-  direct <- runif(n = heatmap$nbirds[i], 0, 360) %>% as.vector()
-  temp <- as.data.frame(cbind(dist, direct))
-  out <- rbind(out, temp)
-}
-'
+colnames(grid) <- seq(from = 46.5, to = 255, by = 0.1)
+grid$lat <- seq(from = -30, to = 30, by = 0.1)
+
+grid <- replace(grid, is.na(grid), 0)
+
+grid.longer <- grid %>% pivot_longer(!lat,
+                                   names_to = "long",
+                                   values_to = "count") %>% as.data.frame()
+grid.longer$long <- as.numeric(grid.longer$long)
+
+
+
+grid.longer <- grid.longer %>% mutate(count = ifelse(lat == 0.9 & long == 172.3, 
+                                                     count+1, 
+                                                     count))
+
 
 ```
 
