@@ -28,11 +28,7 @@ using .CountModels
 include("$ROOT/src/utilities.jl")
 using .CustomUtilityFuns
 
-# Benchmark model?
-benchmark = false
-
-# Run the sampler?
-run = isempty(ARGS) ? true : ARGS[1] == "true"
+# --- MODEL SETUP --- #
 
 # Pick model from ModelZoo 
 # We might as well paste the model here at the end and just reference the model zoo for what we tried?
@@ -40,16 +36,16 @@ model = mMc
 simulate = simulate_Mc
 # Set inputs
 odict_inputs = OrderedDict(
-    "region" => num_region_known,
-    "species" => num_species_known,
-    "nesting" => num_nesting_known,
-    "PC" => PC_known,
-    "species_within_nesting" => num_species_within_nesting_known,
-    "unique_nesting" => unique_nesting_known,
-    "unique_species_within_nesting" => unique_species_within_nesting_known,
-    "n_burow" => count_species_by_nesting[1],
-    "n_ground" => count_species_by_nesting[2],
-    "n_vegetation" => count_species_by_nesting[3],
+    "region" => region.known.num,
+    "species" => species.known.num,
+    "nesting" => nesting.known.num,
+    "PC" => PC.known,
+    "species_within_nesting" => species_in_nesting.known.num,
+    "unique_nesting" => nesting.levels,
+    "unique_species_within_nesting" => species_in_nesting.levels,
+    "n_burow" => nspecies.burrow,
+    "n_ground" => nspecies.ground,
+    "n_vegetation" => nspecies.vegetation,
 )
 
 # If not loading a chain, save results to path below
@@ -76,7 +72,7 @@ end
 # not sure if necessary to show both observed and prior for prior predictive check
 # I guess it's not bad on a second thought though – we don't want probability mass in useless places
 
-# Benchmark different backends to find out which is fastest
+# --- MODEL CONFIG --- #
 
 backends = [
     Turing.Essential.ForwardDiffAD{0}(),
@@ -102,6 +98,8 @@ config = (sampler, MCMCThreads(), nsamples, nchains)
 Samples: $(nsamples)
 Chains: $(nchains)
 """
+
+# --- SAMPLING --- #
 
 # Set seed
 Random.seed!(42)
@@ -131,107 +129,88 @@ let preds = reduce(vcat, preds_train)
 end
 
 # Create dictionary of species-wise posterior prediction plot
-dict_postpred_plot = let
-    # Index vector I sorts other vectors to match region order
-    I = sortperm(num_region_known)
-    # Create matrix of posterior predictions, rows X is species X
-    # Unstandardised and on count scale
-    preds = exp.(unstandardise(reduce(hcat, preds_train), log.(nbirds)))
-    # Enumerate species keys to create one plot per species
-    plots = map(enumerate(keys(odict_species))) do (index, species)
-        # Index for subsetting to species S in current iteration
-        S = num_species_known[I] .== index
-        # Get observed values for species X
-        obs = nbirds[I][S]
-        # Calculate mean of predicted values for species X
-        pred = vec(mean(preds[I, :][S, :], dims=2))
-        # Calculate quantile of predicted values for species X
-        qlims = @chain preds[I, :][S, :] begin
-            map(x -> quantile(x, [0.025, 0.975]), eachslice(_, dims=1))
-            map(i -> abs.(_[i] .- pred[i]), eachindex(_))
-            reduce(hcat, _)
-        end
-        # Assemble plot for species X
-        scatter(str_atoll_known[I][S], pred, yerror=(qlims[1, :], qlims[2, :]), markersize=2.5, msc=1, label="P", permute=(:y, :x))
-        scatter!(str_atoll_known[I][S], obs, markersize=2.5, msc=2, label="O", permute=(:y, :x))
-        title!(replace(species, "_" => " "), titlefontsize=12)
-    end
-    # Collect all plots in a dictionary (plotting all at once is a bit busy, maybe by nesting type or genus?)
-    Dict(Pair.(keys(odict_species), plots))
-end
+dict_postpred_plot = 
+    let preds = exp.(unstandardise(reduce(hcat, preds_train), log.(nbirds)))
+        sorted_species = sort(unique(species.known.str))
+        # I reorders other vectors by region
+        I = sortperm(region.known.num)
 
-# TODO what's up with A minutus? Can we tweak the model to make it work better?
+        # Enumerate sorted species to create one plot per species
+        plots = map(enumerate(sorted_species)) do (idx, sp)
+            # Create BitVector S for species subsetting
+            S = species.known.num[I] .== idx
+            obs = nbirds[I][S]
+            # Calculate mean of predicted values for species X
+            pred = vec(mean(preds[I, :][S, :], dims=2))
+            # Calculate quantile of predicted values for species X
+            qlims = @chain preds[I, :][S, :] begin
+                map(x -> quantile(x, [0.025, 0.975]), eachslice(_, dims=1))
+                map(i -> abs.(_[i] .- pred[i]), eachindex(_))
+                reduce(hcat, _)
+            end
+            # Assemble plot for species X
+            scatter(atoll.known.str[I][S], pred, yerror=(qlims[1, :], qlims[2, :]), markersize=2.5, msc=1, label="P", permute=(:y, :x))
+            scatter!(atoll.known.str[I][S], obs, markersize=2.5, msc=2, label="O", permute=(:y, :x))
+            title!(replace(sp, "_" => " "), titlefontsize=12)
+        end
+        # Collect all plots in a dictionary (plotting all at once is a bit busy, maybe by nesting type or genus?)
+        Dict(Pair.(sorted_species, plots))
+    end
+
+# --- VALIDATION --- #
+
+# The data below consists of islands where only population ranges are known in the literature.
+# We make predictions for these data and check how much of the posterior lies within these population ranges.
 
 preds_validation = let odict_oos_inputs = copy(odict_inputs)
+    # Set names and values of inputs to be replaced in input dictionary
     names = ["region", "species", "PC", "species_within_nesting"]
-    vals = [num_region_oos, num_species_oos, PC_oos, num_species_within_nesting_oos]
+    vals = [region.validation.num, species.validation.num, PC.validation, species_in_nesting.validation]
     setindex!.(Ref(odict_oos_inputs), vals, names)
-    @chain simulate(posterior.samples, values(odict_oos_inputs)...) begin
+    # Make predictions for validation data, transform to natural scale, and plot
+    @chain posterior.samples begin
+        simulate(_, values(odict_oos_inputs)...)
         reduce(hcat, _)
         exp.(unstandardise(_, log.(nbirds)))
-        #[between.(val, oos_lims[i][1], oos_lims[i][2]) for (i, val) in enumerate(eachslice(_, dims=1))]
-        #DataFrame([str_species_oos, mean.(_)], [:species, :overlap])
-        #plot([histogram(subset(_, :species => ByRow(x -> x == s)).overlap, title=s, bins=10) for s in unique(_.species)]..., size=(800,1000), titlefontsize=9, legend=false)
-        #xlims!(0, 1)
+        map(enumerate(eachslice(_, dims=1))) do (i, slice)
+            histogram(slice, title=species.validation.str[i])
+            xlims!(0, quantile(slice, 0.95))
+            vline!(oos_lims[i], lw=2, c=:red)
+        end
     end
 end
 
-xi = findall(i -> (i≤oos_lims[3][1]) & (i≤oos_lims[3][1]), preds_validation[3, :])
-histogram(preds_validation[3, :]); xlims!(0, 1500)
-vline!(oos_lims[3], lw=2, c=:red)
+# --- TARGET PREDICTIONS --- #
 
+# The data below are those atolls where no information on count data are present.
+# We predict data for these atolls, using three different thresholds, and summarise it for export.
 
-# TODO instead shade are within oos lims from top ... 99% ? samples (restrict to kick craziness)
-
-# Predict counts on unknown atolls
 preds_target =
-    let thresholds = 0.75:0.05:0.85
-        odict_unknown_inputs = copy(odict_inputs)
+    let thresholds = 0.75:0.05:0.85, odict_unknown_inputs = copy(odict_inputs)
+        # Set names to be replaced in input dict, values will be subset in each iteration
         names = ["region", "species", "PC", "species_within_nesting"]
         preds = map(thresholds) do threshold
+            # Create BitVector with presence predictions above threshold for indexing input vectors
             pass = ppres .> threshold
-            vals = [num_region_unknown[pass], num_species_unknown[pass], PC_unknown[pass, :], num_species_within_nesting_unknown[pass]]
+            vals = [region.unknown.num[pass], species.unknown.num[pass], PC.unknown[pass, :], species_in_nesting.unknown[pass]]
             setindex!.(Ref(odict_unknown_inputs), vals, names)
-            samples = reduce(hcat, simulate(posterior.samples, values(odict_unknown_inputs)...))
-            # mean, quantile, unstandardise, exponentiate (or reverse order of chunks)
+            # Predict values for those atolls above threshold, and transform to natural scale
+            samples = @chain posterior.samples begin 
+                simulate(_, values(odict_unknown_inputs)...)
+                reduce(hcat, _)
+                exp.(unstandardise(_, log.(nbirds)))
+            end
+            # Calculate rowwise (atoll × species) mean and quantiles (I still haven't looked into why the correct dim here is 2)
+            μs = mean(samples, dims=2)
+            qs = reduce(hcat, [quantile(slice, [0.05, 0.95]) for slice in eachslice(samples, dims=1)])
+            # Wrap everything into a DataFrame for later summary in globalestimates.jl
+            DataFrame([atoll.unknown.str[pass], species.unknown.str[pass], vec(μs), qs[1, :], qs[2, :]], [:atoll, :species, :mean, :lower, :upper])
         end
         Dict(Pair.(string.(thresholds), preds))
     end
 
-# TODO create input dict, change input dict here with oos vals, go
-countpreds_oos = @chain begin
-    predictcount(
-        α,
-        β,
-        σ2,
-        num_species_within_nesting_oos,
-        num_species_oos,
-        num_region_oos,
-        PC_oos,
-    )
-    reduce(hcat, _)
-    Matrix{Float64}(_)
-    mean(_, dims=2)
-    exp.(_)
-    #[between(_[i], oos_lims[i][1], oos_lims[i][2]) for i in eachindex(_)]
-    [_ oos_lims [between(_[i], oos_lims[i][1], oos_lims[i][2]) for i in eachindex(_)] sort(unique(str_species_known))[num_species_oos]]
-end
-
-avg_preds_unknown = vec(mean(countpreds_unknown, dims=2))
-avg_preds_known = vec(mean(countpreds_known, dims=2))
-
-df_countpreds = DataFrame(
-    [
-        num_atoll_unknown[threshold],
-        num_region_unknown[threshold],
-        num_species_unknown[threshold],
-        avg_preds_unknown
-    ],
-    [:atoll, :region, :species, :nbirds]
-)
-
-CSV.write("$ROOT/results/data/countpreds_$PRIORSUFFIX.csv", df_countpreds)
-@info "Successfully saved predictions to `$ROOT/results/data/countpreds_$PRIORSUFFIX.csv`."
+# Save results for each threshold to an individual CSV
+foreach(k -> CSV.write("$ROOT/results/data/countpreds_$k.csv", preds_target[k]), keys(preds_target))
 
 # --- LOO CV --- #
 
@@ -244,4 +223,4 @@ CSV.write("$ROOT/results/data/countpreds_$PRIORSUFFIX.csv", df_countpreds)
 
 loomodel = loospecial(inputs..., zlogn);
 
-cv_res = psis_loo(loomodel, chain)
+cv_res = psis_loo(loomodel, posterior.chains)

@@ -502,8 +502,15 @@ p10 <- map +
 ```{r species heatmaps}
 
 method_julia <- function(h = NULL, adjust = c(1, 1)) {
+    # Force evaluation of function arguments to make sure they're captured
+    force(h)
+    force(adjust)
+
+    # Set up Julia and KernelDensity
     julia_setup()
     julia_command("using KernelDensity")
+
+    # Return closure with format required by get_hdr()
     function(data, n, rangex, rangey) {
         if (is.null(h)) {
             h <- c(MASS::bandwidth.nrd(data$x), MASS::bandwidth.nrd(data$y))

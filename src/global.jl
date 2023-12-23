@@ -54,8 +54,6 @@ pop_unknown = @chain pop begin
     select(_, Not(:presence))
 end
 
-
-
 # Check if prediction data frame for a given prior setting exists
 preds_exist = isfile("$ROOT/results/data/presencepreds.csv")
 
