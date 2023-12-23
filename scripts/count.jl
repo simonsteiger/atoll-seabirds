@@ -198,13 +198,19 @@ preds_target =
             samples = @chain posterior.samples begin 
                 simulate(_, values(odict_unknown_inputs)...)
                 reduce(hcat, _)
-                exp.(unstandardise(_, log.(nbirds)))
             end
             # Calculate rowwise (atoll × species) mean and quantiles (I still haven't looked into why the correct dim here is 2)
-            μs = mean(samples, dims=2)
-            qs = reduce(hcat, [quantile(slice, [0.05, 0.95]) for slice in eachslice(samples, dims=1)])
+            μs = exp.(unstandardise(mean(samples, dims=2), log.(nbirds)))
+            qs = @chain samples begin
+                [quantile(slice, [0.05, 0.95]) for slice in eachslice(_, dims=1)]
+                reduce(hcat, _)
+                exp.(unstandardise(_, log.(nbirds)))
+            end
             # Wrap everything into a DataFrame for later summary in globalestimates.jl
-            DataFrame([atoll.unknown.str[pass], species.unknown.str[pass], vec(μs), qs[1, :], qs[2, :]], [:atoll, :species, :mean, :lower, :upper])
+            DataFrame(
+                [atoll.unknown.str[pass], region.unknown.str[pass], species.unknown.str[pass], vec(μs), qs[1, :], qs[2, :]],
+                [:atoll, :region, :species, :nbirds, :lower, :upper]
+            )
         end
         Dict(Pair.(string.(thresholds), preds))
     end
