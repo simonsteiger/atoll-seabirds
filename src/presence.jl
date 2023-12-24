@@ -1,23 +1,6 @@
 module PresenceVariables
 
-export num_atoll,
-       num_atoll_unknown,
-       str_atoll_unknown,
-       num_species,
-       str_species,
-       num_species_unknown,
-       presence,
-       PC,
-       PC_unknown,
-       count_species_by_nesting,
-       num_species_in_nesting,
-       num_nesting,
-       num_nesting_unknown,
-       num_region,
-       num_region_unknown,
-       unique_nesting,
-       unique_species_in_nesting,
-       num_species_in_nesting_unknown
+export atoll, region, species, nesting, species_in_nesting, presence, PC, nspecies
 
 include("global.jl")
 using .GlobalVariables
@@ -44,20 +27,40 @@ end
 
 # Create model and prediction inputs for presence
 
+# The length of these two vectors is used to scale up the others
+num_nesting_unknown = df_species_unknown.num_nestingtype
+num_region_unknown = Int64.(denserank(envs_unknown.region))
+
+str_nesting_unknown = map(x -> x == 1 ? "burrow" : x == 2 ? "ground" : "vegetation", num_nesting_unknown)
+long_nesting_unknown_num = [fill.(num_nesting_unknown, length(num_region_unknown))...;]
+long_nesting_unknown_str = [fill.(str_nesting_unknown, length(num_region_unknown))...;]
+
 # Atolls. ...
+num_atoll_unknown = Int64.(denserank(envs_unknown.atoll))
+long_atoll_unknown_num = [fill.(num_atoll_unknown, length(num_nesting_unknown))...;]
+long_atoll_unknown_str = [fill.(envs_unknown.atoll, length(num_nesting_unknown))...;]
+
+
 atoll = (
     known=(num=Int64.(denserank(envs_known.atoll)), str=envs_known.atoll),
-    unknown=(num=Int64.(denserank(envs_unknown.atoll)), str=envs_unknown.atoll),
+    unknown=(num=long_atoll_unknown_num, str=long_atoll_unknown_str),
 )
+
+
+long_region_unknown_num = [fill.(num_region_unknown, length(num_nesting_unknown))...;]
+long_region_unknown_str = [fill.(envs_unknown.region, length(num_nesting_unknown))...;]
 
 region = (
     known=(num=Int64.(denserank(envs_known.region)), str=envs_known.region),
-    unknown=(num=Int64.(denserank(envs_unknown.region)), str=envs_unknown.region),
+    unknown=(num=long_region_unknown_num, str=long_region_unknown_str),
 )
+
+num_species_unknown = [fill.(df_species_unknown.num_species, length(num_region_unknown))...;]
+str_species_unknown = [fill.(df_species_unknown.species, length(num_region_unknown))...;]
 
 species = (
     known=(num=Int64.(denserank(envs_known.species)), str=envs_known.species),
-    unknown=(num=Int64.(denserank(envs_unknown.species)), str=envs_unknown.species),
+    unknown=(num=num_species_unknown, str=str_species_unknown)
 )
 
 unique_nesting = @chain envs_known begin
@@ -70,7 +73,7 @@ end
 
 nesting = (
     known=(num=Int64.(denserank(envs_known.nestingtype)), str=envs_known.nestingtype),
-    unknown=(num=Int64.(denserank(envs_unknown.nestingtype)), str=envs_unknown.nestingtype),
+    unknown=(num=long_nesting_unknown_num, str=long_nesting_unknown_str),
     levels=unique_nesting,
 )
 
@@ -78,7 +81,9 @@ presence = Float64.(envs_known.presence)
 
 PC_known = Matrix(envs_known[:, FEATURES])
 PC_unknown = Matrix(envs_unknown[!, begin:6])
-PC = (known=PC, unknown=PC_unknown)
+long_PC_unknown = reduce(vcat, [permutedims(hcat(fill(s, length(num_nesting_unknown))...)) for s in eachslice(PC_unknown, dims=1)])
+
+PC = (known=PC_known, unknown=long_PC_unknown)
 
 
 unique_species_in_nesting = @chain envs_known begin

@@ -121,6 +121,7 @@ cp_df = @chain begin
 end
 
 # problem here might be (is!) that the longitude and latitude data are set to abs
+cp_df.long = [long < 0 ? long + 360 : long for long in cp_df.longitude] # is this superfluous??
 
 # Calculate outcome means for ± 1 long/lat around each atoll
 function extract(df, env_lat, env_long; tol=1)
@@ -128,7 +129,7 @@ function extract(df, env_lat, env_long; tol=1)
 
   out = @chain df begin
     subset(_, cp_ll => ByRow((x, y) -> ≈(x, env_lat; atol=tol) && ≈(y, env_long; atol=tol)))
-    transform(_, Not(cp_ll) .=> ByRow(x -> isinf(x) ? missing : x) .=> identity) # Inf represents land, recode to missing
+    #transform(_, Not(cp_ll) .=> ByRow(x -> isinf(x) ? missing : x) .=> identity) # Inf represents land, recode to missing
     combine(_, Not(cp_ll) .=> (x -> mean(skipmissing(x))) .=> identity)
   end
 
@@ -136,11 +137,11 @@ function extract(df, env_lat, env_long; tol=1)
 end
 
 envs = @chain begin
-  CSV.read("data/seabird_atolls_envs_02May.csv", DataFrame)
+  CSV.read("data/seabird_atolls_envs.csv", DataFrame)
   transform(:long => (x -> ifelse.(x .< 0, x .+ 360, x)) => identity)
 end
 
-cp_summary = reduce(vcat, [extract(cp_df, i...) for i in eachrow(envs[!, [:lat, :long]])])
+cp_summary = reduce(vcat, [extract(cp_df, i...) for i in eachrow(envs[:, [:lat, :long]])])
 cp_summary.atoll = envs.atoll
 
 # Join by atoll

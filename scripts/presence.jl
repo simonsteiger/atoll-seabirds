@@ -1,3 +1,9 @@
+module PresenceModel
+
+export nothing
+
+# --- WORKSPACE SETUP --- #
+
 # Pathing
 const ROOT = dirname(Base.active_project())
 
@@ -29,21 +35,21 @@ using .PresenceModels
 # Set seed
 Random.seed!(42)
 
-# --- SETTINGS --- #
+# --- MODEL SETUP --- #
 
 model = mMp
 simulate = simulate_Mp
 odict_inputs = OrderedDict(
-    "region" => num_region,
-    "species" => num_species,
-    "nesting" => num_nesting,
-    "PC" => PC,
-    "species_within_nesting" => num_species_within_nesting,
-    "unique_nesting" => unique_nesting,
-    "unique_species_within_nesting" => unique_species_within_nesting,
-    "n_burow" => count_species_by_nesting[1],
-    "n_ground" => count_species_by_nesting[2],
-    "n_vegetation" => count_species_by_nesting[3],
+    "region" => region.known.num,
+    "species" => species.known.num,
+    "nesting" => nesting.known.num,
+    "PC" => PC.known,
+    "species_within_nesting" => species_in_nesting.known,
+    "unique_nesting" => nesting.levels,
+    "unique_species_within_nesting" => species_in_nesting.levels,
+    "n_burrow" => nspecies.burrow,
+    "n_ground" => nspecies.ground,
+    "n_vegetation" => nspecies.vegetation,
 )
 
 # Path to read or write chain from / to
@@ -62,6 +68,8 @@ let
     priorpreds = reduce(vcat, simulate(prior.samples, values(odict_inputs)...))
     density(priorpreds, normalize=true, c=2, fillrange=0, fillalpha=0.2, legend=false)
 end
+
+# --- MODEL CONFIG --- #
 
 backends = [
     Turing.Essential.ForwardDiffAD{0}(),
@@ -95,7 +103,7 @@ end
 
 try
     path = "$ROOT/results/chains/$chainpath"
-    serialize(tmp_path, posterior.chains)
+    serialize(path, posterior.chains)
     @info "Saved chains to `$path`."
 catch error
     @warn "Writing chains failed with an $error."
@@ -103,16 +111,18 @@ end
 
 # --- POSTERIOR PREDICTIVE CHECK --- #
 
-postpcplots = let
-    postsamples = reduce(hcat, simulate(posterior.samples, values(odict_inputs)...))
-
-    map(enumerate(unique(num_species))) do (index, species)
-        pred_x = vec(postsamples[num_species.==species, :])
-        obs_x = presence[num_species.==species]
+postpcplots = let preds = reduce(hcat, simulate(posterior.samples, values(odict_inputs)...))
+    # Iterate over species and create plots with posterior predictions
+    map(enumerate(unique(species.known.num))) do (idx, sp)
+        # Predicted values for species sp
+        pred_x = vec(preds[species.known.num.==sp, :])
+        # Observed values for species sp
+        obs_x = presence[species.known.num.==sp]
+        # Assemble plot for species sp
         histogram(obs_x, normalize=true, alpha=0.5, lc=:transparent, bins=10, label="O")
         density!(pred_x, fillrange=0, fillalpha=0.2, normalize=true, alpha=0.5, bins=10, lc=:transparent, yticks=:none, label="P")
         xticks!(0:0.5:1, string.(0:0.5:1))
-        title!(unique(str_species)[index], titlefontsize=8)
+        title!(unique(species.known.str)[idx], titlefontsize=8)
         vline!([0.8], c=:black, ls=:dash, label=:none)
     end
 end
@@ -120,17 +130,10 @@ end
 plot(postpcplots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
 savefig("results/svg/postpreds_Mp.svg")
 
-# Expand vectors to correct lenght
-nau_long = [fill.(num_atoll_unknown, length(num_nesting_unknown))...;]
-nru_long = [fill.(num_region_unknown, length(num_nesting_unknown))...;]
-nsu_long = [fill(num_species_unknown, length(num_region_unknown))...;]
-nnu_long = [fill(num_species_within_nesting_unknown, length(num_region_unknown))...;]
-PCu_long = reduce(vcat, [permutedims(hcat(fill(s, length(num_nesting_unknown))...)) for s in eachslice(PC_unknown, dims=1)])
-
 # Create predictions for unknown atolls
 predictions = let odict_unknown_inputs = copy(odict_inputs)
     names = ["region", "species", "PC", "species_within_nesting"]
-    vals = [nru_long, nsu_long, PCu_long, nnu_long]
+    vals = [region.unknown.num, species.unknown.num, PC.unknown, species_in_nesting.unknown]
     setindex!.(Ref(odict_unknown_inputs), vals, names)
     preds = simulate(posterior.samples, values(odict_unknown_inputs)...)
     reduce(hcat, preds)
@@ -140,7 +143,10 @@ end
 df_preds = let
     μs = vec(mean(predictions, dims=2))
     qs = reduce(hcat, [quantile(slice, [0.05, 0.95]) for slice in eachslice(predictions, dims=1)])
-    DataFrame([nau_long, nru_long, nsu_long, μs, qs[1, :], qs[2, :]], [:atoll, :region, :species, :mean, :lower005, :upper095])
+    DataFrame(
+        [atoll.unknown.str, region.unknown.str, species.unknown.str, μs, qs[1, :], qs[2, :]],
+        [:atoll, :region, :species, :mean, :lower005, :upper095]
+    )
 end
 
 
@@ -149,11 +155,11 @@ dict_unknown_pred_plots = let df = df_preds
     plots = map(enumerate(unique(df.species))) do (index, species)
         I = df.species .== species
         scatter(df.mean[I], df.atoll[I], ms=2, msc=1, xerror=(abs.(df.lower005[I] .- df.mean[I]), abs.(df.upper095[I] .- df.mean[I])))
-        title!(unique(str_species)[index], titlefontsize=8)
+        title!(unique(species.unknown.str)[index], titlefontsize=8)
         xlims!(0, 1)
         vline!([0.8], c=:black, ls=:dash, legend=:none)
     end
-    Dict(Pair.(unique(str_species), plots))
+    Dict(Pair.(unique(species.unknown.str), plots))
 end
 
 plot(dict_unknown_pred_plots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
@@ -175,3 +181,5 @@ cv_res
 # - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))
 # - in line with posterior predictive check
 # - not sure how to interpret differences in naive_lpd and cv_elpd ... but they seem very low p_avg 0.02
+
+end

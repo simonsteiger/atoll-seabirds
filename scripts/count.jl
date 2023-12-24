@@ -1,3 +1,7 @@
+module CountModel
+
+export nothing
+
 # --- WORKSPACE SETUP --- #
 
 # Probabilistic programming
@@ -40,7 +44,7 @@ odict_inputs = OrderedDict(
     "species" => species.known.num,
     "nesting" => nesting.known.num,
     "PC" => PC.known,
-    "species_within_nesting" => species_in_nesting.known.num,
+    "species_within_nesting" => species_in_nesting.known,
     "unique_nesting" => nesting.levels,
     "unique_species_within_nesting" => species_in_nesting.levels,
     "n_burow" => nspecies.burrow,
@@ -83,7 +87,7 @@ backends = [
 TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
 @info "ReverseDiff{true} is the fastest AD backend."
 
-# Set AD backend to :reversediff and compile with setrdcache(true)
+# Use ReverseDiffAD and enable caching
 Turing.setadbackend(:reversediff)
 Turing.setrdcache(true)
 
@@ -112,9 +116,11 @@ posterior = @chain begin
 end
 
 try
-    serialize("$ROOT/results/chains/$chainpath", posterior.chains); @info "💾 Chain saved to `$ROOT/results/chains/$chainpath`."
+    path = "$ROOT/results/chains/$chainpath"
+    serialize(path, posterior.chains)
+    @info "💾 Chain saved to `$path`."
 catch error
-    @warn "Writing failed with an $error."
+    @warn "Writing chains failed with an $error."
 end
 
 # --- POSTERIOR PREDICTIVE CHECK --- #
@@ -230,3 +236,5 @@ foreach(k -> CSV.write("$ROOT/results/data/countpreds_$k.csv", preds_target[k]),
 loomodel = loospecial(inputs..., zlogn);
 
 cv_res = psis_loo(loomodel, posterior.chains)
+
+end
