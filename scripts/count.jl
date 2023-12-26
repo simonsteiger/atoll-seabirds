@@ -93,7 +93,7 @@ Turing.setrdcache(true)
 
 # Configure sampling
 sampler = NUTS(1000, 0.95; max_depth=10)
-nsamples = 2000
+nsamples = 10_000
 nchains = 4
 config = (sampler, MCMCThreads(), nsamples, nchains)
 
@@ -206,7 +206,8 @@ preds_target =
                 reduce(hcat, _)
             end
             # Calculate rowwise (atoll × species) mean and quantiles (I still haven't looked into why the correct dim here is 2)
-            μs = exp.(unstandardise(mean(samples, dims=2), log.(nbirds)))
+            raw = [exp.(unstandardise(slice, log.(nbirds))) for slice in eachslice(samples, dims=1)]
+            mdn = exp.(unstandardise(median(samples, dims=2), log.(nbirds)))
             qs = @chain samples begin
                 [quantile(slice, [0.05, 0.95]) for slice in eachslice(_, dims=1)]
                 reduce(hcat, _)
@@ -214,15 +215,21 @@ preds_target =
             end
             # Wrap everything into a DataFrame for later summary in globalestimates.jl
             DataFrame(
-                [atoll.unknown.str[pass], region.unknown.str[pass], species.unknown.str[pass], vec(μs), qs[1, :], qs[2, :]],
-                [:atoll, :region, :species, :nbirds, :lower, :upper]
+                [atoll.unknown.str[pass], region.unknown.str[pass], species.unknown.str[pass], raw, vec(mdn), qs[1, :], qs[2, :]],
+                [:atoll, :region, :species, :raw, :median, :lower, :upper]
             )
         end
         Dict(Pair.(string.(thresholds), preds))
     end
 
+plots_preds_target = map(eachrow(preds_target["0.8"])) do row
+    density(row.raw[row.raw .< quantile(row.raw, 0.99)], title="$(row.species) on $(row.atoll) ($(row.region))", label=:none, fillrange=0, fillalpha=0.2)
+    vline!([median(row.raw)], c=:red, lw=2, label="med=$(round(median(row.raw), digits=0))", alpha=0.5)
+    vline!([row.lower, row.upper], c=:black, ls=:dash, alpha=0.5, label="$(round(row.lower, digits=0))-$(round(row.upper, digits=0))")
+end
+
 # Save results for each threshold to an individual CSV
-foreach(k -> CSV.write("$ROOT/results/data/countpreds_$k.csv", preds_target[k]), keys(preds_target))
+foreach(k -> CSV.write("$ROOT/results/data/countpreds_$k.csv", select(preds_target[k], Not(:raw))), keys(preds_target))
 
 # --- LOO CV --- #
 

@@ -130,14 +130,14 @@ export mMc, mLc, mXLc, simulate_Mc, simulate_Lc, simulate_XLc
 )
 
     # Priors for species × region
-    μ_sxr ~ filldist(Normal(0, 0.5), Ns)
-    τ_sxr ~ filldist(InverseGamma(3, 0.5), Ns)
+    μ_sxr ~ filldist(Normal(0, 0.2), Ns)
+    τ_sxr ~ filldist(InverseGamma(3, 0.2), Ns)
     z_sxr ~ filldist(Normal(), Ns, Nr)
     α_sxr = μ_sxr .+ τ_sxr .* z_sxr
 
     # Priors for nesting types × PCs
-    μ_pxn ~ filldist(Normal(0, 0.2), Nn, NPC)
-    τ_pxn ~ filldist(InverseGamma(3, 0.2), Nn, NPC)
+    μ_pxn ~ filldist(Normal(0, 0.1), Nn, NPC)
+    τ_pxn ~ filldist(InverseGamma(3, 0.1), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
@@ -145,7 +145,7 @@ export mMc, mLc, mXLc, simulate_Mc, simulate_Lc, simulate_XLc
     β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
 
     # Prior for random error
-    σ2 ~ InverseGamma(3, 0.5)
+    σ2 ~ InverseGamma(3, 0.2)
 
     # Likelihood
     μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
