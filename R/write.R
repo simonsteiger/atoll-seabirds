@@ -16,12 +16,7 @@ box::use(
 pcs <- tbl$tibble(read.csv("data/jl_envscores.csv")) %>%
   dp$distinct(atoll, .keep_all = TRUE)
 
-observed <- tbl$tibble(read.csv("data/atoll_seabird_populations.csv")) %>%
-  dp$mutate(dp$across(ts$where(is.numeric), \(x) ifelse(is.na(x), 0, 1)))
-
 write.csv(cp$cp_data, file = "data/cp_data.csv")
-
-write.csv(out, file = "data/out.csv")
 
 write.csv(ji$ji_data, file = "data/ji_data.csv")
 

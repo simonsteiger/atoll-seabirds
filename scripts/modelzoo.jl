@@ -1,4 +1,4 @@
-module PresenceModels
+module PresenceZoo
     
 using Turing, LazyArrays, StatsFuns
 include("../src/utilities.jl")
@@ -114,7 +114,7 @@ end
 end
 
 
-module CountModels
+module CountZoo
 
 using Turing, LazyArrays, StatsFuns, LinearAlgebra
 include("../src/utilities.jl")

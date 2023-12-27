@@ -1,3 +1,7 @@
+module PlotPrep
+
+export nothing
+
 using Turing, CSV, DataFrames, Chain
 
 const ROOT = dirname(Base.active_project())
@@ -101,3 +105,5 @@ library(here)
 
 write_fst(out, here("results/data/foraging.fst"))
 """
+
+end

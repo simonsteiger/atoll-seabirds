@@ -1,3 +1,7 @@
+module PCs
+
+export nothing
+
 using CSV, DataFrames, Statistics, Turing, Chain, StatsPlots
 import MultivariateStats as MS
 import StatsBase as SB
@@ -51,3 +55,5 @@ cg = cgrad([c[1], :grey80, :grey80, c[50]])
 
 heatmap(PC_NAMES, collect(1:16), proj, size=(800, 600), color=cg)
 yticks!(collect(1:16), features)
+
+end

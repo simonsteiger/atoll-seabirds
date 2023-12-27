@@ -1,4 +1,4 @@
-module CountOutputs
+module GlobalEstimates
 
 export nothing
 
