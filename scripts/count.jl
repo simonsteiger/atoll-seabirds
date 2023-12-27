@@ -27,17 +27,54 @@ const ROOT = dirname(Base.active_project())
 # Load custom modules
 include("$ROOT/src/count.jl")
 using .CountVariables
-include("$ROOT/scripts/modelzoo.jl")
-using .CountModels
 include("$ROOT/src/utilities.jl")
 using .CustomUtilityFuns
 
 # --- MODEL SETUP --- #
 
-# Pick model from ModelZoo 
-# We might as well paste the model here at the end and just reference the model zoo for what we tried?
-model = mMc
-simulate = simulate_Mc
+# Turing model
+@model function model(
+    r, s, n, PC,
+    idx_sn, u_n, u_sn, Nv, Ng, Nb,
+    y;
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
+)
+
+    # Priors for species × region
+    μ_sxr ~ filldist(Normal(0, 0.2), Ns)
+    τ_sxr ~ filldist(InverseGamma(3, 0.2), Ns)
+    z_sxr ~ filldist(Normal(), Ns, Nr)
+    α_sxr = μ_sxr .+ τ_sxr .* z_sxr
+
+    # Priors for nesting types × PCs
+    μ_pxn ~ filldist(Normal(0, 0.1), Nn, NPC)
+    τ_pxn ~ filldist(InverseGamma(3, 0.1), Nn, NPC)
+    z_pxb ~ filldist(Normal(), Nb, NPC)
+    z_pxg ~ filldist(Normal(), Ng, NPC)
+    z_pxv ~ filldist(Normal(), Nv, NPC)
+    z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
+    β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
+
+    # Prior for random error
+    σ2 ~ InverseGamma(3, 0.2)
+
+    # Likelihood
+    μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
+    Σ = σ2 * I
+    y ~ MvNormal(μ, Σ)
+
+    # Generated quantities
+    return (; y, α_sxr, β_pxn, σ2)
+end;
+
+# Function to simulate samples from inputs
+function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
+    map(params) do param
+        μ = param.α_sxr[idx_sr] + sum(param.β_pxn[idx_sn, :] .* X, dims=2)
+        rand.(Normal.(μ, param.σ2))
+    end
+end
+
 # Set inputs
 odict_inputs = OrderedDict(
     "region" => region.known.num,
@@ -240,7 +277,41 @@ foreach(k -> CSV.write("$ROOT/results/data/countpreds_$k.csv", select(preds_targ
 # Regarding the "let's just put the model back into this script" ... 
 # Not a big issue at all, but spelling out loospecial again seems nasty
 
-loomodel = loospecial(inputs..., zlogn);
+@model function broadcastmodel(
+    r, s, n, PC,
+    idx_sn, u_n, u_sn, Nv, Ng, Nb,
+    y;
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
+)
+
+    # Priors for species × region
+    μ_sxr ~ filldist(Normal(0, 0.2), Ns)
+    τ_sxr ~ filldist(InverseGamma(3, 0.2), Ns)
+    z_sxr ~ filldist(Normal(), Ns, Nr)
+    α_sxr = μ_sxr .+ τ_sxr .* z_sxr
+
+    # Priors for nesting types × PCs
+    μ_pxn ~ filldist(Normal(0, 0.1), Nn, NPC)
+    τ_pxn ~ filldist(InverseGamma(3, 0.1), Nn, NPC)
+    z_pxb ~ filldist(Normal(), Nb, NPC)
+    z_pxg ~ filldist(Normal(), Ng, NPC)
+    z_pxv ~ filldist(Normal(), Nv, NPC)
+    z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
+    β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
+
+    # Prior for random error
+    σ2 ~ InverseGamma(3, 0.2)
+
+    # Likelihood
+    μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
+    σ = sqrt(σ2)
+    y .~ Normal.(μ, σ)
+
+    # Generated quantities
+    return (; y, α_sxr, β_pxn, σ2)
+end;
+
+loomodel = broadcastmodel(inputs..., zlogn);
 
 cv_res = psis_loo(loomodel, posterior.chains)
 

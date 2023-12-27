@@ -37,8 +37,42 @@ Random.seed!(42)
 
 # --- MODEL SETUP --- #
 
-model = mMp
-simulate = simulate_Mp
+# Turing model
+@model function model(
+    r, s, n, PC, # inputs
+    idx_sn, u_n, u_sn, Nv, Ng, Nb, # indexes, lengths, etc
+    y; # outcome
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
+)
+
+    # Priors for species × region
+    α_sxr ~ filldist(Normal(0, 1), Ns * Nr)
+
+    # Priors for nesting types × PCs
+    μ_pxn ~ filldist(Normal(0, 0.2), Nn, NPC)
+    σ_pxn ~ filldist(InverseGamma(3, 0.5), Nn, NPC)
+    z_pxb ~ filldist(Normal(), Nb, NPC)
+    z_pxg ~ filldist(Normal(), Ng, NPC)
+    z_pxv ~ filldist(Normal(), Nv, NPC)
+    z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
+    β_pxn = @. μ_pxn[u_n, :] + σ_pxn[u_n, :] * z_pxn[u_sn, :]
+
+    # Likelihood
+    v = α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2)
+    y .~ BernoulliLogit.(v)
+
+    # Generated quantities
+    return (; α_sxr, β_pxn)
+end;
+
+# Function to simulate samples from inputs to model
+function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
+    map(params) do p
+        β = sum(p.β_pxn[idx_sn, :] .* X, dims=2)
+        @. logistic(p.α_sxr[idx_sr] + β)
+    end
+end
+
 odict_inputs = OrderedDict(
     "region" => region.known.num,
     "species" => species.known.num,
@@ -86,7 +120,7 @@ Turing.setrdcache(true)
 
 # Configure sampling
 sampler = NUTS(1000, 0.95; max_depth=10)
-nsamples = 2000
+nsamples = 10_000
 nchains = 4
 config = (sampler, MCMCThreads(), nsamples, nchains)
 
@@ -152,10 +186,10 @@ end
 
 # Plot predictions for unknown atolls and store results in Dict
 dict_unknown_pred_plots = let df = df_preds
-    plots = map(enumerate(unique(df.species))) do (index, species)
-        I = df.species .== species
-        scatter(df.mean[I], df.atoll[I], ms=2, msc=1, xerror=(abs.(df.lower005[I] .- df.mean[I]), abs.(df.upper095[I] .- df.mean[I])))
-        title!(unique(species.unknown.str)[index], titlefontsize=8)
+    plots = map(enumerate(unique(df.species))) do (idx, sp)
+        I = df.species .== sp
+        scatter(df.mean[I], df.atoll[I], c=ifelse.(df.mean[I].>0.8, :red, :black), ms=2, xerror=(abs.(df.lower005[I] .- df.mean[I]), abs.(df.upper095[I] .- df.mean[I])))
+        title!(unique(species.unknown.str)[idx], titlefontsize=8)
         xlims!(0, 1)
         vline!([0.8], c=:black, ls=:dash, legend=:none)
     end

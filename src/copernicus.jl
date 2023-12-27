@@ -4,11 +4,11 @@ using NetCDF, CSV
 using Statistics, DataFrames, Compat, Chain, StatsFuns
 
 const KEYS = [
-  "nppv", 
+  "nppv",
   "chl",
   "phyc",
   "temp_" .* string.(1:2)...,
-  "velo_"  .* string.(1:4)...,
+  "velo_" .* string.(1:4)...,
   "longitude",
   "latitude",
   [x .* y for x in ["longitude", "latitude"], y in ["_velo", "_temp"]]...,
@@ -19,7 +19,7 @@ const FILENAMES = [
   "chl",
   "phyc",
   "temp_" .* string.(1:2)...,
-  "velo_"  .* string.(1:4)...,
+  "velo_" .* string.(1:4)...,
   "nppv", "nppv",
   "velo_1", "velo_1",
   "temp_1", "temp_1",
@@ -47,7 +47,7 @@ const VARS = [
 dct = Dict{String,Any}(Pair.(KEYS, NetCDF.open.("data/copernicus_" .* FILENAMES .* ".nc", VARS)))
 
 # Calculate absolute values of all cells
-[dct[k] = abs.(dct[k]) for k in KEYS[1:9]]; # only nppv, chl, phyc
+[dct[k] = abs.(dct[k]) for k in KEYS[1:9]] # only nppv, chl, phyc
 
 # Calculate mean of array slices
 [dct[k] = mean(dct[k], dims=4) for k in KEYS[1:9]]
@@ -63,7 +63,7 @@ for k in keys(dct)
   dct[k] = allowmissing(Float64.(dct[k]))
 end
 
-[map!(x -> isinf(x) ? missing : x, dct[k], dct[k]) for k in KEYS[1:9]];
+[map!(x -> isinf(x) ? missing : x, dct[k], dct[k]) for k in KEYS[1:9]]
 
 # Concatenate temp arrays on time axis
 dct["temp"] = @chain Base.cat(dct["temp_1"], dct["temp_2"], dims=3) begin
@@ -115,13 +115,9 @@ end
 [dctdf[n] = writecp(dct, n, dct[string("longitude_", n)], dct[string("latitude_", n)]) for n in ["velo", "temp"]]
 
 # Join all dfs stored in dict to single df
-cp_df = @chain begin
-  get.(Ref(dctdf), ["nppv", "chl"], missing)
-  reduce((x, y) -> leftjoin(x, y, on=[:latitude, :longitude]), _)
-end
-
-# problem here might be (is!) that the longitude and latitude data are set to abs
-cp_df.long = [long < 0 ? long + 360 : long for long in cp_df.longitude] # is this superfluous??
+cp_df = get.(Ref(dctdf), ["nppv", "chl", "phyc"], missing)
+insertcols!(cp_df[1], :chl => cp_df[2].chl, :phyc => cp_df[3].phyc)
+cp = cp_df[1]
 
 # Calculate outcome means for ± 1 long/lat around each atoll
 function extract(df, env_lat, env_long; tol=1)
@@ -130,7 +126,7 @@ function extract(df, env_lat, env_long; tol=1)
   out = @chain df begin
     subset(_, cp_ll => ByRow((x, y) -> ≈(x, env_lat; atol=tol) && ≈(y, env_long; atol=tol)))
     #transform(_, Not(cp_ll) .=> ByRow(x -> isinf(x) ? missing : x) .=> identity) # Inf represents land, recode to missing
-    combine(_, Not(cp_ll) .=> (x -> mean(skipmissing(x))) .=> identity)
+    combine(_, Not(cp_ll) .=> mean .=> identity)
   end
 
   return out
@@ -141,8 +137,32 @@ envs = @chain begin
   transform(:long => (x -> ifelse.(x .< 0, x .+ 360, x)) => identity)
 end
 
-cp_summary = reduce(vcat, [extract(cp_df, i...) for i in eachrow(envs[:, [:lat, :long]])])
+function check_coordinates(E, C, i; atol=1)
+  bv = isapprox.(view(E, 1, i), C[1, :], atol=atol) .&& isapprox.(view(E, 2, i), C[2, :], atol=atol)
+  return bv
+end
+
+# Extract latitude and longitude columns without transposing
+E = permutedims(Matrix(envs[:, [:lat, :long]]))
+C = permutedims(Matrix(select(cp, :latitude, :longitude, All())))
+
+# Preallocate a Vector of BitVectors
+indexes = fill(falses(size(C, 2)), size(E, 2))
+
+Threads.@threads for i in 1:size(E, 2)
+  @inbounds indexes[i] = check_coordinates(E, C, i)
+end
+
+cp_summary = @chain indexes begin 
+  map(i -> cp[i, :], _)
+  combine.(_, Not(:longitude, :latitude) .=> (x -> mean(skipmissing(x))) => identity)
+  reduce(vcat, _)
+end
+
 cp_summary.atoll = envs.atoll
+leftjoin!(cp_summary, envs, on=:atoll)
+
+xx = CSV.read("/Users/simonsteiger/Documents/GitHub/atoll-seabirds/data/out.csv", DataFrame)
 
 # Join by atoll
 

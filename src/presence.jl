@@ -55,8 +55,8 @@ region = (
     unknown=(num=long_region_unknown_num, str=long_region_unknown_str),
 )
 
-num_species_unknown = [fill.(df_species_unknown.num_species, length(num_region_unknown))...;]
-str_species_unknown = [fill.(df_species_unknown.species, length(num_region_unknown))...;]
+num_species_unknown = [fill(df_species_unknown.num_species, length(num_region_unknown))...;]
+str_species_unknown = [fill(df_species_unknown.species, length(num_region_unknown))...;]
 
 species = (
     known=(num=Int64.(denserank(envs_known.species)), str=envs_known.species),
@@ -102,10 +102,11 @@ num_species_in_nesting = @chain envs_known begin
 end
 
 num_species_in_nesting_unknown = df_species_unknown.within_nesting
+long_num_species_in_nesting_unknown = [fill(num_species_in_nesting_unknown, length(num_region_unknown))...;]
 
 species_in_nesting = (
     known=num_species_in_nesting,
-    unknown=num_species_in_nesting_unknown,
+    unknown=long_num_species_in_nesting_unknown,
     levels=unique_species_in_nesting,
 )
     
