@@ -33,7 +33,7 @@ filter_copernicus <- function(cp_data, lat, long) {
       longitude <= long + 1
     ) %>%
     dp$summarise(
-      across(c(global$names), ~ mean(.x, na.rm = TRUE), .names = "{.col}")
+      dp$across(c(global$names), ~ mean(.x, na.rm = TRUE), .names = "{.col}")
     )
 }
 

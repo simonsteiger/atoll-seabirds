@@ -16,19 +16,8 @@ box::use(
 pcs <- tbl$tibble(read.csv("data/jl_envscores.csv")) %>%
   dp$distinct(atoll, .keep_all = TRUE)
 
-predictions <- tbl$tibble(read.csv("data/presencepreds_default.csv"))
-
 observed <- tbl$tibble(read.csv("data/atoll_seabird_populations.csv")) %>%
   dp$mutate(dp$across(ts$where(is.numeric), \(x) ifelse(is.na(x), 0, 1)))
-
-full_presence <- dp$bind_rows(observed, predictions) %>%
-  dp$left_join(pcs, by = "atoll")
-
-# TODO pivot longer -> merge by atoll, species -> pivot wider
-
-out <- dp$left_join(cp$out, full_presence)
-
-write.csv(full_presence, file = "data/full_presence.csv")
 
 write.csv(cp$cp_data, file = "data/cp_data.csv")
 
