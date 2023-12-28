@@ -5,7 +5,7 @@ export nothing
 # --- WORKSPACE SETUP --- #
 
 # Probabilistic programming
-using Turing, TuringBenchmarking, ParetoSmooth
+using Turing, TuringBenchmarking, ReverseDiff, ParetoSmooth
 # Model speed optimization
 using LazyArrays
 # Statistics
@@ -41,14 +41,14 @@ using .CustomUtilityFuns
 )
 
     # Priors for species × region
-    μ_sxr ~ filldist(Normal(0, 0.2), Ns)
-    τ_sxr ~ filldist(InverseGamma(3, 0.2), Ns)
+    μ_sxr ~ filldist(Normal(0, 1), Ns)
+    τ_sxr ~ filldist(InverseGamma(3, 2), Ns)
     z_sxr ~ filldist(Normal(), Ns, Nr)
     α_sxr = μ_sxr .+ τ_sxr .* z_sxr
 
     # Priors for nesting types × PCs
-    μ_pxn ~ filldist(Normal(0, 0.1), Nn, NPC)
-    τ_pxn ~ filldist(InverseGamma(3, 0.1), Nn, NPC)
+    μ_pxn ~ filldist(Normal(0, 1), Nn, NPC)
+    τ_pxn ~ filldist(InverseGamma(3, 2), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
@@ -56,7 +56,7 @@ using .CustomUtilityFuns
     β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
 
     # Prior for random error
-    σ2 ~ InverseGamma(3, 0.2)
+    σ2 ~ InverseGamma(3, 2)
 
     # Likelihood
     μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
@@ -108,7 +108,7 @@ let
     histogram(zlogn, normalize=true, c=1)
     density!(priorpreds, normalize=true, c=:white, lw=3)
     density!(priorpreds, normalize=true, c=2, fillrange=0, fillalpha=0.2, legend=false)
-    xlims!(-5, 5)
+    xlims!(-100, 100)
 end
 # not sure if necessary to show both observed and prior for prior predictive check
 # I guess it's not bad on a second thought though – we don't want probability mass in useless places
@@ -124,9 +124,13 @@ backends = [
 TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
 @info "ReverseDiff{true} is the fastest AD backend."
 
+# Set autodiff to ReverseDiff{true}
+Turing.setadbackend(:reversediff)
+Turing.setrdcache(true)
+
 # Configure sampling
-sampler = NUTS(1000, 0.95; max_depth=10, adtype=AutoReverseDiff(true))
-nsamples = 10_000
+sampler = NUTS(1000, 0.95; max_depth=10)
+nsamples = 2000
 nchains = 4
 config = (sampler, MCMCThreads(), nsamples, nchains)
 
@@ -256,6 +260,7 @@ preds_target =
     end
 
 plots_preds_target = map(eachrow(preds_target["0.8"])) do row
+    row.species == "Nesofregetta_fuliginosa" ? println(i) : nothing
     density(row.raw[row.raw .< quantile(row.raw, 0.99)], title="$(row.species) on $(row.atoll) ($(row.region))", label=:none, fillrange=0, fillalpha=0.2)
     vline!([median(row.raw)], c=:red, lw=2, label="med=$(round(median(row.raw), digits=0))", alpha=0.5)
     vline!([row.lower, row.upper], c=:black, ls=:dash, alpha=0.5, label="$(round(row.lower, digits=0))-$(round(row.upper, digits=0))")
