@@ -1,10 +1,6 @@
-using RCall
-
-R"""
-library(here)
-renv::restore()
-source(here("R/write.R"))
-"""
+# NetCDF data frames are too large to share on GitHub
+# We are only uploading the specifications we used to download them
+# and the scripts we used to clean them.
 
 const ROOT = dirname(Base.active_project())
 

@@ -2,7 +2,7 @@ module PlotPrep
 
 export nothing
 
-using Turing, CSV, DataFrames, Chain
+using Distributions, CSV, DataFrames, Chain
 
 const ROOT = dirname(Base.active_project())
 
@@ -92,7 +92,7 @@ out.addlongdeg = vec(reduce(vcat, km2d.(out.addlongkm, out.long)))
 
 select!(out, :lat, :long, :addlatdeg => :addlat, :addlongdeg => :addlong)
 
-transform!(out, [[:lat, :addlat], [:long, :addlong]] .=> ByRow((x, y) -> round(x + y, digits=1)) .=> [:adjlat, :adjlong])
+transform!(out, [[:lat, :addlat], [:long, :addlong]] .=> ByRow((x, y) -> round(x + y, digits=4)) .=> [:adjlat, :adjlong])
 select!(out, r"adj")
 
 using RCall

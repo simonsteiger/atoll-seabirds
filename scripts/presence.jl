@@ -8,19 +8,21 @@ export nothing
 const ROOT = dirname(Base.active_project())
 
 # Probabilistic programming
-using Turing, ReverseDiff, ParetoSmooth
+using Turing, ParetoSmooth
 # Benchmarking
 using TuringBenchmarking, BenchmarkTools
 # Model speed optimization
 using LazyArrays
 # Statistics
-using StatsFuns, LinearAlgebra
+using StatsFuns
+# Variance matrices
+import LinearAlgebra: I
 # Working with tabular data
 using Chain, DataFrames
 # Plotting
 using StatsPlots
 # Saving results and logging
-using Serialization, CSV, Dates, Markdown, OrderedCollections
+using Serialization, CSV, Dates, OrderedCollections
 # Random seeds
 using Random
 
@@ -29,8 +31,6 @@ include("$ROOT/src/presence.jl")
 using .PresenceVariables
 include("$ROOT/src/utilities.jl")
 using .CustomUtilityFuns
-include("$ROOT/scripts/modelzoo.jl")
-using .PresenceModels
 
 # Set seed
 Random.seed!(42)
@@ -114,12 +114,8 @@ backends = [
 TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
 @info "TuringBenchmark shows that ReverseDiff{true} is the fastest AD backend."
 
-# Use ReverseDiffAD and enable caching
-Turing.setadbackend(:reversediff)
-Turing.setrdcache(true)
-
 # Configure sampling
-sampler = NUTS(1000, 0.95; max_depth=10)
+sampler = NUTS(1000, 0.95; max_depth=10, adtype=AutoReverseDiff(true))
 nsamples = 10_000
 nchains = 4
 config = (sampler, MCMCThreads(), nsamples, nchains)

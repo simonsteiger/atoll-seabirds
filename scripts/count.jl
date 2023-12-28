@@ -5,7 +5,7 @@ export nothing
 # --- WORKSPACE SETUP --- #
 
 # Probabilistic programming
-using Turing, TuringBenchmarking, ReverseDiff, ParetoSmooth
+using Turing, TuringBenchmarking, ParetoSmooth
 # Model speed optimization
 using LazyArrays
 # Statistics
@@ -17,7 +17,7 @@ using Chain, DataFrames, OrderedCollections
 # Plotting
 using StatsPlots
 # Saving results and logging
-using Serialization, CSV, Dates, Markdown
+using Serialization, CSV, Dates
 # Random seeds
 using Random
 
@@ -124,12 +124,8 @@ backends = [
 TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
 @info "ReverseDiff{true} is the fastest AD backend."
 
-# Use ReverseDiffAD and enable caching
-Turing.setadbackend(:reversediff)
-Turing.setrdcache(true)
-
 # Configure sampling
-sampler = NUTS(1000, 0.95; max_depth=10)
+sampler = NUTS(1000, 0.95; max_depth=10, adtype=AutoReverseDiff(true))
 nsamples = 10_000
 nchains = 4
 config = (sampler, MCMCThreads(), nsamples, nchains)

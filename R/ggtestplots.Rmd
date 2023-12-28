@@ -538,14 +538,14 @@ spatspec <- st_as_sf(foraging, coords = c("adjlong", "adjlat"), crs = 4326)
 coordspec <- spatspec %>% st_coordinates(extract())
 
 map + 
-  geom_hdr(aes(x = coordspec[,1], y = coordspec[,2]),
-           xlim = c(0,250),
-           method = method_julia(adjust = 1/5000),
+  geom_hdr(aes(x = coordspec[, 1], y = coordspec[, 2]),
+           xlim = c(0, 250),
+           method = method_julia(adjust = 1 / 5000),
            probs = c(0.25, 0.5, 0.75, 0.9, 0.95, 0.97, 0.98),
            fill = "#A71B1B",
            color = NA,
            ) +
-  #geom_point(aes(x = coordspec[,1], y = coordspec[,2]), alpha=0.2) +
+  geom_point(aes(x = coordspec[,1], y = coordspec[,2]), alpha=0.2) +
   geom_sf(data = mapWorld, fill = "#EBE3D5", color = NA) +
   geom_sf(data = mapCoast, linewidth = 0.15) +
   coord_sf(xlim = c(46.5, 265),
