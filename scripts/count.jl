@@ -34,14 +34,15 @@ using .CustomUtilityFuns
 
 # Turing model
 @model function model(
-    r, s, n, PC,
-    idx_sn, u_n, u_sn, Nv, Ng, Nb,
+    r, s, n, PC, # input values
+    idx_sn, u_n, u_sn, Nv, Ng, Nb, # indexes
+    ssp,
     y;
-    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r) # generated indices
 )
 
     # Priors for species × region
-    μ_sxr ~ filldist(Normal(0, 1), Ns)
+    μ_sxr ~ MvNormal(ssp, 1 * I)
     τ_sxr ~ filldist(InverseGamma(3, 2), Ns)
     z_sxr ~ filldist(Normal(), Ns, Nr)
     α_sxr = μ_sxr .+ τ_sxr .* z_sxr
@@ -65,10 +66,10 @@ using .CustomUtilityFuns
 
     # Generated quantities
     return (; y, α_sxr, β_pxn, σ2)
-end;
+end
 
 # Function to simulate samples from inputs
-function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
+function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb, ssp; idx_sr=idx(s, r))
     map(params) do param
         μ = param.α_sxr[idx_sr] + sum(param.β_pxn[idx_sn, :] .* X, dims=2)
         rand.(Normal.(μ, param.σ2))
@@ -87,12 +88,11 @@ odict_inputs = OrderedDict(
     "n_burow" => nspecies.burrow,
     "n_ground" => nspecies.ground,
     "n_vegetation" => nspecies.vegetation,
+    "ssp" => median_species_zlogn,
 )
 
 # If not loading a chain, save results to path below
 chainpath = "count.jls"
-
-zlogn = standardise(log.(nbirds))
 
 # --- PRIOR PREDICTIVE CHECKS --- #
 
@@ -108,7 +108,7 @@ let
     histogram(zlogn, normalize=true, c=1)
     density!(priorpreds, normalize=true, c=:white, lw=3)
     density!(priorpreds, normalize=true, c=2, fillrange=0, fillalpha=0.2, legend=false)
-    xlims!(-100, 100)
+    xlims!(-10, 10)
 end
 # not sure if necessary to show both observed and prior for prior predictive check
 # I guess it's not bad on a second thought though – we don't want probability mass in useless places
@@ -130,7 +130,7 @@ Turing.setrdcache(true)
 
 # Configure sampling
 sampler = NUTS(1000, 0.95; max_depth=10)
-nsamples = 2000
+nsamples = 10_000
 nchains = 4
 config = (sampler, MCMCThreads(), nsamples, nchains)
 
@@ -172,7 +172,7 @@ let preds = reduce(vcat, preds_train)
 end
 
 # Create dictionary of species-wise posterior prediction plot
-dict_postpred_plot = 
+dict_postpred_plot =
     let preds = exp.(unstandardise(reduce(hcat, preds_train), log.(nbirds)))
         sorted_species = sort(unique(species.known.str))
         # I reorders other vectors by region
@@ -238,7 +238,7 @@ preds_target =
             vals = [region.unknown.num[pass], species.unknown.num[pass], PC.unknown[pass, :], species_in_nesting.unknown[pass]]
             setindex!.(Ref(odict_unknown_inputs), vals, names)
             # Predict values for those atolls above threshold, and transform to natural scale
-            samples = @chain posterior.samples begin 
+            samples = @chain posterior.samples begin
                 simulate(_, values(odict_unknown_inputs)...)
                 reduce(hcat, _)
             end
@@ -260,8 +260,7 @@ preds_target =
     end
 
 plots_preds_target = map(eachrow(preds_target["0.8"])) do row
-    row.species == "Nesofregetta_fuliginosa" ? println(i) : nothing
-    density(row.raw[row.raw .< quantile(row.raw, 0.99)], title="$(row.species) on $(row.atoll) ($(row.region))", label=:none, fillrange=0, fillalpha=0.2)
+    density(row.raw[row.raw.<quantile(row.raw, 0.95)], title="$(row.species) on $(row.atoll) ($(row.region))", label=:none, fillrange=0, fillalpha=0.2)
     vline!([median(row.raw)], c=:red, lw=2, label="med=$(round(median(row.raw), digits=0))", alpha=0.5)
     vline!([row.lower, row.upper], c=:black, ls=:dash, alpha=0.5, label="$(round(row.lower, digits=0))-$(round(row.upper, digits=0))")
 end
@@ -310,9 +309,9 @@ foreach(k -> CSV.write("$ROOT/results/data/countpreds_$k.csv", select(preds_targ
 
     # Generated quantities
     return (; y, α_sxr, β_pxn, σ2)
-end;
+end
 
-loomodel = broadcastmodel(inputs..., zlogn);
+loomodel = broadcastmodel(inputs..., zlogn)
 
 cv_res = psis_loo(loomodel, posterior.chains)
 

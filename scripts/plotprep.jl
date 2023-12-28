@@ -95,6 +95,11 @@ select!(out, :lat, :long, :addlatdeg => :addlat, :addlongdeg => :addlong)
 transform!(out, [[:lat, :addlat], [:long, :addlong]] .=> ByRow((x, y) -> round(x + y, digits=4)) .=> [:adjlat, :adjlong])
 select!(out, r"adj")
 
+@chain out begin
+    groupby(_, [:adjlat, :adjlong])
+    combine(_, nrow)
+end
+
 using RCall
 
 @rput out

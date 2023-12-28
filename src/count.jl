@@ -1,9 +1,11 @@
 module CountVariables
 
-export atoll, region, species, nesting, species_in_nesting, PC, nbirds, nspecies, ppres, oos_lims
+export atoll, region, species, nesting, species_in_nesting, PC, zlogn, nbirds, median_species_zlogn, nspecies, ppres, oos_lims
        
 include("global.jl")
 using .GlobalVariables
+include("utilities.jl")
+using .CustomUtilityFuns
 
 using DataFrames, Chain, StatsBase, CSV, OrderedCollections
 
@@ -138,5 +140,14 @@ species_in_nesting = (
     validation = (num=num_species_in_nesting_oos),
     levels=unique_species_in_nesting_known
 )
+
+zlogn = standardise(log.(nbirds))
+
+median_species_zlogn = @chain pop_known begin
+    transform(_, :nbirds => (x -> standardise(log.(x))) => :zlogn)
+    groupby(_, :species)
+    combine(_, :zlogn => median => :median)
+    getproperty(_, :median)
+end
 
 end
