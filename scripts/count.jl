@@ -70,8 +70,9 @@ end
 
 # Function to simulate samples from inputs
 function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb, ssp; idx_sr=idx(s, r))
-    map(params) do param
+    map(enumerate(params)) do (i, param)
         μ = param.α_sxr[idx_sr] + sum(param.β_pxn[idx_sn, :] .* X, dims=2)
+        Random.seed!(i)
         rand.(Normal.(μ, param.σ2))
     end
 end
@@ -148,8 +149,7 @@ Random.seed!(42)
 # Discarding samples is unnecessary after NUTS tuning
 @info "🚀 Starting sampling: $(Dates.now())"
 posterior = @chain begin
-    #sample(m, config...)
-    deserialize("$ROOT/results/chains/count.jls")
+    sample(m, config...)
     ModelSummary(m, _)
 end
 

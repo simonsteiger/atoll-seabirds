@@ -125,6 +125,9 @@ Samples: $(nsamples)
 Threads: $(nchains)
 """
 
+# Set seed
+Random.seed!(42)
+
 @info "🚀 Starting sampling: $(Dates.now())"
 posterior = @chain begin
     sample(m, config...)
