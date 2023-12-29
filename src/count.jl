@@ -29,7 +29,7 @@ df_oos = @chain "$ROOT/data/atoll_seabird_populations_outofsample-validation.csv
     leftjoin(_, unique(pop_known[:, [:species, :nestingtype]], :species), on=:species)
 end
 
-oos_lims = df_oos.lims
+oos_lims = reduce(hcat, df_oos.lims)
 
 # Repeat for population / count model
 
@@ -60,7 +60,7 @@ num_region_known, num_region_unknown, num_region_oos =
 region = (
     known = (num=num_region_known, str=pop_known.region),
     unknown = (num=num_region_unknown, str=pop_unknown.region),
-    validation = (num=Int64.(denserank(df_oos.region)), str=df_oos.region)
+    validation = (num=num_region_oos, str=df_oos.region)
 )
 
 # Species
@@ -74,12 +74,11 @@ num_species_known, num_species_unknown, num_species_oos =
 species = (
     known = (num=num_species_known, str=pop_known.species),
     unknown = (num=num_species_unknown, str=pop_unknown.species),
-    validation = (num=Int64.(denserank(df_oos.species)), str=df_oos.species)
+    validation = (num=num_species_oos, str=df_oos.species)
 )
 
 nbirds = Float64.(pop_known.nbirds)
 ppres = Float64.(pop_unknown.ppres)
-
 
 PC_known = Matrix{Float64}(pop_known[:, FEATURES])
 PC_unknown = Matrix{Float64}(pop_unknown[:, FEATURES])

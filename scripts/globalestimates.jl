@@ -3,8 +3,8 @@ module GlobalEstimates
 export nothing
 
 using CSV, DataFrames, Chain
-
 import StatsBase: denserank, mean
+using StatsPlots
 
 const ROOT = dirname(Base.active_project())
 
@@ -50,7 +50,7 @@ for n in [:nbirds, :lower, :upper], df in [tot75, tot80, tot85]
 end
 select!.([tot75, tot80, tot85], Ref(Not(:birdlife_min, :birdlife_max, :HBW, :Otero)))
 
-histogram((tot75.ratio .- tot85.ratio) .* 100, title="Pop on atoll ratio diff .75 - .85", label=:none)
+histogram((tot75.ratio_nbirds .- tot85.ratio_nbirds) .* 100, title="Pop on atoll ratio diff .75 - .85", label=:none)
 xticks!(-1:3, string.(-1:3) .* "%")
 
 CSV.write("$ROOT/results/data/allpopulations.csv", full80)

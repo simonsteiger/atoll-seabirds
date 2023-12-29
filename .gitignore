@@ -7,3 +7,4 @@ data/copernicus_*
 *.jls
 .DS_Store
 results/data/*.fst
+*_files

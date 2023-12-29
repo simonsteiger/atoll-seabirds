@@ -5,7 +5,7 @@ export nothing
 # --- WORKSPACE SETUP --- #
 
 # Probabilistic programming
-using Turing, TuringBenchmarking, ReverseDiff, ParetoSmooth
+using Turing, TuringBenchmarking, ReverseDiff, ParetoSmooth, PosteriorStats
 # Model speed optimization
 using LazyArrays
 # Statistics
@@ -43,18 +43,18 @@ using .CustomUtilityFuns
 
     # Priors for species × region
     μ_sxr ~ MvNormal(ssp, 1 * I)
-    τ_sxr ~ filldist(InverseGamma(3, 2), Ns)
+    σ_sxr ~ filldist(InverseGamma(3, 2), Ns)
     z_sxr ~ filldist(Normal(), Ns, Nr)
-    α_sxr = μ_sxr .+ τ_sxr .* z_sxr
+    α_sxr = μ_sxr .+ σ_sxr .* z_sxr
 
     # Priors for nesting types × PCs
     μ_pxn ~ filldist(Normal(0, 1), Nn, NPC)
-    τ_pxn ~ filldist(InverseGamma(3, 2), Nn, NPC)
+    σ_pxn ~ filldist(InverseGamma(3, 2), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
     z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
-    β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
+    β_pxn = μ_pxn[u_n, :] .+ σ_pxn[u_n, :] .* z_pxn[u_sn, :]
 
     # Prior for random error
     σ2 ~ InverseGamma(3, 2)
@@ -148,7 +148,8 @@ Random.seed!(42)
 # Discarding samples is unnecessary after NUTS tuning
 @info "🚀 Starting sampling: $(Dates.now())"
 posterior = @chain begin
-    sample(m, config...)
+    #sample(m, config...)
+    deserialize("$ROOT/results/chains/count.jls")
     ModelSummary(m, _)
 end
 
@@ -175,25 +176,25 @@ end
 dict_postpred_plot =
     let preds = exp.(unstandardise(reduce(hcat, preds_train), log.(nbirds)))
         sorted_species = sort(unique(species.known.str))
-        # I reorders other vectors by region
-        I = sortperm(region.known.num)
+        # R reorders other vectors by region
+        R = sortperm(region.known.num)
 
         # Enumerate sorted species to create one plot per species
         plots = map(enumerate(sorted_species)) do (idx, sp)
             # Create BitVector S for species subsetting
-            S = species.known.num[I] .== idx
-            obs = nbirds[I][S]
+            S = species.known.num[R] .== idx
+            obs = nbirds[R][S]
             # Calculate mean of predicted values for species X
-            pred = vec(mean(preds[I, :][S, :], dims=2))
+            pred = vec(median(preds[R, :][S, :], dims=2))
             # Calculate quantile of predicted values for species X
-            qlims = @chain preds[I, :][S, :] begin
-                map(x -> quantile(x, [0.025, 0.975]), eachslice(_, dims=1))
-                map(i -> abs.(_[i] .- pred[i]), eachindex(_))
+            qlims = @chain preds[R, :][S, :] begin
+                map(x -> hdi(x, prob=0.9), eachslice(_, dims=1))
+                map(i -> abs.(getproperty.(Ref(_[i]), [:lower, :upper]) .- pred[i]), eachindex(_))
                 reduce(hcat, _)
             end
             # Assemble plot for species X
-            scatter(atoll.known.str[I][S], pred, yerror=(qlims[1, :], qlims[2, :]), markersize=2.5, msc=1, label="P", permute=(:y, :x))
-            scatter!(atoll.known.str[I][S], obs, markersize=2.5, msc=2, label="O", permute=(:y, :x))
+            scatter(atoll.known.str[R][S], pred, yerror=(qlims[1, :], qlims[2, :]), markersize=2.5, msc=1, label="P", permute=(:y, :x))
+            scatter!(atoll.known.str[R][S], obs, markersize=2.5, msc=2, label="O", permute=(:y, :x))
             title!(replace(sp, "_" => " "), titlefontsize=12)
         end
         # Collect all plots in a dictionary (plotting all at once is a bit busy, maybe by nesting type or genus?)
@@ -211,16 +212,14 @@ preds_validation = let odict_oos_inputs = copy(odict_inputs)
     vals = [region.validation.num, species.validation.num, PC.validation, species_in_nesting.validation]
     setindex!.(Ref(odict_oos_inputs), vals, names)
     # Make predictions for validation data, transform to natural scale, and plot
-    @chain posterior.samples begin
+    mdn = @chain posterior.samples begin
         simulate(_, values(odict_oos_inputs)...)
         reduce(hcat, _)
         exp.(unstandardise(_, log.(nbirds)))
-        map(enumerate(eachslice(_, dims=1))) do (i, slice)
-            histogram(slice, title=species.validation.str[i])
-            xlims!(0, quantile(slice, 0.95))
-            vline!(oos_lims[i], lw=2, c=:red)
-        end
+        vec(median(_, dims=2))
     end
+    pass = vec(Base.isbetween.(oos_lims[1, :], mdn, oos_lims[2, :]))
+    DataFrame([species.validation.str, oos_lims[1, :], mdn, oos_lims[2, :], pass], [:species, :lower, :pred, :upper, :pass])
 end
 
 # --- TARGET PREDICTIONS --- #
@@ -246,7 +245,7 @@ preds_target =
             raw = [exp.(unstandardise(slice, log.(nbirds))) for slice in eachslice(samples, dims=1)]
             mdn = exp.(unstandardise(median(samples, dims=2), log.(nbirds)))
             qs = @chain samples begin
-                [quantile(slice, [0.05, 0.95]) for slice in eachslice(_, dims=1)]
+                [getproperty.(Ref(hdi(slice; prob=0.75)), [:lower, :upper]) for slice in eachslice(_, dims=1)]
                 reduce(hcat, _)
                 exp.(unstandardise(_, log.(nbirds)))
             end
