@@ -1,19 +1,189 @@
 ---
 title: Methods
-format: pdf
+format: html
+toc: true
+toc-depth: 2
+number-sections: true
+embed-resources: true
 ---
 
-# Methods
+```{julia}
+#| include: false
 
-Let $y_{isn}$, where $Y \in \{0, 1\}$, denote the presence of species $s$ $(s = 1, \ldots, S)$ within nesting type $n$ $(N \in \{1, 3\})$ on atoll $i$ $(i = 1, \ldots, I)$ in region $r$ $(R \in \{1, 4\})$.
+ROOT = dirname(Base.active_project())
+
+include("$ROOT/src/count.jl")
+include("$ROOT/src/presence.jl")
+import .CountVariables
+import .PresenceVariables
+
+using Markdown, DataFrames, CSV
+
+lu(x) = length(unique(x))
+
+presencepreds = CSV.read("$ROOT/results/data/presencepreds.csv", DataFrame)
+n_pres_pos = sum(presencepreds.mean .> 0.8)
+n_pres_neg = sum(presencepreds.mean .< 0.2)
+```
+
+# Preamble
+
+## Why Bayesian
+
+::: {.callout-note}
+If the audience requires it, explain what benefits will be gleaned by a Bayesian analysis.
+:::
+
+The models presented below are Bayesian predictive models.
+We have opted for a Bayesian approach because of ability to deal with the small number of observations for some species and the presence of outliers in these small samples.[^1]
+
+Bayesian models are particularly well-suited for handling hierarchical data structures like the one we faced in this analysis.[^2]
+Finally, carefully chosen priors help regularize estimates and thus prevent overfitting, which is essential in prediction modeling.
+
+[^1]: [Gelman et al., 2020](https://www.cambridge.org/highereducation/books/regression-and-other-stories/DD20DD6C9057118581076E54E40C372C#overview)
+[^2]: [McGlothlin & Viele, 2018](doi:10.1001/jama.2018.17977)
+
+## Goals of analysis
+
+::: {.callout-note}
+Explain the goals of the analysis. This prepares the audience for the type of model to expect and how the results will be described.
+:::
+
+```{julia}
+#| echo: false
+
+md"""
+We used a two-stage model to predict the number of individuals breeding on $(lu(CountVariables.atoll.unknown.num)) unsurveyed atolls for $(lu(CountVariables.species.unknown.num)) seabird species.
+
+In the first step, we fit a Bayesian multilevel logistic regression model to presence / absence data from $(lu(PresenceVariables.atoll.known.num)) surveyed atolls.
+Next, posterior samples were used to predict the presence of $(lu(PresenceVariables.species.unknown.num)) species on $(lu(PresenceVariables.atoll.unknown.num)) unsurveyed atolls.
+We combined knowledge from the literature and model predictions to compile a list of atolls for which count predictions should be made.
+Including a given species *S* from a given unsurveyed atoll *A* in the list of atoll-species pairs for which count predictions were made, required that species' *S* mean predicted probability of being present on atoll *A* exceeded 80%.
+In total, we made count predictions for $(nrow(presencepreds)) atoll-species pairs, as described below, of which $(n_pres_pos) were predictions of our presence model.
+Conversely, the model confidently predicted the absence of $(n_pres_neg) atoll-species pairs, i.e., their mean predicted probability was below 20%.
+
+In the second step, we fit a Bayesian multilevel regression model to log-transformed bird counts from surveyed atolls.
+Lastly, posterior samples were used to predict bird counts for those atolls-species pairs for which either the literature or the predictions of our logistic model indicated that a given species was present on a given atoll.
+"""
+```
+
+# Explain the model
+
+## Data variables
+
+::: {.callout-note}
+Explain the dependent (predicted) variables and independent (predictor) variables.
+:::
+
+### Presence model
+
+The presence model predicted the presence of 37 species on 
+
+### Count model
+
+## Likelihood function
+
+::: {.callout-note}
+For every model, explain the likelihood function and all the parameters, distinguishing clearly between parameters of primary theoretical interest and ancillary parameters. If the model is multilevel, be sure that the hierarchical structure is clearly explained.
+:::
+
+## Prior distribution
+
+::: {.callout-note}
+For every model, explain and justify the prior distribution of the parameters in the model.
+:::
+
+## Formal specification
+
+::: {.callout-note}
+Include a formal specification (mathematical or computer code) of the likelihood and prior.
+:::
+
+### Presence model
+
+Let $y_{isn}$, where $Y \in \{0, 1\}$, denote the presence of species $s$ $(s = 1, \ldots, S)$ within nesting type $n$ $(N \in \{1, 3\})$ on atoll $a$ $(a = 1, \ldots, A)$ in region $r$ $(R \in \{1, 4\})$.
 
 $$
 \begin{split}
-y_{isn} &\sim \text{Bern(p)} \\
-\text{logit(p)} &= \alpha_{sr} + \beta_{nj} \times E_{ij} \\
-\alpha_{sr} &\sim \mathcal{N}(0, 1) \\
-\beta_{nj} &\sim \mathcal{N}(\bar{\beta}_{nj}, \sigma_{snj}) \\
-\bar{\beta}_{nj} &\sim \mathcal{N}(0, 1) \\
-\sigma_{nj} &\sim \text{Inv-Gamma}(3, 2)
+y_{asn} &\sim \text{Bern(p)} \\
+\text{logit(p)} &= \beta_{0sr} + \beta_{1nj} \times E_{aj} \\
+\beta_{0sr} &\sim \mathcal{N}(0, 1) \\
+\beta_{1nj} &\sim \mathcal{N}(\bar{\beta}_{1nj}, \tau_{nj}) \\
+\bar{\beta}_{1nj} &\sim \mathcal{N}(0, 0.2) \\
+\tau_{nj} &\sim \text{Inv-Gamma}(3, 0.5)
 \end{split}
 $$
+
+### Count model
+
+Let $y_{isn}$, where $Y \in \{0, 1\}$, denote the log-transformed count of individuals of species $s$ $(s = 1, \ldots, S)$ within nesting type $n$ $(N \in \{1, 3\})$ on atoll $a$ $(a = 1, \ldots, A)$ in region $r$ $(R \in \{1, 4\})$.
+
+$$
+\begin{split}
+y_{asn} &\sim \mathcal{N}(\mu_{snr}, \sqrt{\sigma^2_{asnr}}) \\
+\mu_{snr} &= \beta_{0sr} + \beta_{1nj} \times E_{aj} \\
+\sigma &\sim \text{Inv-Gamma}(3, 2) \\
+\beta_{0sr} &\sim \mathcal{N}(0, 1) \\
+\beta_{1nj} &\sim \mathcal{N}(\bar{\beta}_{1nj}, \sigma_{nj}) \\
+\bar{\beta}_{1nj} &\sim \mathcal{N}(0, 1) \\
+\tau_{nj} &\sim \text{Inv-Gamma}(3, 2)
+
+\end{split}
+$$
+
+
+## Prior predictive check
+
+::: {.callout-note}
+Especially when using informed priors but even with broad priors, it is valuable to report a prior predictive check to demonstrate that the prior really generates simulated data consistent with the assumed prior knowledge.
+:::
+
+# Computational details
+
+## Software
+
+::: {.callout-note}
+Report the software used, including any specific added packages or plugins.
+:::
+
+## MCMC chain convergence
+
+::: {.callout-note}
+Report evidence that the chains have converged, using a convergence statistic such as PSRF, for every parameter or derived value.
+:::
+
+## MCMC chain resolution
+
+::: {.callout-note}
+Report evidence that the chains have high resolution, using the ESS, for every parameter or derived value.
+:::
+
+# Describe the posterior distribution
+
+## Posterior predictive check
+
+::: {.callout-note}
+Provide a posterior predictive check to show that the model usefully mimics the data.
+:::
+
+## Summarize posterior of variables
+
+::: {.callout-note}
+For continuous parameters, derived variables and predicted values, report the central tendency and limits of the credible interval. Explicitly state whether you are using density-based values (mode and HDI) or quantile-based values (median and ETI), and state the mass of the credible interval (e.g., 95%).
+:::
+
+# Report decisions
+
+## Why decisions?
+
+::: {.callout-note}
+Explain why the decisions are theoretically meaningful and which decision procedure is being used.
+:::
+
+# Report sensitivity analysis
+
+## For informed priors
+
+::: {.callout-note}
+If the prior is informed by previous research, show what posterior results from a vague prior or from a range of differently informed priors.
+:::
