@@ -25,6 +25,7 @@ library("here")
 library("fst")
 library("ggdensity")
 library("JuliaCall")
+library("hdrcde")
 
 ```
 
@@ -782,17 +783,15 @@ for(i in 1:nrow(avgforag.atoll)) {
 colnames(out) <- c("dist", "atoll")
 out$dist <- abs(out$dist)
 
-mean.forag <- out %>% group_by(atoll) %>% summarise(mean = mean(dist),
-                                                    sd = sd(dist),
-                                                    nbirds = length(atoll),
-                                                    low.prctile = quantile(dist, probs = 0.25) %>% as.vector(),
-                                                    upp.prctile = quantile(dist, probs = 0.75 %>% as.vector())) %>%
-                          as.data.frame()
+mean.forag <- out %>% group_by(atoll) %>% 
+                        summarise(mean = mean(dist),
+                                  sd = sd(dist),
+                                  nbirds = length(atoll),
+                                  low.prctile = hdr(dist, prob = 50)$hdr[,1] %>% as.vector(),
+                                  upp.prctile = hdr(dist, prob = 50)$hdr[,2] %>% as.vector()) %>% 
+                        as.data.frame()
 
 mean.forag$area <- (pi*mean.forag$upp.prctile^2)-(pi*mean.forag$low.prctile^2)
-mean.forag$std.nbirds <- rescale(mean.forag$nbirds, to = c(0,1))
-mean.forag$std.area <- mean.forag$area * mean.forag$std.nbirds
-
 
 p.forag <- ggplot() +
   geom_density(data = mean.forag,
