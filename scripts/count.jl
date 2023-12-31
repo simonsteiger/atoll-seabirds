@@ -35,21 +35,21 @@ using .CustomUtilityFuns
 # Turing model
 @model function model(
     r, s, n, PC, # input values
-    idx_sn, u_n, u_sn, Nv, Ng, Nb, # indexes
-    ssp,
+    idx_sn, u_n, u_sn, Nv, Ng, Nb, # indexes and array lengths
     y;
-    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r) # generated indices
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r), # generated indices and array
+    pr=(μ_sxr=Ms, σ_sxr=[3, √2], μ_pxn=[0, 1], σ_pxn=[3, √2], σ2=[3, 2]) # prior, default prior is fallback
 )
 
     # Priors for species × region
-    μ_sxr ~ MvNormal(ssp, 1 * I)
-    σ_sxr ~ filldist(InverseGamma(3, 2), Ns)
+    μ_sxr ~ MvNormal(pr.μ_sxr, 1 * I)
+    σ_sxr ~ filldist(InverseGamma(pr.σ_sxr...), Ns)
     z_sxr ~ filldist(Normal(), Ns, Nr)
     α_sxr = μ_sxr .+ σ_sxr .* z_sxr
 
     # Priors for nesting types × PCs
-    μ_pxn ~ filldist(Normal(0, 1), Nn, NPC)
-    σ_pxn ~ filldist(InverseGamma(3, 2), Nn, NPC)
+    μ_pxn ~ filldist(Normal(pr.μ_pxn...), Nn, NPC)
+    σ_pxn ~ filldist(InverseGamma(pr.σ_pxn...), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
@@ -57,7 +57,7 @@ using .CustomUtilityFuns
     β_pxn = μ_pxn[u_n, :] .+ σ_pxn[u_n, :] .* z_pxn[u_sn, :]
 
     # Prior for random error
-    σ2 ~ InverseGamma(3, 2)
+    σ2 ~ InverseGamma(pr.σ2...)
 
     # Likelihood
     μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
@@ -69,7 +69,7 @@ using .CustomUtilityFuns
 end
 
 # Function to simulate samples from inputs
-function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb, ssp; idx_sr=idx(s, r))
+function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
     map(enumerate(params)) do (i, param)
         μ = param.α_sxr[idx_sr] + sum(param.β_pxn[idx_sn, :] .* X, dims=2)
         Random.seed!(i)
@@ -89,16 +89,28 @@ odict_inputs = OrderedDict(
     "n_burow" => nspecies.burrow,
     "n_ground" => nspecies.ground,
     "n_vegetation" => nspecies.vegetation,
-    "ssp" => median_species_zlogn,
 )
-
-# If not loading a chain, save results to path below
-chainpath = "count.jls"
 
 # --- PRIOR PREDICTIVE CHECKS --- #
 
-m = model(values(odict_inputs)..., zlogn)
+# Dictionary holding alternative prior settings for sensitivity analysis
+dict_pr = Dict(
+    "default" => (μ_sxr=Ms, σ_sxr=[3, √2], μ_pxn=[0, 1], σ_pxn=[3, √2], σ2=[3, 2]),
+    # Differently informed prior, using mean instead of median
+    "mean" => (μ_sxr=μs, σ_sxr=[3, √2], μ_pxn=[0, 1], σ_pxn=[3, √2], σ2=[3, 2]),
+    # Using a much more weakly informed global prior in μ_sxr instead of a species-specific one
+    "global" => (μ_sxr=fill(0, 37), σ_sxr=[3, √2], μ_pxn=[0, 1], σ_pxn=[3, √2], σ2=[3, 2]),
+    # Narrow priors on variance parameters and μ_pxn, leaving μ_sxr at median
+    "narrow" => (μ_sxr=Ms, σ_sxr=[3, √2/3], μ_pxn=[0, 1/3], σ_pxn=[3, √2/3], σ2=[3, 2/3]),
+    # Wide priors on variance parameters and μ_pxn, leaving μ_sxr at median
+    "wide" => (μ_sxr=Ms, σ_sxr=[3, √2*3], μ_pxn=[0, 1*3], σ_pxn=[3, √2*3], σ2=[3, 2*3]),
+)
 
+priorsetting = "default"
+
+m = model(values(odict_inputs)..., zlogn; pr=dict_pr[priorsetting])
+
+# ModelSummary object holds chains, parameter names, and parameter samples
 prior = @chain begin
     sample(m, Prior(), 1000)
     ModelSummary(m, _)
@@ -111,8 +123,6 @@ let
     density!(priorpreds, normalize=true, c=2, fillrange=0, fillalpha=0.2, legend=false)
     xlims!(-10, 10)
 end
-# not sure if necessary to show both observed and prior for prior predictive check
-# I guess it's not bad on a second thought though – we don't want probability mass in useless places
 
 # --- MODEL CONFIG --- #
 
@@ -146,17 +156,16 @@ Chains: $(nchains)
 # Set seed
 Random.seed!(42)
 
-# Discarding samples is unnecessary after NUTS tuning
-@info "🚀 Starting sampling: $(Dates.now())"
+# ModelSummary object holds chains, parameter names, and parameter samples
 posterior = @chain begin
     sample(m, config...)
     ModelSummary(m, _)
 end
 
 try
-    path = "$ROOT/results/chains/$chainpath"
+    path = "$ROOT/results/chains/count_$priorsetting.jls"
     serialize(path, posterior.chains)
-    @info "💾 Chain saved to `$path`."
+    @info "Chain saved to `$path`."
 catch error
     @warn "Writing chains failed with an $error."
 end
@@ -187,13 +196,13 @@ dict_postpred_plot =
             # Calculate mean of predicted values for species X
             pred = vec(median(preds[R, :][S, :], dims=2))
             # Calculate quantile of predicted values for species X
-            qlims = @chain preds[R, :][S, :] begin
+            lims = @chain preds[R, :][S, :] begin
                 map(x -> hdi(x, prob=0.9), eachslice(_, dims=1))
                 map(i -> abs.(getproperty.(Ref(_[i]), [:lower, :upper]) .- pred[i]), eachindex(_))
                 reduce(hcat, _)
             end
             # Assemble plot for species X
-            scatter(atoll.known.str[R][S], pred, yerror=(qlims[1, :], qlims[2, :]), markersize=2.5, msc=1, label="P", permute=(:y, :x))
+            scatter(atoll.known.str[R][S], pred, yerror=(lims[1, :], lims[2, :]), markersize=2.5, msc=1, label="P", permute=(:y, :x))
             scatter!(atoll.known.str[R][S], obs, markersize=2.5, msc=2, label="O", permute=(:y, :x))
             title!(replace(sp, "_" => " "), titlefontsize=12)
         end
@@ -265,11 +274,11 @@ plots_preds_target = map(eachrow(preds_target["0.8"])) do row
 end
 
 # Save results for each threshold to an individual CSV
-foreach(k -> CSV.write("$ROOT/results/data/countpreds_$k.csv", select(preds_target[k], Not(:raw))), keys(preds_target))
+foreach(k -> CSV.write("$ROOT/results/data/countpreds_$(k)_$priorsetting.csv", select(preds_target[k], Not(:raw))), keys(preds_target))
 
 # --- LOO CV --- #
 
-# It seems that specifying the model as MvNormal confuses psis_loo ("1 data point")
+# Specifying the model as MvNormal confuses psis_loo, the summary returns "sample size 1 data point"
 # Respecify the likelihood as vectorized Normals
 # y .~ Normal.(μ, σ)
 
@@ -277,29 +286,30 @@ foreach(k -> CSV.write("$ROOT/results/data/countpreds_$k.csv", select(preds_targ
 # Not a big issue at all, but spelling out loospecial again seems nasty
 
 @model function broadcastmodel(
-    r, s, n, PC,
-    idx_sn, u_n, u_sn, Nv, Ng, Nb,
+    r, s, n, PC, # input values
+    idx_sn, u_n, u_sn, Nv, Ng, Nb, # indexes and array lengths
     y;
-    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r), # generated indices and array
+    pr=(μ_sxr=Ms, σ_sxr=[3, √2], μ_pxn=[0, 1], σ_pxn=[3, √2], σ2=[3, 2])
 )
 
     # Priors for species × region
-    μ_sxr ~ filldist(Normal(0, 0.2), Ns)
-    τ_sxr ~ filldist(InverseGamma(3, 0.2), Ns)
+    μ_sxr ~ MvNormal(pr.μ_sxr, 1 * I)
+    σ_sxr ~ filldist(InverseGamma(pr.σ_sxr...), Ns)
     z_sxr ~ filldist(Normal(), Ns, Nr)
-    α_sxr = μ_sxr .+ τ_sxr .* z_sxr
+    α_sxr = μ_sxr .+ σ_sxr .* z_sxr
 
     # Priors for nesting types × PCs
-    μ_pxn ~ filldist(Normal(0, 0.1), Nn, NPC)
-    τ_pxn ~ filldist(InverseGamma(3, 0.1), Nn, NPC)
+    μ_pxn ~ filldist(Normal(pr.μ_pxn...), Nn, NPC)
+    σ_pxn ~ filldist(InverseGamma(pr.σ_pxn...), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
     z_pxn = ApplyArray(vcat, z_pxb, z_pxg, z_pxv)
-    β_pxn = μ_pxn[u_n, :] .+ τ_pxn[u_n, :] .* z_pxn[u_sn, :]
+    β_pxn = μ_pxn[u_n, :] .+ σ_pxn[u_n, :] .* z_pxn[u_sn, :]
 
     # Prior for random error
-    σ2 ~ InverseGamma(3, 0.2)
+    σ2 ~ InverseGamma(pr.σ2...)
 
     # Likelihood
     μ = vec(α_sxr[idx_sr] + sum(β_pxn[idx_sn, :] .* PC, dims=2))
@@ -310,7 +320,7 @@ foreach(k -> CSV.write("$ROOT/results/data/countpreds_$k.csv", select(preds_targ
     return (; y, α_sxr, β_pxn, σ2)
 end
 
-loomodel = broadcastmodel(inputs..., zlogn)
+loomodel = broadcastmodel(values(odict_inputs)..., zlogn; pr=dict_pr[priorsetting])
 
 cv_res = psis_loo(loomodel, posterior.chains)
 

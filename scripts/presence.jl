@@ -8,9 +8,9 @@ export nothing
 const ROOT = dirname(Base.active_project())
 
 # Probabilistic programming
-using Turing, ParetoSmooth
+using Turing, ParetoSmooth, ReverseDiff
 # Benchmarking
-using TuringBenchmarking, BenchmarkTools
+using TuringBenchmarking
 # Model speed optimization
 using LazyArrays
 # Statistics
@@ -42,15 +42,16 @@ Random.seed!(42)
     r, s, n, PC, # inputs
     idx_sn, u_n, u_sn, Nv, Ng, Nb, # indexes, lengths, etc
     y; # outcome
-    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r)
+    Nr=lu(r), Ns=lu(s), Nn=lu(n), NPC=size(PC, 2), idx_sr=idx(s, r),
+    pr=(α_sxr=[0, 1], μ_pxn=[0, 0.2], σ_pxn=[3, 0.5])
 )
 
     # Priors for species × region
-    α_sxr ~ filldist(Normal(0, 1), Ns * Nr)
+    α_sxr ~ filldist(Normal(pr.α_sxr...), Ns * Nr)
 
     # Priors for nesting types × PCs
-    μ_pxn ~ filldist(Normal(0, 0.2), Nn, NPC)
-    σ_pxn ~ filldist(InverseGamma(3, 0.5), Nn, NPC)
+    μ_pxn ~ filldist(Normal(pr.μ_pxn...), Nn, NPC)
+    σ_pxn ~ filldist(InverseGamma(pr.σ_pxn...), Nn, NPC)
     z_pxb ~ filldist(Normal(), Nb, NPC)
     z_pxg ~ filldist(Normal(), Ng, NPC)
     z_pxv ~ filldist(Normal(), Nv, NPC)
@@ -86,12 +87,20 @@ odict_inputs = OrderedDict(
     "n_vegetation" => nspecies.vegetation,
 )
 
-# Path to read or write chain from / to
-chainpath = "presence.jls"
-
 # --- PRIOR PREDICTIVE CHECK --- #
 
-m = model(values(odict_inputs)..., presence)
+# Dictionary holding alternative prior settings for sensitivity analysis
+dict_pr = Dict(
+    "default" => (α_sxr=[0, 1], μ_pxn=[0, 0.2], σ_pxn=[3, 0.5]),
+    # Differently informed prior, using mean instead of median
+    "narrow" => (α_sxr=[0, 1/3], μ_pxn=[0, 0.2/3], σ_pxn=[3, 0.5/3]),
+    # Wide priors on variance parameters and μ_pxn, leaving μ_sxr at median
+    "wide" => (α_sxr=[0, 1*3], μ_pxn=[0, 0.2*3], σ_pxn=[3, 0.5*3]),
+)
+
+priorsetting = "wide"
+
+m = model(values(odict_inputs)..., presence; pr=dict_pr[priorsetting])
 
 prior = @chain begin
     sample(m, Prior(), 1000)
@@ -114,8 +123,12 @@ backends = [
 TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
 @info "TuringBenchmark shows that ReverseDiff{true} is the fastest AD backend."
 
+# Set autodiff to ReverseDiff{true}
+Turing.setadbackend(:reversediff)
+Turing.setrdcache(true)
+
 # Configure sampling
-sampler = NUTS(1000, 0.95; max_depth=10, adtype=AutoReverseDiff(true))
+sampler = NUTS(1000, 0.95; max_depth=10)
 nsamples = 10_000
 nchains = 4
 config = (sampler, MCMCThreads(), nsamples, nchains)
@@ -128,14 +141,13 @@ Threads: $(nchains)
 # Set seed
 Random.seed!(42)
 
-@info "🚀 Starting sampling: $(Dates.now())"
 posterior = @chain begin
     sample(m, config...)
     ModelSummary(m, _)
 end
 
 try
-    path = "$ROOT/results/chains/$chainpath"
+    path = "$ROOT/results/chains/presence_$priorsetting.jls"
     serialize(path, posterior.chains)
     @info "Saved chains to `$path`."
 catch error
@@ -161,7 +173,7 @@ postpcplots = let preds = reduce(hcat, simulate(posterior.samples, values(odict_
 end
 
 plot(postpcplots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
-savefig("results/svg/postpreds_Mp.svg")
+savefig("results/svg/presence_postpreds_$priorsetting.svg")
 
 # Create predictions for unknown atolls
 predictions = let odict_unknown_inputs = copy(odict_inputs)
@@ -195,12 +207,12 @@ dict_unknown_pred_plots = let df = df_preds
     Dict(Pair.(unique(species.unknown.str), plots))
 end
 
-plot(dict_unknown_pred_plots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
+# plot(dict_unknown_pred_plots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
 # TODO plot by nesting type or genus
 
 # Save predictions for unknown atolls to CSV
 try
-    path = "$ROOT/results/data/presencepreds.csv"
+    path = "$ROOT/results/data/presencepreds_$priorsetting.csv"
     CSV.write(path, df_preds); @info "Saved predictions to `$path`."
 catch error
     @warn "Writing predictions failed with an $error."

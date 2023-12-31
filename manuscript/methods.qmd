@@ -1,9 +1,10 @@
 ---
 title: Methods
-format: html
+format: docx
 toc: true
 toc-depth: 2
 number-sections: true
+number-depth: 2
 embed-resources: true
 ---
 
@@ -30,10 +31,6 @@ n_pres_neg = sum(presencepreds.mean .< 0.2)
 
 ## Why Bayesian
 
-::: {.callout-note}
-If the audience requires it, explain what benefits will be gleaned by a Bayesian analysis.
-:::
-
 The models presented below are Bayesian predictive models.
 We have opted for a Bayesian approach because of ability to deal with the small number of observations for some species and the presence of outliers in these small samples.[^1]
 
@@ -45,10 +42,6 @@ Finally, carefully chosen priors help regularize estimates and thus prevent over
 
 ## Goals of analysis
 
-::: {.callout-note}
-Explain the goals of the analysis. This prepares the audience for the type of model to expect and how the results will be described.
-:::
-
 ```{julia}
 #| echo: false
 
@@ -58,7 +51,7 @@ We used a two-stage model to predict the number of individuals breeding on $(lu(
 In the first step, we fit a Bayesian multilevel logistic regression model to presence / absence data from $(lu(PresenceVariables.atoll.known.num)) surveyed atolls.
 Next, posterior samples were used to predict the presence of $(lu(PresenceVariables.species.unknown.num)) species on $(lu(PresenceVariables.atoll.unknown.num)) unsurveyed atolls.
 We combined knowledge from the literature and model predictions to compile a list of atolls for which count predictions should be made.
-Including a given species *S* from a given unsurveyed atoll *A* in the list of atoll-species pairs for which count predictions were made, required that species' *S* mean predicted probability of being present on atoll *A* exceeded 80%.
+Including a given species *s* from a given unsurveyed atoll *a* in the list of atoll-species pairs for which count predictions were made, required that species' *s* mean predicted probability of being present on atoll *a* exceeded 80%.
 In total, we made count predictions for $(nrow(presencepreds)) atoll-species pairs, as described below, of which $(n_pres_pos) were predictions of our presence model.
 Conversely, the model confidently predicted the absence of $(n_pres_neg) atoll-species pairs, i.e., their mean predicted probability was below 20%.
 
@@ -69,44 +62,19 @@ Lastly, posterior samples were used to predict bird counts for those atolls-spec
 
 # Explain the model
 
-## Data variables
+Both the presence model and count model use the same independent variables to model presence or counts, respectively, of species $s$ of nesting type $n$ on atoll $a$, with environmental parameters $E$, in region $r$ (for full lists of these variables, see supplements?).
+Species, nesting type, atoll, and region are categorical variables. 
+The $A \times 6$ matrix of environmental parameters contains the results of a principal component analysis conducted on a selection of 16 environmental variables (for further detail, see supplements?).
 
-::: {.callout-note}
-Explain the dependent (predicted) variables and independent (predictor) variables.
-:::
 
-### Presence model
+## Presence model
 
-The presence model predicted the presence of 37 species on 
-
-### Count model
-
-## Likelihood function
-
-::: {.callout-note}
-For every model, explain the likelihood function and all the parameters, distinguishing clearly between parameters of primary theoretical interest and ancillary parameters. If the model is multilevel, be sure that the hierarchical structure is clearly explained.
-:::
-
-## Prior distribution
-
-::: {.callout-note}
-For every model, explain and justify the prior distribution of the parameters in the model.
-:::
-
-## Formal specification
-
-::: {.callout-note}
-Include a formal specification (mathematical or computer code) of the likelihood and prior.
-:::
-
-### Presence model
-
-Let $y_{isn}$, where $Y \in \{0, 1\}$, denote the presence of species $s$ $(s = 1, \ldots, S)$ within nesting type $n$ $(N \in \{1, 3\})$ on atoll $a$ $(a = 1, \ldots, A)$ in region $r$ $(R \in \{1, 4\})$.
+Let $y_{isn}$, where $Y \in \{0, 1\}$, denote the presence of species $s$ $(s = 1, \ldots, S)$ of nesting type $n$ $(N \in \{1, 3\})$ on atoll $a$ $(a = 1, \ldots, A)$ with environmental parameters $E_{aj}$ $(J \in \{1, 6\})$ in region $r$ $(R \in \{1, 4\})$.
 
 $$
 \begin{split}
-y_{asn} &\sim \text{Bern(p)} \\
-\text{logit(p)} &= \beta_{0sr} + \beta_{1nj} \times E_{aj} \\
+y_{asnr} &\sim \text{Bern}(\text{p}_{asnr}) \\
+\text{logit}(\text{p}_{asnr}) &= \beta_{0s[r]} + \beta_{1n[s]j} \times E_{aj} \\
 \beta_{0sr} &\sim \mathcal{N}(0, 1) \\
 \beta_{1nj} &\sim \mathcal{N}(\bar{\beta}_{1nj}, \tau_{nj}) \\
 \bar{\beta}_{1nj} &\sim \mathcal{N}(0, 0.2) \\
@@ -114,76 +82,109 @@ y_{asn} &\sim \text{Bern(p)} \\
 \end{split}
 $$
 
-### Count model
+### Likelihood function
 
-Let $y_{isn}$, where $Y \in \{0, 1\}$, denote the log-transformed count of individuals of species $s$ $(s = 1, \ldots, S)$ within nesting type $n$ $(N \in \{1, 3\})$ on atoll $a$ $(a = 1, \ldots, A)$ in region $r$ $(R \in \{1, 4\})$.
+The parameter $\beta_{0sr}$ encodes the probability that species $s$ occurs in the region $r$ in which atoll $a$ is located.
+
+The parameter $\beta_{1nj}$ encodes how environmental parameters of atoll $a$ affect the probability that species $s$ within a nesting type $n$ occurs on atoll $a$.
+This effect is allowed to differ between nesting types, such that the probability that a ground nesting species occurs on atoll $a$ increases with some environmental parameter, while the probability of a tree nesting species decreases.
+By partially pooling species within nesting types, we express our assumption that species from the same nesting type $n$ are similarly affected by certain environmental parameters.
+
+### Priors
+
+The priors of the presence model are weakly informative.
+Their small variance serves to regularize the estimates and prevent overfitting where few samples are available in our hierarchical data structure.
+
+We assume $\beta_{0sr}$, the parameter encoding regional variation in species occurence, to have the largest variation. 
+It is often the case that species do not occur in one region while they are common in another.
+
+In contrast, we assume the variation resulting from $\beta_{1nj}$, i.e., nesting type, environmental factors, and their interaction, to be much smaller than that caused by the regional variation encoded in $\beta_{0sr}$.
+
+## Count model
+
+Let $y_{isn}$, where $Y \in \{0, 1\}$, denote the log-transformed count of individuals of species $s$ $(s = 1, \ldots, S)$ of nesting type $n$ $(N \in \{1, 3\})$ on atoll $a$ $(a = 1, \ldots, A)$ in region $r$ $(R \in \{1, 4\})$.
 
 $$
 \begin{split}
-y_{asn} &\sim \mathcal{N}(\mu_{snr}, \sqrt{\sigma^2_{asnr}}) \\
-\mu_{snr} &= \beta_{0sr} + \beta_{1nj} \times E_{aj} \\
-\sigma &\sim \text{Inv-Gamma}(3, 2) \\
-\beta_{0sr} &\sim \mathcal{N}(0, 1) \\
-\beta_{1nj} &\sim \mathcal{N}(\bar{\beta}_{1nj}, \sigma_{nj}) \\
+y_{asnr} &\sim \mathcal{N}(\mu_{asnr}, \sigma) \\
+\mu_{asnr} &= \beta_{0s} + \beta_{1nj} \times E_{aj} \\
+\sigma &\sim \text{Inv-Gamma}(3, \sqrt{2}) \\
+\beta_{0s} &\sim \mathcal{N}(\bar{\beta}_{0s}, \tau_{0}) \\
+\beta_{1nj} &\sim \mathcal{N}(\bar{\beta}_{1nj}, \tau_{nj}) \\
+\bar{\beta}_{0s} &\sim \mathcal{N}(M_s, 1) \\
 \bar{\beta}_{1nj} &\sim \mathcal{N}(0, 1) \\
-\tau_{nj} &\sim \text{Inv-Gamma}(3, 2)
-
+\tau_{0} &\sim \text{Inv-Gamma}(3, \sqrt{2}) \\
+\tau_{1nj} &\sim \text{Inv-Gamma}(3, \sqrt{2})
 \end{split}
 $$
 
+### Likelihood function
+
+The parameter $\beta_{0s}$ encodes the abundance of species $s$ across regions by nesting regional estimates within species.
+As such, $\bar{\beta}_{0s}$ is the average abundance of species $s$ across regions.
+The hyperparameter on $\tau_0$ encodes the variation between regions across species.<br />
+By partially pooling regions within species, we express our assumption that species $s$ forms colonies of similar size across regions.
+This is unlike the presence model, where the fixed effect $\beta_{0sr}$ prevents information flow between species $s$'s estimates for different regions.
+
+The parameter $\beta_{1nj}$ encodes how environmental parameters affect the abundance of species within a nesting type.
+This effect is allowed to differ between nesting types, such that the abundance of a species of ground nesters may be positively related to some environmental parameters, while the abundance of tree nesters may be negatively related.
+By partially pooling species within nesting types, we express our assumption that species from the same nesting type $n$ are similarly affected by certain environmental parameters.
+
+### Priors
+
+The priors of the count model are in part informed and in part weakly informed, with the intention of regularizing estimates.
+
+The informed prior on $\bar{\beta}_{0s}$ is set to the median log-transformed count of each species.
+Our choice of a species-specific prior informed by the data is due to the large differences in colony sizes across species, and the small sample sizes for some species.
+While reasonable prior settings were consistently overwhelmed in species with medium to large sample size, species with small sample sizes ($n < 5$) require more careful specification of priors.
+Consider how a species with small sample size and very small colony size is impacted by setting the prior to the average colony size across species: due to the small sample size, the prior skews our predictions towards the global average, which leads to poor predictions.
+
+Our choice of the median over the mean is motivated by the presence of very few, very large colonies in some species.
+In summary, the goal of the prior on $\bar{\beta}_{0s}$ is to enable our model to make reasonable and conservative predictions even for species with very small samples.
+For further detail on the influence of different prior settings, see the results of the sensitivity analysis in the supplements.
+
+The priors on $\bar{\beta}_{1nj}$ is weakly informed in that it places most probability mass on values near 0.
+
+The priors on the variance parameters $\sigma$, $\tau_0$, and $\tau_{1nj}$ place more probability mass on higher variances than in the presence model to allow uncertain predictions where there are few data.
 
 ## Prior predictive check
 
-::: {.callout-note}
-Especially when using informed priors but even with broad priors, it is valuable to report a prior predictive check to demonstrate that the prior really generates simulated data consistent with the assumed prior knowledge.
-:::
+We have conducted and visually inspected prior predictive checks for both models.
+The prior predictive checks generated data in plausible value ranges, consistent with our prior knowledge.
+For further details, see supplements.
 
 # Computational details
 
 ## Software
 
-::: {.callout-note}
-Report the software used, including any specific added packages or plugins.
-:::
+We used the Julia Programming Language[^3] and most notably the Turing package ecosystem[^4] to fit, diagnose, visualize and summarize the Bayesian models presented here.
+For an exhaustive list of all packages used and the versions, see the `Manifest.toml` file in the GitHub repository associated with this project.
+
+[^3]: [Bezanson et al. 2017](https://doi.org/10.1137/141000671)
+[^4]: [Ge et al. 2018](https://github.com/TuringLang/Turing.jl/blob/master/CITATION.bib)
+
 
 ## MCMC chain convergence
 
-::: {.callout-note}
-Report evidence that the chains have converged, using a convergence statistic such as PSRF, for every parameter or derived value.
-:::
+We made sure that all chains have converged by examining the $\hat{R}$ statistic for all models.
+For detailed convergence diagnostics, see supplements.
 
 ## MCMC chain resolution
 
-::: {.callout-note}
-Report evidence that the chains have high resolution, using the ESS, for every parameter or derived value.
-:::
+We made sure that all chains have high resolution by examining the effective sample size (ESS) in the bulk and tail regions of each parameter distribution.
+For detailed convergence diagnostics, see supplements.
 
 # Describe the posterior distribution
 
 ## Posterior predictive check
 
-::: {.callout-note}
-Provide a posterior predictive check to show that the model usefully mimics the data.
-:::
-
-## Summarize posterior of variables
-
-::: {.callout-note}
-For continuous parameters, derived variables and predicted values, report the central tendency and limits of the credible interval. Explicitly state whether you are using density-based values (mode and HDI) or quantile-based values (median and ETI), and state the mass of the credible interval (e.g., 95%).
-:::
-
-# Report decisions
-
-## Why decisions?
-
-::: {.callout-note}
-Explain why the decisions are theoretically meaningful and which decision procedure is being used.
-:::
+We have conducted posterior predictive checks to make sure that our model usefully mimics the observed data.
+For further details on the posterior predictive checks, see supplements.
 
 # Report sensitivity analysis
 
-## For informed priors
-
-::: {.callout-note}
-If the prior is informed by previous research, show what posterior results from a vague prior or from a range of differently informed priors.
-:::
+Sensitivity analyses were carried out for a wide range of different prior settings.
+In summary, the results show that the results of the presence model are robust across different prior settings.
+The same can be said for the count model, with the exception of very few species for which the small sample sizes are extremely low.
+In situations with extremely small sample sizes, sensitivity to the prior is inevitable.
+Thoughtful prior specification is critical in these situations, as described above.

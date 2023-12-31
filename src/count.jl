@@ -1,6 +1,6 @@
 module CountVariables
 
-export atoll, region, species, nesting, species_in_nesting, PC, zlogn, nbirds, median_species_zlogn, nspecies, ppres, oos_lims
+export atoll, region, species, nesting, species_in_nesting, PC, zlogn, nbirds, Ms, μs, nspecies, ppres, oos_lims
        
 include("global.jl")
 using .GlobalVariables
@@ -142,11 +142,11 @@ species_in_nesting = (
 
 zlogn = standardise(log.(nbirds))
 
-median_species_zlogn = @chain pop_known begin
+Ms, μs = @chain pop_known begin
     transform(_, :nbirds => (x -> standardise(log.(x))) => :zlogn)
     groupby(_, :species)
-    combine(_, :zlogn => median => :median)
-    getproperty(_, :median)
+    combine(_, :zlogn .=> [median, mean] .=> [:median, :mean])
+    getproperty.(Ref(_), [:median, :mean])
 end
 
 end

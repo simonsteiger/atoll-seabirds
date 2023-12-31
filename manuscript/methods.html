@@ -3108,11 +3108,9 @@ return!"\t\n\x0B\f\r                　\u2028\u2029
   </ul></li>
   <li><a href="#explain-the-model" id="toc-explain-the-model" class="nav-link" data-scroll-target="#explain-the-model"><span class="header-section-number">2</span> Explain the model</a>
   <ul class="collapse">
-  <li><a href="#data-variables" id="toc-data-variables" class="nav-link" data-scroll-target="#data-variables"><span class="header-section-number">2.1</span> Data variables</a></li>
-  <li><a href="#likelihood-function" id="toc-likelihood-function" class="nav-link" data-scroll-target="#likelihood-function"><span class="header-section-number">2.2</span> Likelihood function</a></li>
-  <li><a href="#prior-distribution" id="toc-prior-distribution" class="nav-link" data-scroll-target="#prior-distribution"><span class="header-section-number">2.3</span> Prior distribution</a></li>
-  <li><a href="#formal-specification" id="toc-formal-specification" class="nav-link" data-scroll-target="#formal-specification"><span class="header-section-number">2.4</span> Formal specification</a></li>
-  <li><a href="#prior-predictive-check" id="toc-prior-predictive-check" class="nav-link" data-scroll-target="#prior-predictive-check"><span class="header-section-number">2.5</span> Prior predictive check</a></li>
+  <li><a href="#presence-model" id="toc-presence-model" class="nav-link" data-scroll-target="#presence-model"><span class="header-section-number">2.1</span> Presence model</a></li>
+  <li><a href="#count-model" id="toc-count-model" class="nav-link" data-scroll-target="#count-model"><span class="header-section-number">2.2</span> Count model</a></li>
+  <li><a href="#prior-predictive-check" id="toc-prior-predictive-check" class="nav-link" data-scroll-target="#prior-predictive-check"><span class="header-section-number">2.3</span> Prior predictive check</a></li>
   </ul></li>
   <li><a href="#computational-details" id="toc-computational-details" class="nav-link" data-scroll-target="#computational-details"><span class="header-section-number">3</span> Computational details</a>
   <ul class="collapse">
@@ -3123,15 +3121,10 @@ return!"\t\n\x0B\f\r                　\u2028\u2029
   <li><a href="#describe-the-posterior-distribution" id="toc-describe-the-posterior-distribution" class="nav-link" data-scroll-target="#describe-the-posterior-distribution"><span class="header-section-number">4</span> Describe the posterior distribution</a>
   <ul class="collapse">
   <li><a href="#posterior-predictive-check" id="toc-posterior-predictive-check" class="nav-link" data-scroll-target="#posterior-predictive-check"><span class="header-section-number">4.1</span> Posterior predictive check</a></li>
-  <li><a href="#summarize-posterior-of-variables" id="toc-summarize-posterior-of-variables" class="nav-link" data-scroll-target="#summarize-posterior-of-variables"><span class="header-section-number">4.2</span> Summarize posterior of variables</a></li>
   </ul></li>
-  <li><a href="#report-decisions" id="toc-report-decisions" class="nav-link" data-scroll-target="#report-decisions"><span class="header-section-number">5</span> Report decisions</a>
+  <li><a href="#report-sensitivity-analysis" id="toc-report-sensitivity-analysis" class="nav-link" data-scroll-target="#report-sensitivity-analysis"><span class="header-section-number">5</span> Report sensitivity analysis</a>
   <ul class="collapse">
-  <li><a href="#why-decisions" id="toc-why-decisions" class="nav-link" data-scroll-target="#why-decisions"><span class="header-section-number">5.1</span> Why decisions?</a></li>
-  </ul></li>
-  <li><a href="#report-sensitivity-analysis" id="toc-report-sensitivity-analysis" class="nav-link" data-scroll-target="#report-sensitivity-analysis"><span class="header-section-number">6</span> Report sensitivity analysis</a>
-  <ul class="collapse">
-  <li><a href="#for-informed-priors" id="toc-for-informed-priors" class="nav-link" data-scroll-target="#for-informed-priors"><span class="header-section-number">6.1</span> For informed priors</a></li>
+  <li><a href="#for-informed-priors" id="toc-for-informed-priors" class="nav-link" data-scroll-target="#for-informed-priors"><span class="header-section-number">5.1</span> For informed priors</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -3193,7 +3186,7 @@ Note
 <div class="cell" data-execution_count="2">
 <div class="cell-output cell-output-display" data-execution_count="3">
 <p>We used a two-stage model to predict the number of individuals breeding on 217 unsurveyed atolls for 37 seabird species.</p>
-<p>In the first step, we fit a Bayesian multilevel logistic regression model to presence / absence data from 199 surveyed atolls. Next, posterior samples were used to predict the presence of 37 species on 81 unsurveyed atolls. We combined knowledge from the literature and model predictions to compile a list of atolls for which count predictions should be made. Including a given species <em>S</em> from a given unsurveyed atoll <em>A</em> in the list of atoll-species pairs for which count predictions were made, required that species’ <em>S</em> mean predicted probability of being present on atoll <em>A</em> exceeded 80%. In total, we made count predictions for 2997 atoll-species pairs, as described below, of which 114 were predictions of our presence model. Conversely, the model confidently predicted the absence of 2067 atoll-species pairs, i.e., their mean predicted probability was below 20%.</p>
+<p>In the first step, we fit a Bayesian multilevel logistic regression model to presence / absence data from 199 surveyed atolls. Next, posterior samples were used to predict the presence of 37 species on 81 unsurveyed atolls. We combined knowledge from the literature and model predictions to compile a list of atolls for which count predictions should be made. Including a given species <em>s</em> from a given unsurveyed atoll <em>a</em> in the list of atoll-species pairs for which count predictions were made, required that species’ <em>s</em> mean predicted probability of being present on atoll <em>a</em> exceeded 80%. In total, we made count predictions for 2997 atoll-species pairs, as described below, of which 114 were predictions of our presence model. Conversely, the model confidently predicted the absence of 2067 atoll-species pairs, i.e., their mean predicted probability was below 20%.</p>
 <p>In the second step, we fit a Bayesian multilevel regression model to log-transformed bird counts from surveyed atolls. Lastly, posterior samples were used to predict bird counts for those atolls-species pairs for which either the literature or the predictions of our logistic model indicated that a given species was present on a given atoll.</p>
 </div>
 </div>
@@ -3201,109 +3194,64 @@ Note
 </section>
 <section id="explain-the-model" class="level1" data-number="2">
 <h1 data-number="2"><span class="header-section-number">2</span> Explain the model</h1>
-<section id="data-variables" class="level2" data-number="2.1">
-<h2 data-number="2.1" class="anchored" data-anchor-id="data-variables"><span class="header-section-number">2.1</span> Data variables</h2>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>Explain the dependent (predicted) variables and independent (predictor) variables.</p>
-</div>
-</div>
-<section id="presence-model" class="level3" data-number="2.1.1">
-<h3 data-number="2.1.1" class="anchored" data-anchor-id="presence-model"><span class="header-section-number">2.1.1</span> Presence model</h3>
-<p>The presence model predicted the presence of 37 species on</p>
-</section>
-<section id="count-model" class="level3" data-number="2.1.2">
-<h3 data-number="2.1.2" class="anchored" data-anchor-id="count-model"><span class="header-section-number">2.1.2</span> Count model</h3>
-</section>
-</section>
-<section id="likelihood-function" class="level2" data-number="2.2">
-<h2 data-number="2.2" class="anchored" data-anchor-id="likelihood-function"><span class="header-section-number">2.2</span> Likelihood function</h2>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>For every model, explain the likelihood function and all the parameters, distinguishing clearly between parameters of primary theoretical interest and ancillary parameters. If the model is multilevel, be sure that the hierarchical structure is clearly explained.</p>
-</div>
-</div>
-</section>
-<section id="prior-distribution" class="level2" data-number="2.3">
-<h2 data-number="2.3" class="anchored" data-anchor-id="prior-distribution"><span class="header-section-number">2.3</span> Prior distribution</h2>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>For every model, explain and justify the prior distribution of the parameters in the model.</p>
-</div>
-</div>
-</section>
-<section id="formal-specification" class="level2" data-number="2.4">
-<h2 data-number="2.4" class="anchored" data-anchor-id="formal-specification"><span class="header-section-number">2.4</span> Formal specification</h2>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>Include a formal specification (mathematical or computer code) of the likelihood and prior.</p>
-</div>
-</div>
-<section id="presence-model-1" class="level3" data-number="2.4.1">
-<h3 data-number="2.4.1" class="anchored" data-anchor-id="presence-model-1"><span class="header-section-number">2.4.1</span> Presence model</h3>
-<p>Let <span class="math inline">\(y_{isn}\)</span>, where <span class="math inline">\(Y \in \{0, 1\}\)</span>, denote the presence of species <span class="math inline">\(s\)</span> <span class="math inline">\((s = 1, \ldots, S)\)</span> within nesting type <span class="math inline">\(n\)</span> <span class="math inline">\((N \in \{1, 3\})\)</span> on atoll <span class="math inline">\(a\)</span> <span class="math inline">\((a = 1, \ldots, A)\)</span> in region <span class="math inline">\(r\)</span> <span class="math inline">\((R \in \{1, 4\})\)</span>.</p>
+<p>Both the presence model and count model use the same independent variables to model presence or counts, respectively, of species <span class="math inline">\(s\)</span> of nesting type <span class="math inline">\(n\)</span> on atoll <span class="math inline">\(a\)</span>, with environmental parameters <span class="math inline">\(E\)</span>, in region <span class="math inline">\(r\)</span> (for full lists of these variables, see supplements?). Species, nesting type, atoll, and region are categorical variables. The <span class="math inline">\(A \times 6\)</span> matrix of environmental parameters contains the results of a principal component analysis conducted on a selection of 16 environmental variables (for further detail, see supplements?).</p>
+<section id="presence-model" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="presence-model"><span class="header-section-number">2.1</span> Presence model</h2>
+<p>Let <span class="math inline">\(y_{isn}\)</span>, where <span class="math inline">\(Y \in \{0, 1\}\)</span>, denote the presence of species <span class="math inline">\(s\)</span> <span class="math inline">\((s = 1, \ldots, S)\)</span> of nesting type <span class="math inline">\(n\)</span> <span class="math inline">\((N \in \{1, 3\})\)</span> on atoll <span class="math inline">\(a\)</span> <span class="math inline">\((a = 1, \ldots, A)\)</span> with environmental parameters <span class="math inline">\(E_{aj}\)</span> <span class="math inline">\((J \in \{1, 6\})\)</span> in region <span class="math inline">\(r\)</span> <span class="math inline">\((R \in \{1, 4\})\)</span>.</p>
 <p><span class="math display">\[
 \begin{split}
-y_{asn} &amp;\sim \text{Bern(p)} \\
-\text{logit(p)} &amp;= \beta_{0sr} + \beta_{1nj} \times E_{aj} \\
+y_{asnr} &amp;\sim \text{Bern}(\text{p}_{asnr}) \\
+\text{logit}(\text{p}_{asnr}) &amp;= \beta_{0s[r]} + \beta_{1n[s]j} \times E_{aj} \\
 \beta_{0sr} &amp;\sim \mathcal{N}(0, 1) \\
 \beta_{1nj} &amp;\sim \mathcal{N}(\bar{\beta}_{1nj}, \tau_{nj}) \\
 \bar{\beta}_{1nj} &amp;\sim \mathcal{N}(0, 0.2) \\
 \tau_{nj} &amp;\sim \text{Inv-Gamma}(3, 0.5)
 \end{split}
 \]</span></p>
+<section id="likelihood-function" class="level3">
+<h3 class="anchored" data-anchor-id="likelihood-function">Likelihood function</h3>
+<p>The parameter <span class="math inline">\(\beta_{0sr}\)</span> encodes the probability that species <span class="math inline">\(s\)</span> occurs in the region <span class="math inline">\(r\)</span> in which atoll <span class="math inline">\(a\)</span> is located.</p>
+<p>The parameter <span class="math inline">\(\beta_{1nj}\)</span> encodes how environmental parameters of atoll <span class="math inline">\(a\)</span> affect the probability that species <span class="math inline">\(s\)</span> within a nesting type <span class="math inline">\(n\)</span> occurs on atoll <span class="math inline">\(a\)</span>. This effect is allowed to differ between nesting types, such that the probability that a ground nesting species occurs on atoll <span class="math inline">\(a\)</span> increases with some environmental parameter, while the probability of a tree nesting species decreases. By partially pooling species within nesting types, we express our assumption that species from the same nesting type <span class="math inline">\(n\)</span> are similarly affected by certain environmental parameters.</p>
 </section>
-<section id="count-model-1" class="level3" data-number="2.4.2">
-<h3 data-number="2.4.2" class="anchored" data-anchor-id="count-model-1"><span class="header-section-number">2.4.2</span> Count model</h3>
-<p>Let <span class="math inline">\(y_{isn}\)</span>, where <span class="math inline">\(Y \in \{0, 1\}\)</span>, denote the log-transformed count of individuals of species <span class="math inline">\(s\)</span> <span class="math inline">\((s = 1, \ldots, S)\)</span> within nesting type <span class="math inline">\(n\)</span> <span class="math inline">\((N \in \{1, 3\})\)</span> on atoll <span class="math inline">\(a\)</span> <span class="math inline">\((a = 1, \ldots, A)\)</span> in region <span class="math inline">\(r\)</span> <span class="math inline">\((R \in \{1, 4\})\)</span>.</p>
-$$
-<span class="math display">\[\begin{split}
-y_{asn} &amp;\sim \mathcal{N}(\mu_{snr}, \sqrt{\sigma^2_{asnr}}) \\
-\mu_{snr} &amp;= \beta_{0sr} + \beta_{1nj} \times E_{aj} \\
-\sigma &amp;\sim \text{Inv-Gamma}(3, 2) \\
-\beta_{0sr} &amp;\sim \mathcal{N}(0, 1) \\
-\beta_{1nj} &amp;\sim \mathcal{N}(\bar{\beta}_{1nj}, \sigma_{nj}) \\
+<section id="priors" class="level3">
+<h3 class="anchored" data-anchor-id="priors">Priors</h3>
+<p>The priors of the presence model are weakly informative. Their small variance serves to regularize the estimates and prevent overfitting where few samples are available in our hierarchical data structure.</p>
+<p>We assume <span class="math inline">\(\beta_{0sr}\)</span>, the parameter encoding regional variation in species occurence, to have the largest variation. It is often the case that species do not occur in one region while they are common in another.</p>
+<p>In contrast, we assume the variation resulting from <span class="math inline">\(\beta_{1nj}\)</span>, i.e., nesting type, environmental factors, and their interaction, to be much smaller than that caused by the regional variation encoded in <span class="math inline">\(\beta_{0sr}\)</span>.</p>
+</section>
+</section>
+<section id="count-model" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="count-model"><span class="header-section-number">2.2</span> Count model</h2>
+<p>Let <span class="math inline">\(y_{isn}\)</span>, where <span class="math inline">\(Y \in \{0, 1\}\)</span>, denote the log-transformed count of individuals of species <span class="math inline">\(s\)</span> <span class="math inline">\((s = 1, \ldots, S)\)</span> of nesting type <span class="math inline">\(n\)</span> <span class="math inline">\((N \in \{1, 3\})\)</span> on atoll <span class="math inline">\(a\)</span> <span class="math inline">\((a = 1, \ldots, A)\)</span> in region <span class="math inline">\(r\)</span> <span class="math inline">\((R \in \{1, 4\})\)</span>.</p>
+<p><span class="math display">\[
+\begin{split}
+y_{asnr} &amp;\sim \mathcal{N}(\mu_{asnr}, \sigma) \\
+\mu_{asnr} &amp;= \beta_{0s} + \beta_{1nj} \times E_{aj} \\
+\sigma &amp;\sim \text{Inv-Gamma}(3, \sqrt{2}) \\
+\beta_{0s} &amp;\sim \mathcal{N}(\bar{\beta}_{0s}, \tau_{0}) \\
+\beta_{1nj} &amp;\sim \mathcal{N}(\bar{\beta}_{1nj}, \tau_{nj}) \\
+\bar{\beta}_{0s} &amp;\sim \mathcal{N}(M_s, 1) \\
 \bar{\beta}_{1nj} &amp;\sim \mathcal{N}(0, 1) \\
-\tau_{nj} &amp;\sim \text{Inv-Gamma}(3, 2)
-
-\end{split}\]</span>
-<p>$$</p>
+\tau_{0} &amp;\sim \text{Inv-Gamma}(3, \sqrt{2}) \\
+\tau_{1nj} &amp;\sim \text{Inv-Gamma}(3, \sqrt{2})
+\end{split}
+\]</span></p>
+<section id="likelihood-function-1" class="level3">
+<h3 class="anchored" data-anchor-id="likelihood-function-1">Likelihood function</h3>
+<p>The parameter <span class="math inline">\(\beta_{0s}\)</span> encodes the abundance of species <span class="math inline">\(s\)</span> across regions by nesting regional estimates within species. As such, <span class="math inline">\(\bar{\beta}_{0s}\)</span> is the average abundance of species <span class="math inline">\(s\)</span> across regions. The hyperparameter on <span class="math inline">\(\tau_0\)</span> encodes the variation between regions across species.<br> By partially pooling regions within species, we express our assumption that species <span class="math inline">\(s\)</span> forms colonies of similar size across regions. This is unlike the presence model, where the fixed effect <span class="math inline">\(\beta_{0sr}\)</span> prevents information flow between species <span class="math inline">\(s\)</span>’s estimates for different regions.</p>
+<p>The parameter <span class="math inline">\(\beta_{1nj}\)</span> encodes how environmental parameters affect the abundance of species within a nesting type. This effect is allowed to differ between nesting types, such that the abundance of a species of ground nesters may be positively related to some environmental parameters, while the abundance of tree nesters may be negatively related. By partially pooling species within nesting types, we express our assumption that species from the same nesting type <span class="math inline">\(n\)</span> are similarly affected by certain environmental parameters.</p>
+</section>
+<section id="priors-1" class="level3">
+<h3 class="anchored" data-anchor-id="priors-1">Priors</h3>
+<p>The priors of the count model are in part informed and in part weakly informed, with the intention of regularizing estimates.</p>
+<p>The informed prior on <span class="math inline">\(\bar{\beta}_{0s}\)</span> is set to the median log-transformed count of each species. Our choice of a species-specific prior informed by the data is due to the large differences in colony sizes across species, and the small sample sizes for some species. While reasonable prior settings were consistently overwhelmed in species with medium to large sample size, species with small sample sizes (<span class="math inline">\(n &lt; 5\)</span>) require more careful specification of priors. Consider how a species with small sample size and very small colony size is impacted by setting the prior to the average colony size across species: due to the small sample size, the prior skews our predictions towards the global average, which leads to poor predictions.</p>
+<p>Our choice of the median over the mean is motivated by the presence of very few, very large colonies in some species. In summary, the goal of the prior on <span class="math inline">\(\bar{\beta}_{0s}\)</span> is to enable our model to make reasonable and conservative predictions even for species with very small samples. For further detail on the influence of different prior settings, see the results of the sensitivity analysis in the supplements.</p>
+<p>The priors on <span class="math inline">\(\bar{\beta}_{1nj}\)</span> is weakly informed in that it places most probability mass on values near 0.</p>
+<p>The priors on the variance parameters <span class="math inline">\(\sigma\)</span>, <span class="math inline">\(\tau_0\)</span>, and <span class="math inline">\(\tau_{1nj}\)</span> place more probability mass on higher variances than in the presence model to allow uncertain predictions where there are few data.</p>
 </section>
 </section>
-<section id="prior-predictive-check" class="level2" data-number="2.5">
-<h2 data-number="2.5" class="anchored" data-anchor-id="prior-predictive-check"><span class="header-section-number">2.5</span> Prior predictive check</h2>
+<section id="prior-predictive-check" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="prior-predictive-check"><span class="header-section-number">2.3</span> Prior predictive check</h2>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -3317,6 +3265,7 @@ Note
 <p>Especially when using informed priors but even with broad priors, it is valuable to report a prior predictive check to demonstrate that the prior really generates simulated data consistent with the assumed prior knowledge.</p>
 </div>
 </div>
+<p>We have conducted and visually inspected prior predictive checks for both models. The prior predictive checks generated data in plausible value ranges, consistent with our prior knowledge. For further details, see supplements.</p>
 </section>
 </section>
 <section id="computational-details" class="level1" data-number="3">
@@ -3336,6 +3285,7 @@ Note
 <p>Report the software used, including any specific added packages or plugins.</p>
 </div>
 </div>
+<p>We used the Julia Programming Language<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> and most notably the Turing package ecosystem<a href="#fn4" class="footnote-ref" id="fnref4" role="doc-noteref"><sup>4</sup></a> to fit, diagnose, visualize and summarize the Bayesian models presented here. For an exhaustive list of all packages used and the versions, see the <code>Manifest.toml</code> file in the GitHub repository associated with this project.</p>
 </section>
 <section id="mcmc-chain-convergence" class="level2" data-number="3.2">
 <h2 data-number="3.2" class="anchored" data-anchor-id="mcmc-chain-convergence"><span class="header-section-number">3.2</span> MCMC chain convergence</h2>
@@ -3352,6 +3302,7 @@ Note
 <p>Report evidence that the chains have converged, using a convergence statistic such as PSRF, for every parameter or derived value.</p>
 </div>
 </div>
+<p>We made sure that all chains have converged by examining the <span class="math inline">\(\hat{R}\)</span> statistic for all models. For detailed convergence diagnostics, see supplements.</p>
 </section>
 <section id="mcmc-chain-resolution" class="level2" data-number="3.3">
 <h2 data-number="3.3" class="anchored" data-anchor-id="mcmc-chain-resolution"><span class="header-section-number">3.3</span> MCMC chain resolution</h2>
@@ -3368,6 +3319,7 @@ Note
 <p>Report evidence that the chains have high resolution, using the ESS, for every parameter or derived value.</p>
 </div>
 </div>
+<p>We made sure that all chains have high resolution by examining the effective sample size (ESS) in the bulk and tail regions of each parameter distribution. For detailed convergence diagnostics, see supplements.</p>
 </section>
 </section>
 <section id="describe-the-posterior-distribution" class="level1" data-number="4">
@@ -3387,47 +3339,13 @@ Note
 <p>Provide a posterior predictive check to show that the model usefully mimics the data.</p>
 </div>
 </div>
-</section>
-<section id="summarize-posterior-of-variables" class="level2" data-number="4.2">
-<h2 data-number="4.2" class="anchored" data-anchor-id="summarize-posterior-of-variables"><span class="header-section-number">4.2</span> Summarize posterior of variables</h2>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>For continuous parameters, derived variables and predicted values, report the central tendency and limits of the credible interval. Explicitly state whether you are using density-based values (mode and HDI) or quantile-based values (median and ETI), and state the mass of the credible interval (e.g., 95%).</p>
-</div>
-</div>
+<p>We have conducted posterior predictive checks to make sure that our model usefully mimics the observed data. For further details on the posterior predictive checks, see supplements.</p>
 </section>
 </section>
-<section id="report-decisions" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> Report decisions</h1>
-<section id="why-decisions" class="level2" data-number="5.1">
-<h2 data-number="5.1" class="anchored" data-anchor-id="why-decisions"><span class="header-section-number">5.1</span> Why decisions?</h2>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>Explain why the decisions are theoretically meaningful and which decision procedure is being used.</p>
-</div>
-</div>
-</section>
-</section>
-<section id="report-sensitivity-analysis" class="level1" data-number="6">
-<h1 data-number="6"><span class="header-section-number">6</span> Report sensitivity analysis</h1>
-<section id="for-informed-priors" class="level2" data-number="6.1">
-<h2 data-number="6.1" class="anchored" data-anchor-id="for-informed-priors"><span class="header-section-number">6.1</span> For informed priors</h2>
+<section id="report-sensitivity-analysis" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Report sensitivity analysis</h1>
+<section id="for-informed-priors" class="level2" data-number="5.1">
+<h2 data-number="5.1" class="anchored" data-anchor-id="for-informed-priors"><span class="header-section-number">5.1</span> For informed priors</h2>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -3441,6 +3359,7 @@ Note
 <p>If the prior is informed by previous research, show what posterior results from a vague prior or from a range of differently informed priors.</p>
 </div>
 </div>
+<p>Sensitivity analyses were carried out for a wide range of different prior settings. In summary, the results show that the results of the presence model are robust across different prior settings. The same can be said for the count model, with the exception of very few species for which the small sample sizes are extremely low. In situations with extremely small sample sizes, sensitivity to the prior is inevitable. Thoughtful prior specification is critical in these situations, as described above.</p>
 </section>
 </section>
 
@@ -3450,6 +3369,8 @@ Note
 <ol>
 <li id="fn1"><p><a href="https://www.cambridge.org/highereducation/books/regression-and-other-stories/DD20DD6C9057118581076E54E40C372C#overview">Gelman et al., 2020</a><a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
 <li id="fn2"><p><a href="doi:10.1001/jama.2018.17977">McGlothlin &amp; Viele, 2018</a><a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p><a href="https://doi.org/10.1137/141000671">Bezanson et al. 2017</a><a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn4"><p><a href="https://github.com/TuringLang/Turing.jl/blob/master/CITATION.bib">Ge et al. 2018</a><a href="#fnref4" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
 </ol>
 </section></div></main>
 <!-- /main column -->

@@ -21,7 +21,7 @@ glob = CSV.read("$ROOT/data/atoll_seabird_global_popestimates.csv", DataFrame)
 DataFrames.transform!(pop_unknown, [:atoll, :species, :region] .=> denserank => x -> string("num_", x))
 
 # Load data sets
-p75, p80, p85 = CSV.read.("$ROOT/results/data/countpreds_0." .* ["75", "8", "85"] .* ".csv", DataFrame)
+p75, p80, p85 = CSV.read.("$ROOT/results/data/countpreds_0." .* ["75", "8", "85"] .* "_test.csv", DataFrame)
 select!.([p75, p80, p85], Ref([:atoll, :region, :species, :median, :lower, :upper]))
 rename!.([p75, p80, p85], :median => :nbirds)
 
@@ -53,7 +53,7 @@ select!.([tot75, tot80, tot85], Ref(Not(:birdlife_min, :birdlife_max, :HBW, :Ote
 histogram((tot75.ratio_nbirds .- tot85.ratio_nbirds) .* 100, title="Pop on atoll ratio diff .75 - .85", label=:none)
 xticks!(-1:3, string.(-1:3) .* "%")
 
-CSV.write("$ROOT/results/data/allpopulations.csv", full80)
-CSV.write("$ROOT/results/data/ratios.csv", tot80)
+CSV.write("$ROOT/results/data/allpopulations_test.csv", full80)
+CSV.write("$ROOT/results/data/ratios_test.csv", tot80)
 
 end
