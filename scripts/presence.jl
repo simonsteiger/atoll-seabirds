@@ -112,6 +112,8 @@ let
     density(priorpreds, normalize=true, c=2, fillrange=0, fillalpha=0.2, legend=false)
 end
 
+savefig("$ROOT/results/svg/priorpredictions/presence_$priorsetting.svg")
+
 # --- MODEL CONFIG --- #
 
 backends = [

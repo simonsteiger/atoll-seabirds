@@ -5,7 +5,6 @@ toc: true
 toc-depth: 2
 number-sections: true
 number-depth: 2
-embed-resources: true
 ---
 
 ```{julia}

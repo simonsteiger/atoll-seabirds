@@ -1,0 +1,35 @@
+---
+title: Supplements MCMC Diagnostic Tables
+format: docx
+---
+
+All diagnostics presented here are for default priors.
+
+# Presende model
+
+```{r}
+#| echo: false
+#| warning: false
+
+library(tibble)
+library(gt)
+library(here)
+library(dplyr)
+
+presence_diag <- read.csv(here("results/chains/diagnostics_count.csv"))
+presence_diag %>%
+    mutate(across(where(is.numeric), \(x) round(x, 3))) %>%
+    gt()
+```
+
+# Count model
+
+```{r}
+#| echo: false
+#| warning: false
+
+count_diag <- read.csv(here("results/chains/diagnostics_presence.csv"))
+count_diag %>%
+    mutate(across(where(is.numeric), \(x) round(x, 3))) %>%
+    gt()
+```

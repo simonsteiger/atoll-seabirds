@@ -101,12 +101,12 @@ dict_pr = Dict(
     # Using a much more weakly informed global prior in μ_sxr instead of a species-specific one
     "global" => (μ_sxr=fill(0, 37), σ_sxr=[3, √2], μ_pxn=[0, 1], σ_pxn=[3, √2], σ2=[3, 2]),
     # Narrow priors on variance parameters and μ_pxn, leaving μ_sxr at median
-    "narrow" => (μ_sxr=Ms, σ_sxr=[3, √2/3], μ_pxn=[0, 1/3], σ_pxn=[3, √2/3], σ2=[3, 2/3]),
+    "narrow" => (μ_sxr=Ms, σ_sxr=[3, √2 / 3], μ_pxn=[0, 1 / 3], σ_pxn=[3, √2 / 3], σ2=[3, 2 / 3]),
     # Wide priors on variance parameters and μ_pxn, leaving μ_sxr at median
-    "wide" => (μ_sxr=Ms, σ_sxr=[3, √2*3], μ_pxn=[0, 1*3], σ_pxn=[3, √2*3], σ2=[3, 2*3]),
+    "wide" => (μ_sxr=Ms, σ_sxr=[3, √2 * 3], μ_pxn=[0, 1 * 3], σ_pxn=[3, √2 * 3], σ2=[3, 2 * 3]),
 )
 
-priorsetting = "default"
+priorsetting = "wide"
 
 m = model(values(odict_inputs)..., zlogn; pr=dict_pr[priorsetting])
 
@@ -121,19 +121,23 @@ let
     histogram(zlogn, normalize=true, c=1)
     density!(priorpreds, normalize=true, c=:white, lw=3)
     density!(priorpreds, normalize=true, c=2, fillrange=0, fillalpha=0.2, legend=false)
-    xlims!(-10, 10)
+    xlims!(-4, 4)
 end
+
+savefig("$ROOT/results/svg/priorpredictions/count_$priorsetting.svg")
 
 # --- MODEL CONFIG --- #
 
-backends = [
-    Turing.Essential.ForwardDiffAD{0}(),
-    Turing.Essential.ReverseDiffAD{false}(),
-    Turing.Essential.ReverseDiffAD{true}()
-]
+# We test several autodiff methods to check which one is fastest for our model
+let backends = [
+        Turing.Essential.ForwardDiffAD{0}(),
+        Turing.Essential.ReverseDiffAD{false}(),
+        Turing.Essential.ReverseDiffAD{true}()
+    ]
 
-TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
-@info "ReverseDiff{true} is the fastest AD backend."
+    TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
+    @info "ReverseDiff{true} is the fastest AD backend."
+end
 
 # Set autodiff to ReverseDiff{true}
 Turing.setadbackend(:reversediff)
@@ -178,8 +182,10 @@ let preds = reduce(vcat, preds_train)
     histogram(zlogn, normalize=true, c=1)
     density!(preds, normalize=true, c=:white, lw=3)
     density!(preds, normalize=true, c=2, fillrange=0, fillalpha=0.2, legend=false)
-    xlims!(-5, 5)
+    xlims!(-4, 4)
 end
+
+savefig("$ROOT/results/svg/posteriorpredictions/count_$priorsetting.svg")
 
 # Create dictionary of species-wise posterior prediction plot
 dict_postpred_plot =
