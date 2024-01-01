@@ -1,6 +1,10 @@
-module PlotPrep
+module ForagingTrips
 
 export nothing
+
+# This module simulates a single foraging trip for each bird on each atoll
+# The total number of birds is the sum of predicted birds and populations 
+# known from the literature, see totalcounts.jl
 
 using Distributions, CSV, DataFrames, Chain
 
@@ -87,8 +91,6 @@ out.long = [long < 0 ? long + 360 : long for long in out.long]
 
 out.addlatdeg = vec(reduce(vcat, km2d.(out.addlatkm, out.lat)))
 out.addlongdeg = vec(reduce(vcat, km2d.(out.addlongkm, out.long)))
-
-# TODO subset to Cocos only and check if result is oval
 
 select!(out, :lat, :long, :addlatdeg => :addlat, :addlongdeg => :addlong)
 
