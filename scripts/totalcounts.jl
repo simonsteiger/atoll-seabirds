@@ -21,7 +21,7 @@ glob = CSV.read("$ROOT/data/atoll_seabird_global_popestimates.csv", DataFrame)
 DataFrames.transform!(pop_unknown, [:atoll, :species, :region] .=> denserank => x -> string("num_", x))
 
 # Load data sets
-p75, p80, p85 = CSV.read.("$ROOT/results/data/countpreds_0." .* ["75", "8", "85"] .* "default.csv", DataFrame)
+p75, p80, p85 = CSV.read.("$ROOT/results/data/countpreds_0." .* ["75", "8", "85"] .* "_default.csv", DataFrame)
 select!.([p75, p80, p85], Ref([:atoll, :region, :species, :median, :lower, :upper]))
 rename!.([p75, p80, p85], :median => :nbirds)
 

@@ -162,7 +162,8 @@ Random.seed!(42)
 
 # ModelSummary object holds chains, parameter names, and parameter samples
 posterior = @chain begin
-    sample(m, config...)
+    deserialize("$ROOT/results/chains/count_$priorsetting.jls")
+    #sample(m, config...)
     ModelSummary(m, _)
 end
 
@@ -260,7 +261,7 @@ preds_target =
             raw = [exp.(unstandardise(slice, log.(nbirds))) for slice in eachslice(samples, dims=1)]
             mdn = exp.(unstandardise(median(samples, dims=2), log.(nbirds)))
             qs = @chain samples begin
-                [getproperty.(Ref(hdi(slice; prob=0.75)), [:lower, :upper]) for slice in eachslice(_, dims=1)]
+                [getproperty.(Ref(hdi(slice; prob=0.5)), [:lower, :upper]) for slice in eachslice(_, dims=1)]
                 reduce(hcat, _)
                 exp.(unstandardise(_, log.(nbirds)))
             end
@@ -281,6 +282,8 @@ end
 
 # Save results for each threshold to an individual CSV
 foreach(k -> CSV.write("$ROOT/results/data/countpreds_$(k)_$priorsetting.csv", select(preds_target[k], Not(:raw))), keys(preds_target))
+
+# TODO rerun target_preds for all other prior settings (currently lower / upper at 0.75 HDI, not 0.5)
 
 # --- LOO CV --- #
 
