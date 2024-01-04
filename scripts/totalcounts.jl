@@ -89,4 +89,21 @@ xticks!(0:0.5:2, string.(Int64.(collect(0:0.5:2) .* 100), "%"))
 yticks!(eachindex(unique(df_sens.species)), unique(df_sens.species), size=(600,600), tickfontsize=7)
 savefig("$ROOT/results/svg/sensitivity_count.svg")
 
+many_global = CSV.read("$ROOT/results/data/countpreds_global_dist.csv", DataFrame)
+leftjoin!(many_global, glob, on=:species)
+out = @chain known begin
+    groupby(_, :species)
+    combine(_, :nbirds => sum => identity)
+    leftjoin(many_global, _, on=:species)
+    transform(_, [:res, :nbirds] => ByRow((x,y) -> x+y) => :nbirds)
+    transform(_, [:nbirds, :birdlife_min, :birdlife_max, :HBW, :Otero] => ByRow(calcratio) => string("ratio"))
+end
+
+using StatsPlots
+
+density(out.ratio[out.ratio .< 1], normalize=true, group=out.species[out.ratio .< 1])
+xlims!(0, 1)
+
+CSV.write("$ROOT/results/data/countpreds_ratio_dist.csv", out[:, [:species, :ratio]])
+
 end

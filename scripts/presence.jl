@@ -98,7 +98,7 @@ dict_pr = Dict(
     "wide" => (α_sxr=[0, 1*3], μ_pxn=[0, 0.2*3], σ_pxn=[3, 0.5*3]),
 )
 
-priorsetting = "wide"
+priorsetting = "default"
 
 m = model(values(odict_inputs)..., presence; pr=dict_pr[priorsetting])
 

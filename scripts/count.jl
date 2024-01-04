@@ -106,7 +106,7 @@ dict_pr = Dict(
     "wide" => (μ_sxr=Ms, σ_sxr=[3, √2 * 3], μ_pxn=[0, 1 * 3], σ_pxn=[3, √2 * 3], σ2=[3, 2 * 3]),
 )
 
-priorsetting = "wide"
+priorsetting = "default"
 
 m = model(values(odict_inputs)..., zlogn; pr=dict_pr[priorsetting])
 
@@ -124,7 +124,7 @@ let
     xlims!(-4, 4)
 end
 
-savefig("$ROOT/results/svg/priorpredictions/count_$priorsetting.svg")
+savefig("$ROOT/results/svg/count/prior_$priorsetting.svg")
 
 # --- MODEL CONFIG --- #
 
@@ -162,8 +162,7 @@ Random.seed!(42)
 
 # ModelSummary object holds chains, parameter names, and parameter samples
 posterior = @chain begin
-    deserialize("$ROOT/results/chains/count_$priorsetting.jls")
-    #sample(m, config...)
+    sample(m, config...)
     ModelSummary(m, _)
 end
 
@@ -186,7 +185,7 @@ let preds = reduce(vcat, preds_train)
     xlims!(-4, 4)
 end
 
-savefig("$ROOT/results/svg/posteriorpredictions/count_$priorsetting.svg")
+savefig("$ROOT/results/svg/count/posterior_$priorsetting.svg")
 
 # Create dictionary of species-wise posterior prediction plot
 dict_postpred_plot =
@@ -283,7 +282,12 @@ end
 # Save results for each threshold to an individual CSV
 foreach(k -> CSV.write("$ROOT/results/data/countpreds_$(k)_$priorsetting.csv", select(preds_target[k], Not(:raw))), keys(preds_target))
 
-# TODO rerun target_preds for all other prior settings (currently lower / upper at 0.75 HDI, not 0.5)
+many_global = @chain preds_target["0.8"] begin
+    groupby(_, :species)
+    combine(_, :raw => (x -> vec(sum(reduce(hcat, x)', dims=1))) => :res)
+end
+
+CSV.write("$ROOT/results/data/countpred_global_dist.csv", many_global)
 
 # --- LOO CV --- #
 
