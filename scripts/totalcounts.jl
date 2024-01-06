@@ -81,13 +81,16 @@ for (k, v) in Pair.(keys(dict_sensitivity), values(dict_sensitivity))
     dict_sensitivity[k] = insertcols(v, 1, :prior => k)
 end
 
+
+# Compare global predictions for different prior settings
 df_sens = reduce(vcat, values(dict_sensitivity))
 
 scatter(df_sens.ratio_nbirds, df_sens.species, group=df_sens.prior, alpha=0.75, markershape=:x)
 xlabel!("Global population on atolls")
 xticks!(0:0.5:2, string.(Int64.(collect(0:0.5:2) .* 100), "%"))
 yticks!(eachindex(unique(df_sens.species)), unique(df_sens.species), size=(600,600), tickfontsize=7)
-savefig("$ROOT/results/svg/sensitivity_count.svg")
+
+foreach(ext -> savefig("$ROOT/results/$ext/count/sensitivity_count.$ext"), ["svg", "png"])
 
 many_global = CSV.read("$ROOT/results/data/countpreds_global_dist.csv", DataFrame)
 leftjoin!(many_global, glob, on=:species)
@@ -99,11 +102,6 @@ out = @chain known begin
     transform(_, [:nbirds, :birdlife_min, :birdlife_max, :HBW, :Otero] => ByRow(calcratio) => string("ratio"))
 end
 
-using StatsPlots
-
-density(out.ratio[out.ratio .< 1], normalize=true, group=out.species[out.ratio .< 1])
-xlims!(0, 1)
-
-CSV.write("$ROOT/results/data/countpreds_ratio_dist.csv", out[:, [:species, :ratio]])
+CSV.write("$ROOT/results/data/countpreds_preds_known_dist.csv", out[:, [:species, :nbirds]])
 
 end

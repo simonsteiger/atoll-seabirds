@@ -122,9 +122,11 @@ let
     density!(priorpreds, normalize=true, c=:white, lw=3)
     density!(priorpreds, normalize=true, c=2, fillrange=0, fillalpha=0.2, legend=false)
     xlims!(-4, 4)
+    title!("Prior predictive check, $priorsetting prior")
+    xlabel!("z-standardised log-count"); ylabel!("Density")
 end
 
-savefig("$ROOT/results/svg/count/prior_$priorsetting.svg")
+foreach(ext -> savefig("$ROOT/results/$ext/count/prior_$priorsetting.$ext"), ["svg", "png"])
 
 # --- MODEL CONFIG --- #
 
@@ -162,7 +164,8 @@ Random.seed!(42)
 
 # ModelSummary object holds chains, parameter names, and parameter samples
 posterior = @chain begin
-    sample(m, config...)
+    deserialize("$ROOT/results/chains/count_$priorsetting.jls")
+    #sample(m, config...)
     ModelSummary(m, _)
 end
 
@@ -178,6 +181,9 @@ end
 
 preds_train = simulate(posterior.samples, values(odict_inputs)...)
 
+# Check if posterior similar to overall sample distribution
+# This check is of lower resolution than necessary for the research question
+# See species specific plots below
 let preds = reduce(vcat, preds_train)
     histogram(zlogn, normalize=true, c=1)
     density!(preds, normalize=true, c=:white, lw=3)
@@ -185,9 +191,33 @@ let preds = reduce(vcat, preds_train)
     xlims!(-4, 4)
 end
 
-savefig("$ROOT/results/svg/count/posterior_$priorsetting.svg")
+# Overview plot of posterior predictions per species and atoll
+postpred_plot_view = let preds = exp.(unstandardise(reduce(hcat, preds_train), log.(nbirds)))
+    sorted_species = sort(unique(species.known.str))
+    # R reorders other vectors by region
+    R = sortperm(region.known.num)
 
-# Create dictionary of species-wise posterior prediction plot
+    # Enumerate sorted species to create one plot per species
+    plots = map(enumerate(sorted_species)) do (idx, sp)
+        # Create BitVector S for species subsetting
+        S = species.known.num[R] .== idx
+        obs = nbirds[R][S]
+        # Calculate mean of predicted values for species S
+        pred = vec(median(preds[R, :][S, :], dims=2))
+        # Assemble plot for species S
+        scatter(pred, markersize=2, msc=1, alpha=0.8, label="P")
+        scatter!(obs, markersize=2, msc=2, alpha=0.8, label="O", xformatter=_->"")
+        title!(replace(sp, "_" => " "), titlefontsize=12)
+    end
+    # Collect all plots in a dictionary (plotting all at once is a bit busy, maybe by nesting type or genus?)
+    plot(plots..., layout=(8,5), titlefontsize=8, size=(800,1000))
+end
+
+foreach(ext -> savefig("$ROOT/results/$ext/count/posterior_$priorsetting.$ext"), ["svg", "png"])
+
+# Create dictionary of species-wise posterior prediction plot, also showing uncertainty of estimates
+# Showing error bars makes the plot too busy for a single global view
+# Instead it is saved as a dictionary with one plot per species
 dict_postpred_plot =
     let preds = exp.(unstandardise(reduce(hcat, preds_train), log.(nbirds)))
         sorted_species = sort(unique(species.known.str))
@@ -199,15 +229,15 @@ dict_postpred_plot =
             # Create BitVector S for species subsetting
             S = species.known.num[R] .== idx
             obs = nbirds[R][S]
-            # Calculate mean of predicted values for species X
+            # Calculate mean of predicted values for species S
             pred = vec(median(preds[R, :][S, :], dims=2))
-            # Calculate quantile of predicted values for species X
+            # Calculate quantile of predicted values for species S
             lims = @chain preds[R, :][S, :] begin
                 map(x -> hdi(x, prob=0.9), eachslice(_, dims=1))
                 map(i -> abs.(getproperty.(Ref(_[i]), [:lower, :upper]) .- pred[i]), eachindex(_))
                 reduce(hcat, _)
             end
-            # Assemble plot for species X
+            # Assemble plot for species S
             scatter(atoll.known.str[R][S], pred, yerror=(lims[1, :], lims[2, :]), markersize=2.5, msc=1, label="P", permute=(:y, :x))
             scatter!(atoll.known.str[R][S], obs, markersize=2.5, msc=2, label="O", permute=(:y, :x))
             title!(replace(sp, "_" => " "), titlefontsize=12)
@@ -218,8 +248,8 @@ dict_postpred_plot =
 
 # --- VALIDATION --- #
 
-# The data below consists of islands where only population ranges are known in the literature.
-# We make predictions for these data and check how much of the posterior lies within these population ranges.
+# The data below consists of islands where only population ranges are known in the literature
+# We make predictions for these data and check how much of the posterior lies within these population ranges
 
 preds_validation = let odict_oos_inputs = copy(odict_inputs)
     # Set names and values of inputs to be replaced in input dictionary
@@ -239,8 +269,8 @@ end
 
 # --- TARGET PREDICTIONS --- #
 
-# The data below are those atolls where no information on count data are present.
-# We predict data for these atolls, using three different thresholds, and summarise it for export.
+# The data below are those atolls where no information on count data are present
+# We predict data for these atolls, using three different thresholds, and summarise it for export
 
 preds_target =
     let thresholds = 0.75:0.05:0.85, odict_unknown_inputs = copy(odict_inputs)
@@ -282,6 +312,7 @@ end
 # Save results for each threshold to an individual CSV
 foreach(k -> CSV.write("$ROOT/results/data/countpreds_$(k)_$priorsetting.csv", select(preds_target[k], Not(:raw))), keys(preds_target))
 
+# Express uncertainty in global predictions by making a global prediction for each sample
 many_global = @chain preds_target["0.8"] begin
     groupby(_, :species)
     combine(_, :raw => (x -> vec(sum(reduce(hcat, x)', dims=1))) => :res)

@@ -98,7 +98,7 @@ dict_pr = Dict(
     "wide" => (α_sxr=[0, 1*3], μ_pxn=[0, 0.2*3], σ_pxn=[3, 0.5*3]),
 )
 
-priorsetting = "default"
+priorsetting = "narrow"
 
 m = model(values(odict_inputs)..., presence; pr=dict_pr[priorsetting])
 
@@ -110,9 +110,11 @@ end
 let
     priorpreds = reduce(vcat, simulate(prior.samples, values(odict_inputs)...))
     density(priorpreds, normalize=true, c=2, fillrange=0, fillalpha=0.2, legend=false)
+    title!("Prior predictive check, $priorsetting prior")
+    ylabel!("Density"), xlabel!("Probability of presence")
 end
 
-savefig("$ROOT/results/svg/priorpredictions/presence_$priorsetting.svg")
+foreach(ext -> savefig("$ROOT/results/svg/presence/prior_$priorsetting.$ext"), ["svg", "png"])
 
 # --- MODEL CONFIG --- #
 
@@ -144,7 +146,8 @@ Threads: $(nchains)
 Random.seed!(42)
 
 posterior = @chain begin
-    sample(m, config...)
+    deserialize("$ROOT/results/chains/presence_$priorsetting.jls")
+    #sample(m, config...)
     ModelSummary(m, _)
 end
 
@@ -175,7 +178,7 @@ postpcplots = let preds = reduce(hcat, simulate(posterior.samples, values(odict_
 end
 
 plot(postpcplots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
-savefig("results/svg/presence_postpreds_$priorsetting.svg")
+foreach(ext -> savefig("results/$ext/presence/posterior_$priorsetting.$ext"), ["svg", "png"])
 
 # Create predictions for unknown atolls
 predictions = let odict_unknown_inputs = copy(odict_inputs)
