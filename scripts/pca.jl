@@ -5,7 +5,6 @@ export nothing
 using CSV, DataFrames, Statistics, Turing, Chain, StatsPlots
 import MultivariateStats as MS
 import StatsBase as SB
-using Match
 
 const ROOT = dirname(Base.active_project())
 
@@ -49,11 +48,13 @@ df_proj = @chain begin
     insertcols(_, 1, :features => features)
 end
 
-c = palette(:viridis, 50)
+c = palette(:inferno, 50)
 
-cg = cgrad([c[1], :grey80, :grey80, c[50]])
+cg = palette([:blue, :white, :white, :red], 25)
 
-heatmap(PC_NAMES, collect(1:16), proj, size=(800, 600), color=cg)
+heatmap(PC_NAMES, collect(1:16), proj, size=(800, 600), color=cg, clim=(-0.75, 0.75))
 yticks!(collect(1:16), features)
+
+foreach(ext -> savefig("$ROOT/results/$ext/pca.$ext"), ["svg", "png"])
 
 end
