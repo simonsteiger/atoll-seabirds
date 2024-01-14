@@ -7,5 +7,11 @@ const ROOT = dirname(Base.active_project())
 include("$ROOT/scripts/pca.jl")
 include("$ROOT/scripts/presence.jl")
 include("$ROOT/scripts/count.jl")
-include("$ROOT/scripts/globalestimates.jl")
-include("$ROOT/scripts/plotprep.jl")
+
+# TODO decide if Rmd file should be included here
+# using RCall
+# 
+# R"""
+# library(here)
+# source(here("R", "ggtestplots.Rmd"))
+# """

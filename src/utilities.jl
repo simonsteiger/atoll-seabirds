@@ -1,34 +1,48 @@
+"This module contains helper functions for modeling and postprocessing."
 module CustomUtilityFuns
 
-using Turing, DataFrames
+# Modeling and wrangling
+using Turing, DataFrames, Chain
+# Plotting
+using Colors, ColorSchemes, StatsPlots
 
 export getsamples,
        peaceful_generated_quantities,
-       idx,
+       idx, midx,
        lu,
        between,
        standardise, unstandardise,
-       ModelSummary
+       ModelSummary,
+       diagnose,
+       popsum,
+       calcratio,
+       blue_in_blue
 
-# Shorthand length unique
+"Shorthand length unique"
 lu(x) = length(unique(x))
 
-# Convert matrix indexing to vector indexing
+"Convert matrix indexing to vector indexing"
 idx(i, j) = i .+ (j .- 1) * maximum(i)
 
-# Z standardise
+"Convert vector indexing to matrix indexing"
+function midx(x, r)
+    i = x % r == 0 ? r : x % r
+    j = i == r ? x ÷ r : x ÷ r + 1
+    return [j, i]
+end
+
+"Z standardise"
 standardise(v) = (v .- mean(v)) ./ std(v)
-# Revert Z standardisation
+"Revert Z standardisation"
 unstandardise(z, v) = z .* std(v) .+ mean(v)
 
-# Get samples from a generated quantities object
+"Get samples from a generated quantities object"
 getsamples(θ, fields...) = map(x -> NamedTuple{fields}(getfield.(Ref(x), fields)), θ)
-# TODO make a generated quantities struct?
 
-# Get generated quantities from model / chain and avoid warning for model internals
+"Get generated quantities from model / chain and avoid warning for model internals"
 peaceful_generated_quantities(m, c) = generated_quantities(m, Turing.MCMCChains.get_sections(c, :parameters))
 
-# Summarise a DynamicPPL Model
+"Summarise a DynamicPPL Model"
 struct ModelSummary{T}
     model::T
     chains::Chains
@@ -42,22 +56,57 @@ struct ModelSummary{T}
     end
 end
 
-between(x, lower, upper) = lower ≤ x && x ≤ upper
+"Calculate ratio from an array of binary values"
+ratio(x::AbstractArray) = sum(x) / length(x)
 
-function rdistearth(x1; x2=nothing, miles=false, R=nothing)
-    isnothing(R) && begin R = miles ? 3963.34 : 6378.388 end
-    coslat1, sinlat1 = [@. f((x1[:, 2] * π) / 180) for f in [cos, sin]]
-    coslon1, sinlon1 = [@. f((x1[:, 1] * π) / 180) for f in [cos, sin]]
+"Print summary of basic MCMC diagnostics"
+function diagnose(chains::Chains)
+    numerical_error_ratio = ratio(DataFrame(chains).numerical_error)
+    df_describe = DataFrame(describe(chains)[1])
+    max_rhat = maximum(df_describe.rhat)
+    min_ess_bulk, min_ess_tail = [minimum(col) for col in eachcol(df_describe[:, [:ess_bulk, :ess_tail]])]
     
-    if isnothing(x2)
-        pp = [coslat1 .* coslon1 coslat1 .* sinlon1 sinlat1] * [coslat1 .* coslon1 coslat1 .* sinlon1 sinlat1]'
-        return @. R * acos([abs(x > 1 ? 1 * sign(x) : x for x in pp)])
+    msg = """Minimal MCMC Diagnostics
+    Divergent transitions    => $(round(numerical_error_ratio*100, digits=2))%
+    Maximum Rhat             => $(round(max_rhat, digits=4))
+    Minimum ESS (Bulk, Tail) => $(Int64(round(min_ess_bulk, digits=0))), $(Int64(round(min_ess_tail, digits=0)))
+    """
+
+    if numerical_error_ratio > 0.03 || max_rhat > 1.01 || any(.>(1000, [min_ess_bulk, min_ess_tail]))
+        @warn msg
     else
-        coslat2, sinlat2 = [@. f((x2[:, 2] * π) / 180) for f in [cos, sin]]
-        coslon2, sinlon2 = [@. f((x2[:, 1] * π) / 180) for f in [cos, sin]]
-        pp = [coslat1 .* coslon1 coslat1 .* sinlon1 sinlat1] * [coslat2 .* coslon2 coslat2 .* sinlon2 sinlat2]'
-        return @. R * acos([abs(x > 1 ? 1 * sign(x) : x for x in pp)])
+        @info msg
     end
+        
+    return nothing
 end
-    
+
+"Wrapper around simple summary for easier broadcasting in count summary"
+function popsum(df)
+    out = @chain df begin
+        groupby(_, :species)
+        combine(_, [:nbirds, :lower, :upper] .=> sum .=> identity)
+    end
+    return out
+end
+
+"Compare populations on atolls to global population of each species"
+function calcratio(species, n, blmin, blmax, hbw, otero)
+    species ∈ ["Gygis_alba", "Nesofregetta_fuliginosa"] ? n / hbw :
+    ismissing(blmin) && ismissing(hbw) ? n / otero :
+    ismissing(blmin) ? n / hbw :
+    ismissing(blmax) ? n / blmin :
+    n / mean([blmin, blmax])
+end
+
+"Return pseudo-categorical color scheme for two cutoffs"
+function in_out_colorscheme(out, in; eps=eps(Float64))
+    return cgrad([out, in, in, out], [0.0, eps, 1.0 - eps, 1.0])
+end
+
+# Create color scheme for validation plots in count pipeline
+out_blue = HSLA(200, 0.9, 0.8, 0.8)
+in_blue = HSLA(200, 0.9, 0.4, 0.8)
+blue_in_blue = in_out_colorscheme(out_blue, in_blue)
+
 end

@@ -1,8 +1,9 @@
+"This module creates objects necessary for fitting the presence model."
 module PresenceVariables
 
 export atoll, region, species, nesting, species_in_nesting, presence, PC, nspecies
 
-include("global.jl")
+include("globalvars.jl")
 using .GlobalVariables
 
 using DataFrames, Chain, StatsBase

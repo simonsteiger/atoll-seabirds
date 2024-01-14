@@ -1,8 +1,9 @@
+"This module creates objects necessary for fitting the count model."
 module CountVariables
 
 export atoll, region, species, nesting, species_in_nesting, PC, zlogn, nbirds, Ms, μs, nspecies, ppres, oos_lims
        
-include("global.jl")
+include("globalvars.jl")
 using .GlobalVariables
 include("utilities.jl")
 using .CustomUtilityFuns

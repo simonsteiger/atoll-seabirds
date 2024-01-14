@@ -1,3 +1,6 @@
+# --- MODEL MODULE --- #
+
+"This module fits the presence model, runs basic model diagnostics, summarises and exports the results."
 module PresenceModel
 
 export nothing
@@ -27,13 +30,10 @@ using Serialization, CSV, Dates, OrderedCollections
 using Random
 
 # Load custom modules
-include("$ROOT/src/presence.jl")
+include("$ROOT/src/presencevars.jl")
 using .PresenceVariables
 include("$ROOT/src/utilities.jl")
 using .CustomUtilityFuns
-
-# Set seed
-Random.seed!(42)
 
 # --- MODEL SETUP --- #
 
@@ -64,7 +64,7 @@ Random.seed!(42)
 
     # Generated quantities
     return (; α_sxr, β_pxn)
-end;
+end
 
 # Function to simulate samples from inputs to model
 function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(s, r))
@@ -74,6 +74,7 @@ function simulate(params, r, s, n, X, idx_sn, u_n, u_sn, Nv, Ng, Nb; idx_sr=idx(
     end
 end
 
+# Dictionary holding inputs
 odict_inputs = OrderedDict(
     "region" => region.known.num,
     "species" => species.known.num,
@@ -87,149 +88,205 @@ odict_inputs = OrderedDict(
     "n_vegetation" => nspecies.vegetation,
 )
 
-# --- PRIOR PREDICTIVE CHECK --- #
-
 # Dictionary holding alternative prior settings for sensitivity analysis
 dict_pr = Dict(
     "default" => (α_sxr=[0, 1], μ_pxn=[0, 0.2], σ_pxn=[3, 0.5]),
     # Differently informed prior, using mean instead of median
-    "narrow" => (α_sxr=[0, 1/3], μ_pxn=[0, 0.2/3], σ_pxn=[3, 0.5/3]),
+    "narrow" => (α_sxr=[0, 1 / 3], μ_pxn=[0, 0.2 / 3], σ_pxn=[3, 0.5 / 3]),
     # Wide priors on variance parameters and μ_pxn, leaving μ_sxr at median
-    "wide" => (α_sxr=[0, 1*3], μ_pxn=[0, 0.2*3], σ_pxn=[3, 0.5*3]),
+    "wide" => (α_sxr=[0, 1 * 3], μ_pxn=[0, 0.2 * 3], σ_pxn=[3, 0.5 * 3]),
 )
 
-priorsetting = "narrow"
+for priorsetting in keys(dict_pr)
 
-m = model(values(odict_inputs)..., presence; pr=dict_pr[priorsetting])
+    m = model(values(odict_inputs)..., presence; pr=dict_pr[priorsetting])
 
-prior = @chain begin
-    sample(m, Prior(), 1000)
-    ModelSummary(m, _)
-end
+    # --- PRIOR PREDICTIVE CHECK --- #
 
-let
-    priorpreds = reduce(vcat, simulate(prior.samples, values(odict_inputs)...))
-    density(priorpreds, normalize=true, c=2, fillrange=0, fillalpha=0.2, legend=false)
-    title!("Prior predictive check, $priorsetting prior")
-    ylabel!("Density"), xlabel!("Probability of presence")
-end
+    @info "Presence model: Prior predictive check for $priorsetting priors"
 
-foreach(ext -> savefig("$ROOT/results/svg/presence/prior_$priorsetting.$ext"), ["svg", "png"])
+    # Set seed
+    Random.seed!(42)
 
-# --- MODEL CONFIG --- #
-
-backends = [
-    Turing.Essential.ForwardDiffAD{0}(),
-    Turing.Essential.ReverseDiffAD{false}(),
-    Turing.Essential.ReverseDiffAD{true}()
-];
-
-TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
-@info "TuringBenchmark shows that ReverseDiff{true} is the fastest AD backend."
-
-# Set autodiff to ReverseDiff{true}
-Turing.setadbackend(:reversediff)
-Turing.setrdcache(true)
-
-# Configure sampling
-sampler = NUTS(1000, 0.95; max_depth=10)
-nsamples = 10_000
-nchains = 4
-config = (sampler, MCMCThreads(), nsamples, nchains)
-
-@info """Sampler: $(string(sampler))
-Samples: $(nsamples)
-Threads: $(nchains)
-"""
-
-# Set seed
-Random.seed!(42)
-
-posterior = @chain begin
-    deserialize("$ROOT/results/chains/presence_$priorsetting.jls")
-    #sample(m, config...)
-    ModelSummary(m, _)
-end
-
-try
-    path = "$ROOT/results/chains/presence_$priorsetting.jls"
-    serialize(path, posterior.chains)
-    @info "Saved chains to `$path`."
-catch error
-    @warn "Writing chains failed with an $error."
-end
-
-# --- POSTERIOR PREDICTIVE CHECK --- #
-
-postpcplots = let preds = reduce(hcat, simulate(posterior.samples, values(odict_inputs)...))
-    # Iterate over species and create plots with posterior predictions
-    map(enumerate(unique(species.known.num))) do (idx, sp)
-        # Predicted values for species sp
-        pred_x = vec(preds[species.known.num.==sp, :])
-        # Observed values for species sp
-        obs_x = presence[species.known.num.==sp]
-        # Assemble plot for species sp
-        histogram(obs_x, normalize=true, alpha=0.5, lc=:transparent, bins=10, label="O")
-        density!(pred_x, fillrange=0, fillalpha=0.2, normalize=true, alpha=0.5, bins=10, lc=:transparent, yticks=:none, label="P")
-        xticks!(0:0.5:1, string.(0:0.5:1))
-        title!(unique(species.known.str)[idx], titlefontsize=8)
-        vline!([0.8], c=:black, ls=:dash, label=:none)
+    # ModelSummary object holds chains, parameter names, and parameter samples
+    prior = @chain begin
+        sample(m, Prior(), 1000)
+        ModelSummary(m, _)
     end
-end
 
-plot(postpcplots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
-foreach(ext -> savefig("results/$ext/presence/posterior_$priorsetting.$ext"), ["svg", "png"])
-
-# Create predictions for unknown atolls
-predictions = let odict_unknown_inputs = copy(odict_inputs)
-    names = ["region", "species", "PC", "species_within_nesting"]
-    vals = [region.unknown.num, species.unknown.num, PC.unknown, species_in_nesting.unknown]
-    setindex!.(Ref(odict_unknown_inputs), vals, names)
-    preds = simulate(posterior.samples, values(odict_unknown_inputs)...)
-    reduce(hcat, preds)
-end
-
-# Wrap predictions and quantile in DataFrame with inputs
-df_preds = let
-    μs = vec(mean(predictions, dims=2))
-    qs = reduce(hcat, [quantile(slice, [0.05, 0.95]) for slice in eachslice(predictions, dims=1)])
-    DataFrame(
-        [atoll.unknown.str, region.unknown.str, species.unknown.str, μs, qs[1, :], qs[2, :]],
-        [:atoll, :region, :species, :mean, :lower005, :upper095]
-    )
-end
-
-
-# Plot predictions for unknown atolls and store results in Dict
-dict_unknown_pred_plots = let df = df_preds
-    plots = map(enumerate(unique(df.species))) do (idx, sp)
-        I = df.species .== sp
-        scatter(df.mean[I], df.atoll[I], c=ifelse.(df.mean[I].>0.8, :red, :black), ms=2, xerror=(abs.(df.lower005[I] .- df.mean[I]), abs.(df.upper095[I] .- df.mean[I])))
-        title!(unique(species.unknown.str)[idx], titlefontsize=8)
-        xlims!(0, 1)
-        vline!([0.8], c=:black, ls=:dash, legend=:none)
+    let
+        priorpreds = reduce(vcat, simulate(prior.samples, values(odict_inputs)...))
+        density(priorpreds, normalize=true, c=2, fillrange=0, fillalpha=0.2, legend=false)
+        title!("Prior predictive check, $priorsetting prior")
+        ylabel!("Density"), xlabel!("Probability of presence")
     end
-    Dict(Pair.(unique(species.unknown.str), plots))
+
+    foreach(ext -> savefig("$ROOT/results/$ext/presence/prior_$priorsetting.$ext"), ["svg", "png"])
+
+    # --- MODEL CONFIG --- #
+
+    # We tested several autodiff methods to check which one is fastest for our model
+    # ReverseDiff with caching enabled is the fastest choice.
+    benchmark = false # do not rerun unless specifically requested
+
+    if benchmark
+        @info "Presence model: Benchmarking model for $priorsetting priors"
+
+        backends = [
+            Turing.Essential.ForwardDiffAD{0}(),
+            Turing.Essential.ReverseDiffAD{false}(),
+            Turing.Essential.ReverseDiffAD{true}()
+        ]
+
+        TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
+    end
+
+    # Set autodiff to ReverseDiff{true}
+    Turing.setadbackend(:reversediff)
+    Turing.setrdcache(true)
+
+    # Configure sampling
+    sampler = NUTS(1000, 0.95; max_depth=10)
+    nsamples = 10_000
+    nchains = 4
+    config = (sampler, MCMCThreads(), nsamples, nchains)
+
+    @info """Presence model: Sampling posterior for $priorsetting priors
+    Sampler: $(string(sampler))
+    Samples: $(nsamples)
+    Chains: $(nchains)
+    """
+
+    # Set seed
+    Random.seed!(42)
+
+    posterior = @chain begin
+        deserialize("$ROOT/results/chains/presence_$priorsetting.jls") # Load existing chains
+        #sample(m, config...) # Sample from model
+        ModelSummary(m, _)
+    end
+
+    diagnose(posterior.chains)
+
+    try
+        path = "$ROOT/results/chains/presence_$priorsetting.jls"
+        serialize(path, posterior.chains)
+        @info "Presence model: Chains saved to `$path`."
+    catch error
+        @warn "Presence model: Writing chains failed with an $error."
+    end
+
+    # --- POSTERIOR PREDICTIVE CHECK --- #
+
+    @info "Presence model: Posterior predictive check for $priorsetting priors"
+
+    postpcplots = let preds = reduce(hcat, simulate(posterior.samples, values(odict_inputs)...))
+        # Iterate over species and create plots with posterior predictions
+        map(enumerate(unique(species.known.num))) do (idx, sp)
+            # Predicted values for species sp
+            pred_x = vec(preds[species.known.num.==sp, :])
+            # Observed values for species sp
+            obs_x = presence[species.known.num.==sp]
+            # Assemble plot for species sp
+            histogram(obs_x, normalize=true, alpha=0.5, lc=:transparent, bins=10, label="O")
+            density!(pred_x, fillrange=0, fillalpha=0.2, normalize=true, alpha=0.5, lc=:transparent, yticks=:none, label="P")
+            xticks!(0:0.5:1, string.(0:0.5:1))
+            title!(unique(species.known.str)[idx], titlefontsize=8)
+            vline!([0.8], c=:black, ls=:dash, label=:none)
+        end
+    end
+
+    plot(postpcplots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
+    foreach(ext -> savefig("$ROOT/results/$ext/presence/posterior_$priorsetting.$ext"), ["svg", "png"])
+
+    # --- TARGET PREDICTIONS --- #
+
+    @info "Presence model: Target predictions for $priorsetting model"
+
+    # Create predictions for unknown atolls
+    predictions = let odict_unknown_inputs = copy(odict_inputs)
+        names = ["region", "species", "PC", "species_within_nesting"]
+        vals = [region.unknown.num, species.unknown.num, PC.unknown, species_in_nesting.unknown]
+        setindex!.(Ref(odict_unknown_inputs), vals, names)
+        preds = simulate(posterior.samples, values(odict_unknown_inputs)...)
+        reduce(hcat, preds)
+    end
+
+    # Wrap predictions and quantile in DataFrame with inputs
+    df_preds = let
+        μs = vec(mean(predictions, dims=2))
+        qs = reduce(hcat, [quantile(slice, [0.05, 0.95]) for slice in eachslice(predictions, dims=1)])
+        DataFrame(
+            [atoll.unknown.str, region.unknown.str, species.unknown.str, μs, qs[1, :], qs[2, :]],
+            [:atoll, :region, :species, :mean, :lower005, :upper095]
+        )
+    end
+
+
+    # Plot predictions for unknown atolls and store results in Dict
+    dict_unknown_pred_plots = let df = df_preds
+        plots = map(enumerate(unique(df.species))) do (idx, sp)
+            I = df.species .== sp
+            scatter(df.mean[I], df.atoll[I], c=ifelse.(df.mean[I] .> 0.8, :red, :black), ms=2, xerror=(abs.(df.lower005[I] .- df.mean[I]), abs.(df.upper095[I] .- df.mean[I])))
+            title!(unique(species.unknown.str)[idx], titlefontsize=8)
+            xlims!(0, 1)
+            vline!([0.8], c=:black, ls=:dash, legend=:none)
+        end
+        Dict(Pair.(unique(species.unknown.str), plots))
+    end
+
+    # plot(dict_unknown_pred_plots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
+    # TODO plot by nesting type or genus
+
+    # Save predictions for unknown atolls to CSV
+    try
+        path = "$ROOT/results/data/presencepreds_$priorsetting.csv"
+        CSV.write(path, df_preds)
+        @info "Presence model: Saved predictions to `$path`."
+    catch error
+        @warn "Presence model: Writing predictions failed with an $error."
+    end
+
+    # --- PSIS-LOO CV --- #
+    @info "Presence model: Crossvalidation for $priorsetting priors"
+    cv_res = psis_loo(m, posterior.chains)
+    cv_res
+    # - no overfit
+    # - out of sample performance near in-sample performance (gmpd 0.76)
+    # - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))
+    # - in line with posterior predictive check
+    # - not sure how to interpret differences in naive_lpd and cv_elpd ... but they seem very low p_avg 0.02
+
+
 end
 
-# plot(dict_unknown_pred_plots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
-# TODO plot by nesting type or genus
-
-# Save predictions for unknown atolls to CSV
-try
-    path = "$ROOT/results/data/presencepreds_$priorsetting.csv"
-    CSV.write(path, df_preds); @info "Saved predictions to `$path`."
-catch error
-    @warn "Writing predictions failed with an $error."
 end
 
-# LOO
-cv_res = psis_loo(m, posterior.chains);
-cv_res
-# - no overfit
-# - out of sample performance near in-sample performance (gmpd 0.76)
-# - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))
-# - in line with posterior predictive check
-# - not sure how to interpret differences in naive_lpd and cv_elpd ... but they seem very low p_avg 0.02
+# --- SENSITIVITY MODULE --- #
+
+"This module runs the sensitivity analyses for the presence model and exports the results."
+module PresenceSensitivity
+
+const ROOT = dirname(Base.active_project())
+
+using DataFrames, Chain, CSV, StatsPlots
+
+my_unstack(df) = unstack(df[:, [:atoll, :species, :mean]], :species, :mean)
+
+preds_narrow = @chain CSV.read("$ROOT/results/data/presencepreds_narrow.csv", DataFrame) my_unstack(_)
+preds_wide = @chain CSV.read("$ROOT/results/data/presencepreds_wide.csv", DataFrame) my_unstack(_)
+preds_default = @chain CSV.read("$ROOT/results/data/presencepreds_default.csv", DataFrame) my_unstack(_)
+
+plot(
+    map([0.7:0.05:0.9;]) do threshold
+        heatmap(Matrix(preds_default[!, 2:end] .> threshold), title="Threshold: $threshold")
+    end...,
+    layout=(3, 2),
+    size=(600, 800),
+    plot_title="Species included per cutoff",
+)
+ylabel!("Atoll"); xlabel!("Species")
+
+foreach(ext -> savefig("$ROOT/results/$ext/presence/sensitivity.$ext"), ["svg", "png"])
 
 end

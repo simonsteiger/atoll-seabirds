@@ -1,3 +1,4 @@
+"This module creates precursor objects for further processing in `countvars.jl` and `presencevars.jl`."
 module GlobalVariables
 
 export envs_known,

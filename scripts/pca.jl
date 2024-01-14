@@ -2,7 +2,7 @@ module PCs
 
 export nothing
 
-using CSV, DataFrames, Statistics, Turing, Chain, StatsPlots
+using CSV, DataFrames, Statistics, Turing, Chain, StatsPlots, Random
 import MultivariateStats as MS
 import StatsBase as SB
 
@@ -24,6 +24,8 @@ end
 
 df_features = envs[!, [collect(7:12)..., 15, collect(17:25)...]] # was 8:13, 
 X_features = Matrix{Float64}(df_features)'
+
+Random.seed!(42)
 
 Z = MS.fit(SB.ZScoreTransform, X_features)
 SB.transform!(Z, X_features)
@@ -48,12 +50,29 @@ df_proj = @chain begin
     insertcols(_, 1, :features => features)
 end
 
-c = palette(:inferno, 50)
+plotfeatures = [
+    "Number islets",
+    "Annual precipitation",
+    "Land area",
+    "Lagoon area",
+    "Tropical storms within 50km",
+    "Hurricanes within 50km",
+    "Distance nearest atoll",
+    "Distance nearest high island",
+    "Distance continent",
+    "Human population",
+    "Precipitation anomaly",
+    "Total primary production Phyto",
+    "Total chlorophyll",
+    "Total phytoplankton",
+    "Sea surface tempterature",
+    "Wind speed",
+]
 
 cg = palette([:blue, :white, :white, :red], 25)
 
 heatmap(PC_NAMES, collect(1:16), proj, size=(800, 600), color=cg, clim=(-0.75, 0.75))
-yticks!(collect(1:16), features)
+yticks!(collect(1:16), plotfeatures)
 
 foreach(ext -> savefig("$ROOT/results/$ext/pca.$ext"), ["svg", "png"])
 
