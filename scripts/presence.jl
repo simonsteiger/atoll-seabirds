@@ -7,8 +7,9 @@ export nothing
 
 # --- WORKSPACE SETUP --- #
 
-# Pathing
+# Pathing and cmd args
 const ROOT = dirname(Base.active_project())
+load = isempty(ARGS) ? false : ARGS[1]
 
 # Probabilistic programming
 using Turing, ParetoSmooth, ReverseDiff
@@ -161,8 +162,11 @@ for priorsetting in keys(dict_pr)
     Random.seed!(42)
 
     posterior = @chain begin
-        deserialize("$ROOT/results/chains/presence_$priorsetting.jls") # Load existing chains
-        #sample(m, config...) # Sample from model
+        if load 
+            deserialize("$ROOT/results/chains/presence_$priorsetting.jls") # Load existing chains
+        else
+            sample(m, config...) # Sample from model
+        end
         ModelSummary(m, _)
     end
 
