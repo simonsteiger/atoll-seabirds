@@ -9,7 +9,7 @@ export nothing
 
 # Pathing and cmd args
 const ROOT = dirname(Base.active_project())
-load = isempty(ARGS) ? false : ARGS[1]
+load = isempty(Main.ARGS) ? false : Main.ARGS[1]
 
 # Probabilistic programming
 using Turing, ParetoSmooth, ReverseDiff
@@ -152,19 +152,25 @@ for priorsetting in keys(dict_pr)
     nchains = 4
     config = (sampler, MCMCThreads(), nsamples, nchains)
 
-    @info """Presence model: Sampling posterior for $priorsetting priors
+    @info """Presence model: Sampling config for $priorsetting priors
     Sampler: $(string(sampler))
     Samples: $(nsamples)
-    Chains: $(nchains)
-    """
+    Chains: $(nchains)"""
 
     # Set seed
     Random.seed!(42)
 
     posterior = @chain begin
-        if load 
-            deserialize("$ROOT/results/chains/presence_$priorsetting.jls") # Load existing chains
+        if load
+            try
+                @info "Loading chains for $priorsetting priors."
+                deserialize("$ROOT/results/chains/presence_$priorsetting.jls") # Load existing chains
+            catch error
+                @warn "Loading failed with an $error, sampling from posterior instead."
+                sample(m, config...) # Sample from model
+            end
         else
+            @info "Sampling from posterior."
             sample(m, config...) # Sample from model
         end
         ModelSummary(m, _)
@@ -289,7 +295,8 @@ plot(
     size=(600, 800),
     plot_title="Species included per cutoff",
 )
-ylabel!("Atoll"); xlabel!("Species")
+ylabel!("Atoll")
+xlabel!("Species")
 
 foreach(ext -> savefig("$ROOT/results/$ext/presence/sensitivity.$ext"), ["svg", "png"])
 

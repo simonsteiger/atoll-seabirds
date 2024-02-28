@@ -9,7 +9,7 @@ export nothing
 
 # Path and cmd args
 const ROOT = dirname(Base.active_project())
-load = isempty(ARGS) ? false : ARGS[1]
+load = isempty(Main.ARGS) ? false : Main.ARGS[1]
 
 # Probabilistic programming
 using Turing, TuringBenchmarking, ReverseDiff, ParetoSmooth, PosteriorStats
@@ -171,23 +171,29 @@ for priorsetting in keys(dict_pr)
     nchains = 4
     config = (sampler, MCMCThreads(), nsamples, nchains)
 
+    # --- SAMPLING --- #
+
     # Notify user about sampling configuration
-    @info """Count model: Sampling posterior for $priorsetting priors
+    @info """Count model: Sampling config for $priorsetting priors
     Sampler: $(string(sampler))
     Samples: $(nsamples)
-    Chains: $(nchains)
-    """
-
-    # --- SAMPLING --- #
+    Chains: $(nchains)"""
 
     # Set seed
     Random.seed!(42)
 
     # ModelSummary object holds chains, parameter names, and parameter samples
     posterior = @chain begin
-        if load 
-            deserialize("$ROOT/results/chains/presence_$priorsetting.jls") # Load existing chains
+        if load
+            try
+                @info "Loading chains for $priorsetting prior."
+                deserialize("$ROOT/results/chains/count_$priorsetting.jls") # Load existing chains
+            catch error
+                @warn "Could not load chains, sampling from posterior instead."
+                sample(m, config...) # Sample from model
+            end
         else
+            @info "Sampling from posterior."
             sample(m, config...) # Sample from model
         end
         ModelSummary(m, _)
@@ -350,7 +356,7 @@ for priorsetting in keys(dict_pr)
                 raw = [exp.(unstandardise(slice, log.(nbirds))) for slice in eachslice(samples, dims=1)]
                 mdn = exp.(unstandardise(median(samples, dims=2), log.(nbirds)))
                 qs = @chain samples begin
-                    [getproperty.(Ref(hdi(slice; prob=0.5)), [:lower, :upper]) for slice in eachslice(_, dims=1)]
+                    [getproperty.(Ref(hdi(slice; prob=0.95)), [:lower, :upper]) for slice in eachslice(_, dims=1)]
                     reduce(hcat, _)
                     exp.(unstandardise(_, log.(nbirds)))
                 end
