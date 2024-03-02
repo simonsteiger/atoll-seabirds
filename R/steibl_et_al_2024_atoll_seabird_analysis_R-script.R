@@ -5,6 +5,10 @@
 
 # Load packages ----
 
+# Should avoid importing tidyverse, as it adds many unused dependencies
+# I assume we would need `dplyr`, `tidyr`, and `purrr`? depends on for loop
+# Add all used libraries in `dependencies.R` and run `renv::snapshot()`
+
 library("tidyverse")
 library("sf")
 library("patchwork")

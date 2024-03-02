@@ -15,7 +15,7 @@ renv_path="$1/renv/activate.R"
 r_path="$1/R/steibl_et_al_2024_atoll_seabird_analysis_R-script.R"
 
 # Execute the julia pipeline
-julia --project "$julia_path" "$2" "$3"
+julia --project --threads 4 "$julia_path" "$2" "$3"
 
 # Activate renv
 Rscript "$renv_path"

@@ -14,7 +14,7 @@ export nothing
 
 # Cmd args
 # Need to check for "true" again because the shell script converts args to strings
-load = Main.ARGS[1] == "true"
+load = Main.ARGS[1] == "false"
 run_loocv = Main.ARGS[2] == "true"
 
 # Probabilistic programming

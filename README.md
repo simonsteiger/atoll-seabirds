@@ -44,9 +44,9 @@ $ ./reproduce.sh /path/to/repository true true
 Replace the segment `path/to/repository` with the path to the project folder on your machine.
 
 **Note on Z shell:**
-The command above can also be run in the Z shell. 
-To do so, prefix with `bash`, i.e., `% bash ./reproduce.sh ...`.
+To run the above command in Z shell, prefix with `bash`, i.e., `% bash ./reproduce.sh ...`.
 
+**Additional arguments:**
 The extra arguments to `reproduce.sh` (here, `true true`) are forwarded to the Julia scripts.
 The first argument determines if the analysis scripts sample from the posterior (`true`) or attempt to load previously saved chains (`false`). Loading saved chains requires having sampled from the posterior at least once on your machine.
 The second argument determines if [cross validation](https://mc-stan.org/loo/articles/online-only/faq.html) is performed (`true`) or skipped (`false`).
@@ -54,6 +54,8 @@ Both options are intended to allow the user to quickly rerun the analysis after 
 
 **Run-time:**
 The analyses were performed on a MacBook Pro (M1) and took *TODO measure time!*.
+
+(If we / reviewers think that this runtime is too long, we can make running sensitivity analyses optional with another argument to `reproduce.sh`)
 
 ## Project structure
 
@@ -66,8 +68,8 @@ A sentence or two about the project structure.
 ├── data                         # CSV files which are *inputs to* the model
 ├── figures                      # Final figures used in the article
 ├── julia                        # Julia scripts
-│   ├── scripts                      # Julia scripts used for data wrangling
-│   ├── scripts                      # Julia scripts used for data wrangling
+│   ├── scripts                      # Analysis scripts
+│   ├── src                          # Modules defining functions and variables
 │   └── reproduce.jl                 # Runs all julia scripts
 ├── manuscript                   # Directory with manuscript
 ├── renv                         # Renv for storing R package versions
