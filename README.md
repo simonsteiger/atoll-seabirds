@@ -2,9 +2,7 @@
 
 Text about main findings 
 
-(figure seems to have a lot of whitespace below it)
-
-![](figures/figure_summary.svg)
+(Tried adding the summary figure, but this currently contains a lot of whitespace at the bottom. Can add it back later after removing whitespace)
 
 ## Workflow
 
@@ -13,22 +11,53 @@ Drop or describe in text format?
 
 ## Installation
 
-Make sure to run this in an environment that supports bash if you are on Windows, e.g., Git Bash.
+### System-independent prerequisites
 
-```bash
-chmod +x /path/to/repository/reproduce.sh # Make shell script executable
-bash ./reproduce.sh /path/to/repository true true # Reproduce all scripts
+Install the R programming language ([Windows](https://cran.r-project.org/bin/windows/), [MacOS](https://cran.r-project.org/bin/macosx/), [Linux](https://cran.r-project.org/bin/linux/)), and the [Julia programming language](https://julialang.org/downloads/).
+
+### Windows-specific prerequisites
+
+Install an environment that allows you to run bash scripts, like [Git Bash](https://gitforwindows.org/)
+
+### Unix-based systems
+
+Unix-based systems support executing bash scripts natively.
+However, since the default shell used by MacOS is now the Z shell, we recommend running the commands under [Reproducing results](#reproducing-results) in the bash shell.
+
+## Reproducing results
+
+You can reproduce the analysis and corresponding visualisations by executing the `reproduce.sh` script.
+To do so, start by making this file executable on your machine:
+
+```console
+$ chmod +x /path/to/repository/reproduce.sh
 ```
 
-### Note on ARGS 
+Replace the segment `/path/to/repository` below with the path to the project folder on your machine.
 
-- first arg is the path
-- second arg is sampling from posterior (! requires locally saved chains)
-- third arg is running LOO CV
+Next, run all scripts by executing `reproduce.sh`:
+
+```console
+$ ./reproduce.sh /path/to/repository true true
+```
+
+Replace the segment `path/to/repository` with the path to the project folder on your machine.
+
+**Note on Z shell:**
+The command above can also be run in the Z shell. 
+To do so, prefix with `bash`, i.e., `% bash ./reproduce.sh ...`.
+
+The extra arguments to `reproduce.sh` (here, `true true`) are forwarded to the Julia scripts.
+The first argument determines if the analysis scripts sample from the posterior (`true`) or attempt to load previously saved chains (`false`). Loading saved chains requires having sampled from the posterior at least once on your machine.
+The second argument determines if [cross validation](https://mc-stan.org/loo/articles/online-only/faq.html) is performed (`true`) or skipped (`false`).
+Both options are intended to allow the user to quickly rerun the analysis after having sampled from the posterior once.
+
+**Run-time:**
+The analyses were performed on a MacBook Pro (M1) and took *TODO measure time!*.
 
 ## Project structure
 
-TODO: Move R wrangle scripts into R/wrangle folder
+A sentence or two about the project structure.
 
 ```
 ├── R                            # R scripts

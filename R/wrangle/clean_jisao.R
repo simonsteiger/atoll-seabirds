@@ -9,9 +9,9 @@ box::use(
 )
 
 box::use(
-  R/global,
-  R/load,
-  fn = R/functions,
+  R / wrangle / global,
+  R / wrangle / load,
+  fn = R / wrangle / functions,
 )
 
 data_nc <- nc$nc_open("data/preci_anom_cor.nc")
@@ -43,4 +43,3 @@ out <-
 #' @export
 envs <- dp$left_join(load$envs, out, by = "atoll", suffix = c("", ".dupl")) %>% 
   dp$select(-ts$ends_with(".dupl"))
-

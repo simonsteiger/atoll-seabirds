@@ -12,9 +12,9 @@ box::use(
 )
 
 box::use(
-  R / load,
-  R / global,
-  fn = R / functions,
+  R / wrangle / load,
+  R / wrangle / global,
+  fn = R / wrangle / functions,
 )
 
 params <- tbl$tibble(
@@ -58,13 +58,3 @@ out <-
 #' @export
 envs <- dp$left_join(load$envs_trans_coord, out, by = "atoll", suffix = c("", ".dupl")) %>%
   dp$select(-ts$ends_with(".dupl"))
-
-# What was that for?
-# res <- data %>%
-#   dplyr::filter(
-#     latitude >= target_lat - 1,
-#     latitude <= target_lat + 1,
-#     longitude >= target_long - 1,
-#     longitude <= target_long + 1
-#   ) %>%
-#   summarise(mean = mean(nppv, na.rm = TRUE))

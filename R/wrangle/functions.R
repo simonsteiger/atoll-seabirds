@@ -7,7 +7,7 @@ box::use(
 )
 
 box::use(
-  R / global,
+  R / wrangle / global,
 )
 
 #' @export
