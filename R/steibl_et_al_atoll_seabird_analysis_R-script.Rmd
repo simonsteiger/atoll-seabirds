@@ -34,24 +34,22 @@ preds <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/resul
 est <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/atoll_seabird_global_popestimates.csv")
 envs <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_atolls_envs.csv")
 nest <- read.csv("C:/Users/sebas/OneDrive/Dokumente/GitHub/atoll-seabirds/data/seabird_filterconditions.csv")
-mpa <- read.csv("C:/Users/sebas/OneDrive/Dokumente/Github/atoll-seabirds/data/mpa_polygons.csv")
 forag <- read.csv("C:/Users/sebas/OneDrive/Dokumente/Github/atoll-seabirds/data/seabird_atolls_foraging.csv")
 
+# convert longitudes for 'sf' format
+envs$long <- ifelse(envs$long < 0, envs$long+360, envs$long)
+
 # turn into factors
-envs <- envs %>% select(atoll, region, lat, long, land_area_sqkm, human_population) %>% mutate(across(1:2, as.factor))
+missing <- envs %>% mutate(across(1:3, as.factor))
+envs <- envs %>% select(atoll, region, lat, long, land_area_sqkm) %>% mutate(across(1:2, as.factor))
 preds <- preds %>% select(atoll, species, nbirds, lower, upper) %>% mutate(across(1:2, as.factor))
 nest <- nest %>% select(!filtercondition) %>% mutate(across(1:3, as.factor))
-mpa$mpa <- as.factor(mpa$mpa)
 forag$species <- as.factor(forag$species)
 
 # turn predicted abundances into whole numbers
 preds$nbirds <- round(preds$nbirds, 0)
 preds$lower <- round(preds$lower, 0)
 preds$upper <- round(preds$upper, 0)
-
-# convert longitudes for 'sf' format
-envs$long <- ifelse(envs$long < 0, envs$long+360, envs$long)
-mpa$long <- ifelse(mpa$long < 0, mpa$long+360, mpa$long)
 
 # drop unneeded columns from foraging dataset
 forag <- forag %>% select(!c(location, reference))
@@ -81,28 +79,28 @@ rm(dat) # no longer needed, keep tidy
 
 
 # calculate local contribution to beta diversity (LCBD) [and species contribution to beta diversity (SCBD)]
-beta.atoll <- matrix[c(which(rowMeans(matrix[,-c(1:6)]) > 0)),-c(1:6)] %>% 
+beta.atoll <- matrix[c(which(rowMeans(matrix[,-c(1:5)]) > 0)),-c(1:5)] %>% 
                 beta.div(., method = "percentdiff", sqrt.D = TRUE, samp = FALSE)
 beta <- beta.atoll$LCBD %>% as.data.frame()
-beta$atoll <- matrix[c(which(rowMeans(matrix[,-c(1:6)]) > 0)),]$atoll
+beta$atoll <- matrix[c(which(rowMeans(matrix[,-c(1:5)]) > 0)),]$atoll
 colnames(beta)[1] <- "lcbd"
 rm(beta.atoll) # no longer needed, keep tidy
 
 # Richness differences and species turnover
-comp.atoll <- matrix[c(which(rowMeans(matrix[,-c(1:6)]) > 0)),-c(1:6)] %>% beta.div.comp(., coef = "J", quant = FALSE)
+comp.atoll <- matrix[c(which(rowMeans(matrix[,-c(1:5)]) > 0)),-c(1:5)] %>% beta.div.comp(., coef = "J", quant = FALSE)
 
 
 # add seabird metadata and calculate atoll-wise biomass per species
-comb <- matrix %>% pivot_longer(!c(atoll, region, lat, long, land_area_sqkm, human_population),
+comb <- matrix %>% pivot_longer(!c(atoll, region, lat, long, land_area_sqkm),
                                 names_to = "species", values_to = "nbirds")
 comb$species <- as.factor(comb$species)
 comb <- comb %>% left_join(., nest, by = "species") %>% as.data.frame()
 
-comb.lwr <- matrix.lwr %>% pivot_longer(!c(atoll, region, lat, long, land_area_sqkm, human_population),
+comb.lwr <- matrix.lwr %>% pivot_longer(!c(atoll, region, lat, long, land_area_sqkm),
                                         names_to = "species", values_to = "lower")
 comb.lwr$species <- as.factor(comb.lwr$species)
 
-comb.upr <- matrix.upr %>% pivot_longer(!c(atoll, region, lat, long, land_area_sqkm, human_population),
+comb.upr <- matrix.upr %>% pivot_longer(!c(atoll, region, lat, long, land_area_sqkm),
                                         names_to = "species", values_to = "upper")
 comb.lwr$species <- as.factor(comb.upr$species)
 
@@ -177,7 +175,7 @@ comb <- comb %>% select(!c(bodymass, nestingtype, BMR, AMR, dailyN, dailyP, seas
 
 
 # summarize atoll-wise,
-atoll <- comb %>% group_by(atoll, region, lat, long, land_area_sqkm, human_population) %>%
+atoll <- comb %>% group_by(atoll, region, lat, long, land_area_sqkm) %>%
                     summarise(nspec = sum(nbirds > 0),
                               nbirds = sum(nbirds),
                               totbiomass = sum(biomass),
@@ -197,7 +195,7 @@ spec <- comb %>% group_by(species, group) %>% summarise(nbirds = sum(nbirds),
                                                  totP = sum(excretedP),
                                                  totNH3 = sum(NH3emit)) %>% as.data.frame()
 
-# add 50%-lower and -upper HDR abundance predictions
+# add 95%-lower and -upper HDR abundance predictions
 preds.lwr <- preds %>% group_by(species) %>% summarise(lower = sum(lower)) %>% as.data.frame()
 preds.upr <- preds %>% group_by(species) %>% summarise(upper = sum(upper)) %>% as.data.frame()
 
@@ -216,7 +214,7 @@ spec$ratios <- ifelse(is.na(spec$Otero) == FALSE, spec$nbirds*1/spec$Otero,
               ifelse(is.na(spec$birdlife_max) == TRUE, spec$nbirds*1/spec$birdlife_min,
                       spec$nbirds*1/spec$birdlife_max)))
 
-# calculate proportion contribution to global population using 50%-lower and 50%-upper HDR population predictions
+# calculate proportion contribution to global population using 95%-lower and 95%-upper HDR population predictions
 spec$ratios.lwr <- ifelse(is.na(spec$Otero) == FALSE, spec$lower*1/spec$Otero,
                       ifelse(is.na(spec$HBW) == FALSE, spec$lower*1/spec$HBW, 
                         ifelse(is.na(spec$birdlife_max) == TRUE, spec$lower*1/spec$birdlife_min,
@@ -241,18 +239,6 @@ spec$species <- as.factor(spec$species)
 ```{r base map}
 mapWorld <- ne_countries(scale = "medium", returnclass = "sf")
 mapCoast <- ne_coastline(scale = "medium", returnclass = "sf")
-
-spat.mpa <- mpa %>% st_as_sf(., coords = c("long", "lat"), crs = 4326)
-coords.mpa <- spat.mpa %>% st_coordinates(extract())
-
-mpa.areas <-  geom_polygon(inherit.aes = FALSE, data = spat.mpa, 
-                aes(x = coords.mpa[,1], y = coords.mpa[,2], colour = mpa),
-                linewidth = 1, fill = NA)
-
-mpa.areas <- geom_polygon(aes(x = coords.mpa[which(spat.mpa$mpa == levels(spat.mpa$mpa)[1:3]),1],
-                              y = coords.mpa[which(spat.mpa$mpa == levels(spat.mpa$mpa)[1:3]),2]),
-                          linewidth = 0.8, fill = NA, colour = "black")
-
 
 # create map layer
 map <- ggplot() + 
@@ -284,6 +270,163 @@ boxplotaesth <- theme_classic() +
                     )
 
 ```
+
+```{r analysis of missingness}
+
+spat.missing <- missing %>% arrange(rev(seabird_data)) %>% st_as_sf(., coords = c("long", "lat"), crs = 4326)
+coords.missing <- spat.missing %>% st_coordinates(extract())
+
+map.missing <- map + 
+                geom_point(data = spat.missing,
+                           aes( x= coords.missing[,1], y = coords.missing[,2], colour = seabird_data),
+                           size = 1.1, shape = 21, alpha = 0.9, stroke = 1.9) +
+                scale_colour_discrete(name = "seabird data \navailable?")
+
+map.missing
+
+pmiss1 <- ggplot(data = missing, aes(x = seabird_data, y = number_islets, fill = seabird_data)) + 
+            geom_boxplot() +
+            geom_jitter(width = 0.1, size = 1.5) + 
+            ylab("Number of islands per atoll") +
+            xlab("Seabird data available?") +
+            ggtitle("a. Island per atoll") + 
+            theme_classic() +
+            guides(x = "axis_truncated", y = "axis_truncated") +
+            theme(legend.position = "none",
+                  axis.title.y = element_text(size = 12),
+                  axis.title.x = element_blank(),
+                  axis.text = element_text(size =11))
+
+pmiss2 <- ggplot(data = missing, aes(x = seabird_data, y = annual_precipitation_mm, fill = seabird_data)) + 
+            geom_boxplot() +
+            geom_jitter(width = 0.1, size = 1.5) + 
+            ylab("Annual precipitation [mm]") +
+            xlab("Seabird data available?") +
+            ggtitle("b. Annual precipitation") + 
+            theme_classic() +
+            guides(x = "axis_truncated", y = "axis_truncated") +
+            theme(legend.position = "none",
+                  axis.title.y = element_text(size = 12),
+                  axis.title.x = element_blank(),
+                  axis.text = element_text(size =11))
+
+pmiss3 <- ggplot(data = missing, aes(x = seabird_data, y = land_area_sqkm, fill = seabird_data)) + 
+            geom_boxplot() +
+            geom_jitter(width = 0.1, size = 1.5) + 
+            ylab("Total atoll land area [km²]") +
+            xlab("Seabird data available?") +
+            ggtitle("c. Atoll land area") + 
+            scale_y_continuous(trans = "log10", labels = scales::comma,
+                                breaks = c(0.1, 1, 10, 100)) +
+            guides(x = "axis_truncated", y = "axis_truncated") +
+            theme_classic() +
+            theme(legend.position = "none",
+                  axis.title.y = element_text(size = 12),
+                  axis.title.x = element_blank(),
+                  axis.text = element_text(size =11))
+
+pmiss4 <- ggplot(data = missing, aes(x = seabird_data, y = lagoon_area_sqkm, fill = seabird_data)) + 
+            geom_boxplot() +
+            geom_jitter(width = 0.1, size = 1.5) + 
+            ylab("Total atoll lagoon area [km²]") +
+            xlab("Seabird data available?") +
+            ggtitle("d. Atoll lagoon area") + 
+            guides(x = "axis_truncated", y = "axis_truncated") +
+            theme_classic() +
+            theme(legend.position = "none",
+                  axis.title.y = element_text(size = 12),
+                  axis.title.x = element_blank(),
+                  axis.text = element_text(size =11))
+
+pmiss5 <- ggplot(data = missing, aes(x = seabird_data, y = tropical_storms_50km, fill = seabird_data)) + 
+            geom_boxplot() +
+            geom_jitter(width = 0.1, size = 1.5) + 
+            ylab("Number of tropical storms") +
+            xlab("Seabird data available?") +
+            ggtitle("e. Tropical storms") + 
+            guides(x = "axis_truncated", y = "axis_truncated") +
+            theme_classic() +
+            theme(legend.position = "none",
+                  axis.title.y = element_text(size = 12),
+                  axis.title.x = element_blank(),
+                  axis.text = element_text(size =11))
+
+pmiss6 <- ggplot(data = missing, aes(x = seabird_data, y = hurricanes_50km, fill = seabird_data)) + 
+            geom_boxplot() +
+            geom_jitter(width = 0.1, size = 1.5) + 
+            ylab("Number of cyclones") +
+            xlab("Seabird data available?") +
+            ggtitle("f. Cyclones") + 
+            guides(x = "axis_truncated", y = "axis_truncated") +
+            theme_classic() +
+            theme(legend.position = "none",
+                  axis.title.y = element_text(size = 12),
+                  axis.title.x = element_blank(),
+                  axis.text = element_text(size =11))
+
+pmiss7 <- ggplot(data = missing, aes(x = seabird_data, y = distance_nearest_atoll_km, fill = seabird_data)) + 
+            geom_boxplot() +
+            geom_jitter(width = 0.1, size = 1.5) + 
+            ylab("Distance to nearest atoll [km]") +
+            ggtitle("g. Isolation: nearest atoll") + 
+            scale_y_continuous(trans = "log10", labels = scales::comma,
+                                breaks = c(10, 100, 1000)) +
+            guides(x = "axis_truncated", y = "axis_truncated") +
+            theme_classic() +
+            theme(legend.position = "none",
+                  axis.title.y = element_text(size = 12),
+                  axis.title.x = element_blank(),
+                  axis.text = element_text(size =11))
+
+pmiss8 <- ggplot(data = missing, aes(x = seabird_data, y = distance_nearest_high_island_km, fill = seabird_data)) + 
+            geom_boxplot() +
+            geom_jitter(width = 0.1, size = 1.5) + 
+            ylab("Distance to nearest high island [km]") +
+            xlab("Seabird data available?") +
+            ggtitle("h. Isolation: nearest high island") + 
+            scale_y_continuous(trans = "log10", labels = scales::comma,
+                                breaks = c(10, 100, 1000)) +
+            guides(x = "axis_truncated", y = "axis_truncated") +
+            theme_classic() +
+            theme(legend.position = "none",
+                  axis.title = element_text(size = 12),
+                  axis.text = element_text(size =11))
+
+pmiss9 <- ggplot(data = missing, aes(x = seabird_data, y = distance_continent_km, fill = seabird_data)) + 
+            geom_boxplot() +
+            geom_jitter(width = 0.1, size = 1.5) + 
+            ylab("Distance to nearest continent [km]") +
+            xlab("Seabird data available?") +
+            ggtitle("i. Isolation: continent") + 
+            guides(x = "axis_truncated", y = "axis_truncated") +
+            theme_classic() +
+            theme(legend.position = "none",
+                  axis.title = element_text(size = 12),
+                  axis.text = element_text(size =11))
+
+pmiss10 <- ggplot(data = na.omit(missing), aes(x = seabird_data, y = human_population+1, fill = seabird_data)) + 
+            geom_boxplot() +
+            geom_jitter(width = 0.1, size = 1.5) + 
+            ylab("Human population") +
+            xlab("Seabird data available?") +
+            ggtitle("j. Human population") + 
+            guides(x = "axis_truncated", y = "axis_truncated") +
+            scale_y_continuous(trans = "log10", labels = scales::comma,
+                                breaks = c(10, 100, 1000, 10000)) +
+            theme_classic() +
+            theme(legend.position = "none",
+                  axis.title = element_text(size = 12),
+                  axis.text = element_text(size =11))
+
+plotmissing <- (pmiss1+pmiss2+pmiss3)/(pmiss4+pmiss5+pmiss6)/(pmiss7+pmiss8+pmiss9)/(pmiss10+ggplot()+ggplot())
+
+# Save and export plot for analysis of missingness
+ggsave(plotmissing, filename = "fig_analysis_missing01.svg", dpi = 300, width = 210, height = 250, units = "mm")
+ggsave(map.missing, filename = "fig_analysis_missing02.svg", dpi = 300, width = 210, height = 100, units = "mm")
+
+
+```
+
 
 ```{r FIGURE 1 PLOTTING: abundance and richness}
 
@@ -525,7 +668,7 @@ pnutrientsP <- pphosph.a + pphosph.b + plot_layout(widths = c(1, 1.3)) # figure 
 
 # Save and export figure 3 and S2
 #ggsave(pnutrientsN, filename = "fig_nitrogen_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
-#ggsave(pnutrientsP, filename = "fig_phosphorous_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
+ggsave(pnutrientsP, filename = "fig_phosphorous_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
 
 ```
 
@@ -739,15 +882,6 @@ quantile(atoll$totP, probs = c(0.025, 0.975))
 sum(atoll$totNH3)
 mean(atoll$totNH3)
 quantile(atoll$totNH3, probs = c(0.025, 0.975))
-
-
-# Human presence on atolls is related to seabird presence
-atoll$human_presence <- ifelse(atoll$human_population == 0, "uninhabited", "inhabited")
-atoll$human_presence <- as.factor(atoll$human_presence)
-# Liot is inhabited but because pop size unknown it is returned as NA: change manually to inhabited atolls
-atoll$human_presence <- replace_na(atoll$human_presence, "inhabited")
-
-ggplot(atoll, aes(x = human_presence, y = log1p(nbirds))) + geom_boxplot() + geom_jitter() + theme_classic()
 
 ```
 

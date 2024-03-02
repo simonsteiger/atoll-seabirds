@@ -9,7 +9,7 @@ Ailinginae,Micronesia,yes,11.144382,166.378242,25,1651,2.8,112,3,1,2,4,27,Kosrae
 Ailinglaplap,Micronesia,no,7.394,168.7634,56,2950,14.7,777,2,1,3,6,67,Kosrae,674,3530,1729
 Ailuk,Micronesia,yes,10.3410084,169.9418605,57,1816,5.4,192,2,2,2,3,89,Kosrae,938,3860,339
 Aldabra,Indian_Ocean,yes,-9.416548,46.343366,46,673,155.4,191,2,0,0,3,132,Comores,356,650,0
-Alphonse,Indian_Ocean,no,-7.0206,52.7374,1,1350,1.7,8,0,0,0,0,6,Mahe,391,1282,82
+Alphonse,Indian_Ocean,yes,-7.0206,52.7374,1,1350,1.7,8,0,0,0,0,6,Mahe,391,1282,82
 Amanu,Polynesia,no,-17.8076,-140.7621,101,1369,15.6,212,0,0,2,2,35,Mangareva,840,6738,192
 Anaa,Polynesia,yes,-17.41667,-145.5,70,1584,38,112,0,2,2,3,70,Tahiti,386,6394,494
 Analtin,Melanesia,no,-1.1263,144.3952,11,3382,5.6,36,0,0,0,0,8.8,Manus,259,1112,0
@@ -61,7 +61,7 @@ Eniwetok,Micronesia,yes,11.4205556,162.3405556,40,1523,5.85,949,5,3,3,9,232,Pohn
 Erikub,Micronesia,yes,9.142,170.0205,14,1499,1.5,275,4,0,2,2,23,Kosrae,878,3748,0
 Etal,Micronesia,yes,5.5680556,153.5861111,17,3400,1.36,17,2,0,1,4,10,Chuuk,263,2186,0
 Europa,Indian_Ocean,yes,-22.3698,40.3699,1,137,28,5,17,3,8,22,119,Madagascar,298,495,0
-Faadhippolhu,Indian_Ocean,no,5.3905,73.52,52,1779,3.4,622,1,0,0,0,37,Sri_Lanka,740,506,9190
+Faadhippolhu,Indian_Ocean,yes,5.3905,73.52,52,1779,3.4,622,1,0,0,0,37,Sri_Lanka,740,506,9190
 Faafu,Indian_Ocean,no,3.1951,72.9295,23,1966,2,536,0,0,0,0,21,Sri_Lanka,858,728,3765
 Faaite,Polynesia,yes,-16.7506,-145.2421,32,1560,8.9,246,1,0,0,3,28,Tahiti,427,6359,246
 Fakahina,Polynesia,yes,-15.9851,-140.1331,2,1305,11.6,20,0,0,0,2,77,Mangareva,954,6882,155
@@ -228,7 +228,7 @@ Sapwuahfik,Micronesia,yes,5.8161306,157.2477972,10,4000,1.5,96,2,0,0,4,124,Pohnp
 Satawan,Micronesia,yes,5.4915713,153.5423431,33,3406,5,376,2,0,0,4,8,Chuuk,280,2172,3000
 Scilly,Polynesia,yes,-16.5434,-154.6841,13,1846,3.5,89,2,2,2,4,78,Maupiti,254,5452,40
 Sorol,Micronesia,yes,8.123771,140.40636,9,3250,0.93,10,8,10,21,32,196,Colonia,287,2097,0
-St_Francois,Indian_Ocean,no,-7.1177,52.749,2,1420,0.5,34,0,0,0,0,8,Mahe,398,1321,0
+St_Francois,Indian_Ocean,yes,-7.1177,52.749,2,1420,0.5,34,0,0,0,0,8,Mahe,398,1321,0
 St_Joseph,Indian_Ocean,yes,-5.4306,53.3358,13,1490,1.21,10,0,0,0,0,185,Mahe,249,1191,0
 Starbuck,Polynesia,yes,-5.6405,-155.8776,1,800,16.2,0,0,0,0,0,207,Bora_Bora,1276,5853,0
 Suheli_Par,Indian_Ocean,yes,10.0774,72.2915,3,1614,0.89,52,3,1,4,7,144,Sri_Lanka,837,404,10
