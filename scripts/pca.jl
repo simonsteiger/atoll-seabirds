@@ -7,7 +7,7 @@ import MultivariateStats as MS
 import StatsBase as SB
 
 const ROOT = dirname(Base.active_project())
-
+const SUFFIX = "steibl_et_al_2024_atoll_seabirds"
 const PC_NAMES = ["PC1", "PC2", "PC3", "PC4", "PC5", "PC6"]
 
 envs = CSV.read("$ROOT/data/envs_jicp.csv", DataFrame, missingstring="NA")
@@ -39,7 +39,7 @@ envscores = @chain predict(M, X_features)' begin
     outerjoin(_, seabirds, on=:atoll)
 end
 
-CSV.write("$ROOT/results/data/jl_envscores.csv", envscores)
+CSV.write("$ROOT/results/data/jl_envscores_$SUFFIX.csv", envscores)
 
 # Make a heatmap from PCA projections
 proj = MS.projection(M)
@@ -74,6 +74,6 @@ cg = palette([:blue, :white, :white, :red], 25)
 heatmap(PC_NAMES, collect(1:16), proj, size=(800, 600), color=cg, clim=(-0.75, 0.75))
 yticks!(collect(1:16), plotfeatures)
 
-foreach(ext -> savefig("$ROOT/results/$ext/pca.$ext"), ["svg", "png"])
+foreach(ext -> savefig("$ROOT/results/$ext/pca_$(SUFFIX).$ext"), ["svg", "png"])
 
 end

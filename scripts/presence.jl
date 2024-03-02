@@ -1,3 +1,8 @@
+# This script is part of the project associated with the article
+# ...
+# Authors:
+# Last edited:
+
 # --- MODEL MODULE --- #
 
 "This module fits the presence model, runs basic model diagnostics, summarises and exports the results."
@@ -7,9 +12,11 @@ export nothing
 
 # --- WORKSPACE SETUP --- #
 
-# Pathing and cmd args
+# Constants and cmd args
 const ROOT = dirname(Base.active_project())
-load = isempty(Main.ARGS) ? false : Main.ARGS[1]
+const SUFFIX = "steibl_et_al_2024_atoll_seabirds"
+load = Main.ARGS[1]
+run_loocv = Main.ARGS[2]
 
 # Probabilistic programming
 using Turing, ParetoSmooth, ReverseDiff
@@ -178,8 +185,9 @@ for priorsetting in keys(dict_pr)
 
     diagnose(posterior.chains)
 
-    try
-        path = "$ROOT/results/chains/presence_$priorsetting.jls"
+
+    !load && try
+        path = "$ROOT/results/chains/presence_$(priorsetting)_$(SUFFIX).jls"
         serialize(path, posterior.chains)
         @info "Presence model: Chains saved to `$path`."
     catch error
@@ -207,7 +215,7 @@ for priorsetting in keys(dict_pr)
     end
 
     plot(postpcplots..., titlefontsize=9, size=(800, 1200), layout=(8, 5))
-    foreach(ext -> savefig("$ROOT/results/$ext/presence/posterior_$priorsetting.$ext"), ["svg", "png"])
+    foreach(ext -> savefig("$ROOT/results/$ext/presence/posterior_$(priorsetting)_$(SUFFIX).$ext"), ["svg", "png"])
 
     # --- TARGET PREDICTIONS --- #
 
@@ -250,7 +258,7 @@ for priorsetting in keys(dict_pr)
 
     # Save predictions for unknown atolls to CSV
     try
-        path = "$ROOT/results/data/presencepreds_$priorsetting.csv"
+        path = "$ROOT/results/data/presencepreds_$(priorsetting)_$(SUFFIX).csv"
         CSV.write(path, df_preds)
         @info "Presence model: Saved predictions to `$path`."
     catch error
@@ -258,15 +266,17 @@ for priorsetting in keys(dict_pr)
     end
 
     # --- PSIS-LOO CV --- #
-    @info "Presence model: Crossvalidation for $priorsetting priors"
-    cv_res = psis_loo(m, posterior.chains)
-    cv_res
-    # - no overfit
-    # - out of sample performance near in-sample performance (gmpd 0.76)
-    # - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))
-    # - in line with posterior predictive check
-    # - not sure how to interpret differences in naive_lpd and cv_elpd ... but they seem very low p_avg 0.02
-
+    if run_loocv
+        @info "Presence model: Crossvalidation for $priorsetting priors"
+        cv_res = psis_loo(m, posterior.chains)
+        cv_res
+        # - no overfit
+        # - out of sample performance near in-sample performance (gmpd 0.76)
+        # - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))
+        # - in line with posterior predictive check
+    else
+        @warn "Presence model: Skipping crossvalidation for $priorsetting priors"
+    end
 
 end
 
@@ -298,6 +308,6 @@ plot(
 ylabel!("Atoll")
 xlabel!("Species")
 
-foreach(ext -> savefig("$ROOT/results/$ext/presence/sensitivity.$ext"), ["svg", "png"])
+foreach(ext -> savefig("$ROOT/results/$ext/presence/sensitivity_$(SUFFIX).$ext"), ["svg", "png"])
 
 end

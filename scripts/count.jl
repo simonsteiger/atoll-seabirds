@@ -7,9 +7,11 @@ export nothing
 
 # --- WORKSPACE SETUP --- #
 
-# Path and cmd args
+# Constants and cmd args
 const ROOT = dirname(Base.active_project())
-load = isempty(Main.ARGS) ? false : Main.ARGS[1]
+const SUFFIX = "steibl_et_al_2024_atoll_seabirds"
+load = Main.ARGS[1]
+run_loocv = Main.ARGS[2]
 
 # Probabilistic programming
 using Turing, TuringBenchmarking, ReverseDiff, ParetoSmooth, PosteriorStats
@@ -141,7 +143,7 @@ for priorsetting in keys(dict_pr)
         ylabel!("Density")
     end
 
-    foreach(ext -> savefig("$ROOT/results/$ext/count/prior_$priorsetting.$ext"), ["svg", "png"])
+    foreach(ext -> savefig("$ROOT/results/$ext/count/prior_$(priorsetting)_$(SUFFIX).$ext"), ["svg", "png"])
 
     # --- MODEL CONFIG --- #
 
@@ -187,7 +189,7 @@ for priorsetting in keys(dict_pr)
         if load
             try
                 @info "Loading chains for $priorsetting prior."
-                deserialize("$ROOT/results/chains/count_$priorsetting.jls") # Load existing chains
+                deserialize("$ROOT/results/chains/count_$(priorsetting)_$(SUFFIX).jls") # Load existing chains
             catch error
                 @warn "Could not load chains, sampling from posterior instead."
                 sample(m, config...) # Sample from model
@@ -201,8 +203,8 @@ for priorsetting in keys(dict_pr)
 
     diagnose(posterior.chains)
 
-    try
-        path = "$ROOT/results/chains/count_$priorsetting.jls"
+    !load && try
+        path = "$ROOT/results/chains/count_$(priorsetting)_$(SUFFIX).jls"
         serialize(path, posterior.chains)
         @info "Count model: Chains saved to `$path`."
     catch error
@@ -247,7 +249,7 @@ for priorsetting in keys(dict_pr)
         plot(plots..., layout=(8, 5), titlefontsize=8, size=(800, 1000))
     end
 
-    foreach(ext -> savefig("$ROOT/results/$ext/count/posterior_$priorsetting.$ext"), ["svg", "png"])
+    foreach(ext -> savefig("$ROOT/results/$ext/count/posterior_$(priorsetting)_$(SUFFIX).$ext"), ["svg", "png"])
 
     # Create dictionary of species-wise posterior prediction plot, also showing uncertainty of estimates
     # Showing error bars makes the plot too busy for a single global view
@@ -310,7 +312,7 @@ for priorsetting in keys(dict_pr)
 
             q = maximum([quantile(slice, 0.8) for slice in eachslice(sppred, dims=1)])
 
-            ax = CM.Axis(f[midx(idx, 4)...], title=sp, xlabel="Abundance (N)")
+            ax = CM.Axis(f[midx(idx, 4)...], title=replace(sp, "_" => " "), xlabel="Abundance (N)")
 
             for (i, v) in enumerate(eachslice(sppred, dims=1))
                 CM.density!(v[v.<q],
@@ -328,7 +330,7 @@ for priorsetting in keys(dict_pr)
             CM.hidespines!(ax, :t, :r, :l)
         end
         # Save plots to svg and png
-        foreach(ext -> CM.save("$ROOT/results/$ext/count/validation_$priorsetting.$ext", f), ["svg", "png"])
+        foreach(ext -> CM.save("$ROOT/results/$ext/count/validation_$(priorsetting)_$(SUFFIX).$ext", f), ["svg", "png"])
     end
 
     # --- TARGET PREDICTIONS --- #
@@ -376,7 +378,7 @@ for priorsetting in keys(dict_pr)
     end
 
     # Save results for each threshold to an individual CSV
-    foreach(k -> CSV.write("$ROOT/results/data/countpreds_$(k)_$priorsetting.csv", select(preds_target[k], Not(:raw))), keys(preds_target))
+    foreach(k -> CSV.write("$ROOT/results/data/countpreds_$(k)_$(priorsetting)_$(SUFFIX).csv", select(preds_target[k], Not(:raw))), keys(preds_target))
 
     # --- PSIS-LOO CV --- #
 
@@ -386,8 +388,6 @@ for priorsetting in keys(dict_pr)
 
     # Regarding the "let's just put the model back into this script" ... 
     # Not a big issue at all, but spelling out loospecial again seems nasty
-
-    @info "Count model: Crossvalidation for $priorsetting priors"
 
     @model function broadcastmodel(
         r, s, n, PC, # input values
@@ -426,7 +426,12 @@ for priorsetting in keys(dict_pr)
 
     loomodel = broadcastmodel(values(odict_inputs)..., zlogn; pr=dict_pr[priorsetting])
 
-    cv_res = psis_loo(loomodel, posterior.chains)
+    if run_loocv
+        @info "Count model: Crossvalidation for $priorsetting priors"
+        cv_res = psis_loo(loomodel, posterior.chains)
+    else
+        @warn "Count model: Skipping crossvalidation for $priorsetting priors"
+    end
 
 end
 
@@ -478,9 +483,9 @@ select!.([tot75, tot80, tot85], Ref(Not(:birdlife_min, :birdlife_max, :HBW, :Ote
 histogram((tot75.ratio_nbirds .- tot85.ratio_nbirds) .* 100, title="Pop on atoll ratio diff .75 - .85", label=:none)
 xticks!(-1:3, string.(-1:3) .* "%")
 
-CSV.write("$ROOT/results/data/allpopulations.csv", full80)
+CSV.write("$ROOT/results/data/allpopulations_$SUFFIX.csv", full80)
 # Not used in plotting pipeline, instead recalculated there
-CSV.write("$ROOT/results/data/ratios.csv", tot80)
+CSV.write("$ROOT/results/data/ratios_$SUFFIX.csv", tot80)
 
 # --- SENSITIVITY ANALYSIS --- # 
 

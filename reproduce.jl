@@ -8,8 +8,13 @@ Pkg.instantiate()
 
 const ROOT = dirname(Base.active_project())
 
-# Set ARGS to true if you have saved chains from a previous run which you want to load
-ARGS = false
+# ARGS allows you to make slight modifications on how the scripts are run
+# ARGS[1]: if `true`, load previously created chains
+# This can save a lot of time if want to recreate summaries without refitting the models
+# ARGS[2]: if `true`, run loo_cv
+# Running loo_cv takes the longest out of all downstream analyses, and skipping it further speeds up recreating summaries
+# => The fastest setup is `ARGS = [true, false]`, but it assumes that you have saved chains!
+ARGS = [true, false]
 
 include("$ROOT/scripts/pca.jl")
 include("$ROOT/scripts/presence.jl")
