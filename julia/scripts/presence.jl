@@ -16,6 +16,7 @@ export nothing
 # Need to check for "true" again because the shell script converts args to strings
 load = Main.ARGS[1] == "false"
 run_loocv = Main.ARGS[2] == "true"
+run_sensitivity = Main.ARGS[3] == "true"
 
 # Probabilistic programming
 using Turing, ParetoSmooth, ReverseDiff
@@ -104,7 +105,9 @@ dict_pr = Dict(
     "wide" => (α_sxr=[0, 1 * 3], μ_pxn=[0, 0.2 * 3], σ_pxn=[3, 0.5 * 3]),
 )
 
-for priorsetting in keys(dict_pr)
+priorsettings = run_sensitivity ? collect(keys(dict_pr)) : "default"
+
+for priorsetting in priorsettings
 
     m = model(values(odict_inputs)..., presence; pr=dict_pr[priorsetting])
 

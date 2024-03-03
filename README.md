@@ -38,7 +38,7 @@ Replace the segment `/path/to/repository` below with the path to the project fol
 Next, run all scripts by executing `reproduce.sh`:
 
 ```console
-$ ./reproduce.sh /path/to/repository true true
+$ ./reproduce.sh /path/to/repository true true false
 ```
 
 Replace the segment `path/to/repository` with the path to the project folder on your machine.
@@ -47,10 +47,11 @@ Replace the segment `path/to/repository` with the path to the project folder on 
 To run the above command in Z shell, prefix with `bash`, i.e., `% bash ./reproduce.sh ...`.
 
 **Additional arguments:**
-The extra arguments to `reproduce.sh` (here, `true true`) are forwarded to the Julia scripts.
+The extra arguments to `reproduce.sh` (`true true false`) are forwarded to the Julia scripts, and intend to give the user more fine-grained control over the runtime.
 The first argument determines if the analysis scripts sample from the posterior (`true`) or attempt to load previously saved chains (`false`). Loading saved chains requires having sampled from the posterior at least once on your machine.
 The second argument determines if [cross validation](https://mc-stan.org/loo/articles/online-only/faq.html) is performed (`true`) or skipped (`false`).
-Both options are intended to allow the user to quickly rerun the analysis after having sampled from the posterior once.
+The third argument determines if sensitivity analyses with different prior settings are run (`true`), or if only the default prior is used (`false`).
+Note that running sensitivity analyses quadruples the runtime.
 
 **Run-time:**
 The analyses were performed on a MacBook Pro (M1) and took *TODO measure time!*.
