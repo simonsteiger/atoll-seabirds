@@ -105,7 +105,7 @@ dict_pr = Dict(
     "wide" => (α_sxr=[0, 1 * 3], μ_pxn=[0, 0.2 * 3], σ_pxn=[3, 0.5 * 3]),
 )
 
-priorsettings = run_sensitivity ? collect(keys(dict_pr)) : "default"
+priorsettings = run_sensitivity ? collect(keys(dict_pr)) : ["default"]
 
 for priorsetting in priorsettings
 
