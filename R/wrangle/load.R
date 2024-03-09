@@ -15,7 +15,7 @@ box::use(
 
 #' @export
 list_nc <- pr$set_names(global$names_load) %>%
-  pr$map(~ nc$nc_open(here$here(paste0("data/copernicus_", .x, ".nc"))))
+  pr$map(~ nc$nc_open(here$here(paste0("data/remotesensing/copernicus_", .x, ".nc"))))
 
 #' @export
 latitude <- as.vector(list_nc$nppv$dim[[3]]$vals)
@@ -55,7 +55,7 @@ list_matrix$velo <- ab$abind(
 list_matrix <- list_matrix[-c(4:9)]
 
 #' @export
-envs <- ut$read.csv(here$here("data/seabird_atolls_envs.csv"))
+envs <- ut$read.csv(here$here(paste0("data/vars_atoll", global$suffix, ".csv")))
 
 #' @export
 envs_trans_coord <- envs %>%
@@ -64,7 +64,7 @@ envs_trans_coord <- envs %>%
   )
 
 #' @export
-pop <- ut$read.csv(here$here("data/atoll_seabird_populations.csv"))
+pop <- ut$read.csv(here$here(paste0("data/obs_seabird_populations", global$suffix, ".csv")))
 
 # Assert that all counts are integers
 if (!all(dp$summarise(pop, dp$across(ts$where(is.numeric), is.integer)))) {

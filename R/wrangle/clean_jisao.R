@@ -6,6 +6,7 @@ box::use(
   dp = dplyr,
   ts = tidyselect,
   magrittr[`%>%`],
+  here,
 )
 
 box::use(
@@ -14,7 +15,7 @@ box::use(
   fn = R / wrangle / functions,
 )
 
-data_nc <- nc$nc_open("data/preci_anom_cor.nc")
+data_nc <- nc$nc_open(here$here("data/remotesensing/preci_anom_cor.nc"))
 
 latitude <- as.vector(data_nc$dim[[1]]$vals)
 

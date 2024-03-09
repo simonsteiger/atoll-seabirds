@@ -19,7 +19,7 @@ const FEATURES = [:PC1, :PC2, :PC3, :PC4, :PC5, :PC6]
 
 # Import the outofsample validation data
 df_oos = @chain begin
-    joinpath(Main.ROOT, "data", "atoll_seabird_populations_outofsample-validation.csv")
+    joinpath(Main.ROOT, "data", "obs_seabird_populations_outofsample-validation_$(Main.SUFFIX).csv")
     # Three columns formatted as date in original file, make sure to read as String
     CSV.read(_, DataFrame, types=Union{String, Missing})
     stack(_, Not(:atoll), variable_name=:species)

@@ -2,9 +2,9 @@
 .Rhistory
 .RData
 .Ruserdata
-fits/_*
-data/copernicus_*
+*.nc
 *.jls
 .DS_Store
-results/data/*.fst
 *_files
+*.png
+*.svg

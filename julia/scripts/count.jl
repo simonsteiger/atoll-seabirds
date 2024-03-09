@@ -490,9 +490,7 @@ select!.([tot75, tot80, tot85], Ref(Not(:birdlife_min, :birdlife_max, :HBW, :Ote
 histogram((tot75.ratio_nbirds .- tot85.ratio_nbirds) .* 100, title="Pop on atoll ratio diff .75 - .85", label=:none)
 xticks!(-1:3, string.(-1:3) .* "%")
 
-CSV.write(joinpath(Main.ROOT, "results", "data", "allpopulations_$(Main.SUFFIX).csv"), full80)
-# Not used in plotting pipeline, instead recalculated there
-CSV.write(joinpath(Main.ROOT, "results", "data", "ratios_$(Main.SUFFIX).csv"), tot80)
+CSV.write(joinpath(Main.ROOT, "results", "data", "pred_and_obs_atolls_$(Main.SUFFIX).csv"), full80)
 
 # --- SENSITIVITY ANALYSIS --- # 
 

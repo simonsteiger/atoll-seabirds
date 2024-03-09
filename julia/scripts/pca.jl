@@ -13,14 +13,14 @@ import StatsBase as SB
 
 const PC_NAMES = ["PC1", "PC2", "PC3", "PC4", "PC5", "PC6"]
 
-envs = CSV.read(joinpath(Main.ROOT, "data", "envs_jicp.csv"), DataFrame, missingstring="NA")
+envs = CSV.read(joinpath(Main.ROOT, "data", "remotesensing", "envs_jicp.csv"), DataFrame, missingstring="NA")
 
 DataFrames.transform!(envs, :human_population => ByRow(x -> ifelse(ismissing(x), round(median(skipmissing(envs.human_population)), digits=0), x)) => identity)
 
 DataFrames.transform!(envs, [:number_islets, :land_area_sqkm, :distance_nearest_atoll_km, :distance_nearest_high_island_km] .=> ByRow(x -> log(x)) => identity)
 DataFrames.transform!(envs, [:lagoon_area_sqkm, :tropical_storms_50km, :hurricanes_50km, :human_population] .=> ByRow(x -> log1p(x)) => identity)
 
-seabirds = @chain CSV.read(joinpath(Main.ROOT, "data", "atoll_seabird_populations.csv"), DataFrame) begin
+seabirds = @chain CSV.read(joinpath(Main.ROOT, "data", "obs_seabird_populations_$(Main.SUFFIX).csv"), DataFrame) begin
     stack(_, Not(:atoll), variable_name=:species, value_name=:presence)
     DataFrames.transform(_, :presence => ByRow(x -> ismissing(x) ? 0.0 : 1.0) => identity)
 end
@@ -42,7 +42,7 @@ envscores = @chain predict(M, X_features)' begin
     outerjoin(_, seabirds, on=:atoll)
 end
 
-CSV.write(joinpath(Main.ROOT, "results", "data", "jl_envscores_$(Main.SUFFIX).csv"), envscores)
+CSV.write(joinpath(Main.ROOT, "results", "data", "pca_scores_$(Main.SUFFIX).csv"), envscores)
 
 # Make a heatmap from PCA projections
 proj = MS.projection(M)

@@ -12,7 +12,7 @@ cd "$1" || { echo "Error: Directory not found"; exit 1; }
 # Define the paths to the scripts
 julia_path="$1/julia/reproduce.jl"
 rprofile_path="$1/.Rprofile"
-r_path="$1/R/steibl_et_al_2024_atoll_seabird_analysis_R-script.R"
+r_path="$1/R/plot_results_steibl_et_al_2024_atoll_seabird_analysis.R"
 
 # Execute the julia pipeline
 julia --project --threads 4 "$julia_path" "$2" "$3" "$4"

@@ -9,32 +9,31 @@
 # I assume we would need `dplyr`, `tidyr`, and `purrr`? depends on for loop
 # Add all used libraries in `dependencies.R` and run `renv::snapshot()`
 
-library("tidyverse")
+library("dplyr")
+library("ggplot2")
+library("tidyr")
 library("sf")
+library("purrr")
 library("patchwork")
 library("rnaturalearth")
 library("rnaturalearthdata")
 library("RColorBrewer")
 library("ggh4x")
-library("adespatial")
 library("scales")
-library("EnvStats")
 library("fields")
 library("here")
-library("fst")
-library("ggdensity")
 library("hdrcde")
 
 suffix <- "_steibl_et_al_2024_atoll_seabird_analysis"
 
 # Read data ----
 
-preds <- read.csv(here(paste0("results/data/allpopulations", suffix, ".csv")))
+preds <- read.csv(here(paste0("results/data/pred_and_obs_atolls", suffix, ".csv")))
 # Currently the files in data/ are not renamed
-est <- read.csv(here(paste0("data/atoll_seabird_global_popestimates", "", ".csv")))
-envs <- read.csv(here(paste0("data/seabird_atolls_envs", "", ".csv")))
-nest <- read.csv(here(paste0("data/seabird_filterconditions", "", ".csv")))
-forag <- read.csv(here(paste0("data/seabird_atolls_foraging", "", ".csv")))
+est <- read.csv(here(paste0("data/birdlife_hbw_globalestimates", suffix, ".csv")))
+envs <- read.csv(here(paste0("data/vars_atoll", suffix, ".csv")))
+nest <- read.csv(here(paste0("data/vars_seabird", suffix, ".csv")))
+forag <- read.csv(here(paste0("data/vars_foraging", suffix, ".csv")))
 
 
 # Prepare data frames for plotting ----
@@ -491,8 +490,8 @@ pmiss10 <- ggplot(data = na.omit(missing), aes(x = seabird_data, y = human_popul
 plotmissing <- (pmiss1 + pmiss2 + pmiss3) / (pmiss4 + pmiss5 + pmiss6) / (pmiss7 + pmiss8 + pmiss9) / (pmiss10 + ggplot() + ggplot())
 
 # Save and export plot for analysis of missingness
-ggsave(plotmissing, path = here("results", "svg", "article"), filename = "fig_analysis_missing01.svg", dpi = 300, width = 210, height = 250, units = "mm")
-ggsave(map.missing, path = here("results", "svg", "article"), filename = "fig_analysis_missing02.svg", dpi = 300, width = 210, height = 100, units = "mm")
+# ggsave(plotmissing, path = here("results", "svg", "article"), filename = "fig_analysis_missing01.svg", dpi = 300, width = 210, height = 250, units = "mm")
+# ggsave(map.missing, path = here("results", "svg", "article"), filename = "fig_analysis_missing02.svg", dpi = 300, width = 210, height = 100, units = "mm")
 
 
 # FIGURE 1 PLOTTING: abundance and richness ----
@@ -911,28 +910,7 @@ avgforag.atoll <- comb %>%
   select(atoll, nbirds, dist, distvar) %>%
   filter(nbirds > 0)
 
-start1 <- Sys.time()
-out <- data.frame()
-for (i in 1:nrow(avgforag.atoll)) {
-  temp1 <- rnorm(
-    n = avgforag.atoll[i, ]$nbirds,
-    mean = avgforag.atoll[i, ]$dist,
-    sd = avgforag.atoll[i, ]$distvar
-  ) %>% as.data.frame()
-  temp2 <- rep(avgforag.atoll[i, ]$atoll, times = avgforag.atoll[i, ]$nbirds) %>% as.data.frame()
-
-  temp <- cbind(temp1, temp2)
-
-  out <- rbind(out, temp)
-}
-end1 <- Sys.time()
-
-### DECIDE IF WE WANT THIS, CURRENTLY DUPLICATE
-
-library(purrr)
-
-start2 <- Sys.time()
-out2 <- map(seq_len(nrow(avgforag.atoll)), \(i) {
+out <- map(seq_len(nrow(avgforag.atoll)), \(i) {
   data.frame(
     atoll = avgforag.atoll[i, ]$atoll,
     n = rnorm(
@@ -942,11 +920,6 @@ out2 <- map(seq_len(nrow(avgforag.atoll)), \(i) {
     )
   )
 }) %>% list_rbind()
-end2 <- Sys.time()
-print(end1 - start1)
-print(end2 - start2)
-
-###
 
 colnames(out) <- c("dist", "atoll")
 out$dist <- abs(out$dist)

@@ -18,12 +18,12 @@ using CSV, DataFrames, Chain
 import StatsBase: denserank
 
 # Import the data
-envscores = CSV.read(joinpath(Main.ROOT, "results", "data", "jl_envscores_$(Main.SUFFIX).csv"), DataFrame)
-pop = CSV.read(joinpath(Main.ROOT, "data", "atoll_seabird_populations.csv"), DataFrame)
+envscores = CSV.read(joinpath(Main.ROOT, "results", "data", "pca_scores_$(Main.SUFFIX).csv"), DataFrame)
+pop = CSV.read(joinpath(Main.ROOT, "data", "obs_seabird_populations_$(Main.SUFFIX).csv"), DataFrame)
 
 # Add data about nesting type
 specinfo = @chain begin
-    CSV.read(joinpath(Main.ROOT, "data", "seabird_filterconditions.csv"), DataFrame)
+    CSV.read(joinpath(Main.ROOT, "data", "vars_seabird_$(Main.SUFFIX).csv"), DataFrame)
     select(_, [:species, :nestingtype])
 end
 

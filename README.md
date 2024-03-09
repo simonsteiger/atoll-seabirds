@@ -54,7 +54,7 @@ The third argument determines if sensitivity analyses with different prior setti
 Note that running sensitivity analyses quadruples the runtime.
 
 **Run-time:**
-The analyses were performed on a MacBook Pro (M1) and took *TODO measure time!*.
+The analyses were performed on a MacBook Pro (M1) and took 75 minutes.
 
 (If we / reviewers think that this runtime is too long, we can make running sensitivity analyses optional with another argument to `reproduce.sh`)
 
