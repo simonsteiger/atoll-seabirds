@@ -1,3 +1,8 @@
+# This script is part of the project associated with
+# Article: Atolls are globally significant hubs for tropical seabirds
+# Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
+# Last edited: 2024-03-10
+
 box::use(
   nc = ncdf4,
   ut = utils,
@@ -29,7 +34,7 @@ precip_anom <- whole_array[, , 2] # cm/month is second slice
 ji_data <- fn$convert_to_tibble(precip_anom, "precip_anom", lat = latitude, long = longitude)
 
 #' @export
-out <- 
+out <-
   pr$map(
     seq_len(nrow(load$envs)), # nrow load$envs = number of atolls
     ~ fn$filter_jisao(ji_data, load$envs_trans_coord[.x, ]$lat, load$envs_trans_coord[.x, ]$long)
@@ -42,5 +47,5 @@ out <-
   )
 
 #' @export
-envs <- dp$left_join(load$envs, out, by = "atoll", suffix = c("", ".dupl")) %>% 
+envs <- dp$left_join(load$envs, out, by = "atoll", suffix = c("", ".dupl")) %>%
   dp$select(-ts$ends_with(".dupl"))

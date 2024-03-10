@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "# --- STARTING PIPELINE --- #"
+
 # Check if the project directory path and additional arguments are provided
 if [ $# -lt 4 ]; then
     echo "Usage: $0 <project_directory> <sample?> <loocv?> <sensitivity?>"
@@ -22,3 +24,5 @@ Rscript "$rprofile_path"
 
 # Create figures
 Rscript "$r_path"
+
+echo "# --- PIPELINE ENDED --- #"

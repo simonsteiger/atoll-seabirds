@@ -1,7 +1,7 @@
-# This script is part of the project associated with the article
-# ...
-# Authors:
-# Last edited:
+# This script is part of the project associated with
+# Article: Atolls are globally significant hubs for tropical seabirds
+# Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
+# Last edited: 2024-03-10
 
 # --- MODEL MODULE --- #
 
@@ -291,12 +291,11 @@ module PresenceSensitivity
 
 using DataFrames, Chain, CSV, StatsPlots
 
+# Helper to unstack dataframe
 my_unstack(df) = unstack(df[:, [:atoll, :species, :mean]], :species, :mean)
 
-preds_narrow, preds_wide, preds_default =
-    map(["narrow", "wide", "default"]) do pr
-        my_unstack(CSV.read(joinpath(Main.ROOT, "results", "data", "presencepreds_$(pr)_$(Main.SUFFIX).csv"), DataFrame))
-    end
+# Only running cutoff sensitivity checks for default priors here
+preds_default = my_unstack(CSV.read(joinpath(Main.ROOT, "results", "data", "presencepreds_default_$(Main.SUFFIX).csv"), DataFrame))
 
 plot(
     map([0.7:0.05:0.9;]) do threshold

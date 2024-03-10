@@ -1,7 +1,7 @@
-# This script is part of the project associated with the article
-# ...
-# Authors:
-# Last edited:
+# This script is part of the project associated with
+# Article: Atolls are globally significant hubs for tropical seabirds
+# Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
+# Last edited: 2024-03-10
 
 # --- MODEL MODULE --- #
 
@@ -462,12 +462,15 @@ using .GlobalVariables
 include(joinpath(Main.ROOT, "julia", "src", "utilities.jl"))
 using .CustomUtilityFuns
 
+run_sensitivity = Main.ARGS[3] == "true"
+priorsettings = run_sensitivity ? ["default", "mean", "global", "narrow", "wide"] : ["default"]
+
 known = @chain pop_known begin
     select(_, [:atoll, :region, :species, :nbirds])
     transform(_, :nbirds => ByRow(x -> (lower=x, upper=x)) => AsTable)
 end
 
-glob = CSV.read(joinpath(Main.ROOT, "data", "atoll_seabird_global_popestimates.csv"), DataFrame)
+glob = CSV.read(joinpath(Main.ROOT, "data", "birdlife_hbw_globalestimates_$(Main.SUFFIX).csv"), DataFrame)
 
 DataFrames.transform!(pop_unknown, [:atoll, :species, :region] .=> denserank => x -> string("num_", x))
 
@@ -497,8 +500,8 @@ CSV.write(joinpath(Main.ROOT, "results", "data", "pred_and_obs_atolls_$(Main.SUF
 # for 0.8 cutoffs
 
 dict_sensitivity = @chain begin
-    map(["default", "mean", "global", "narrow", "wide"]) do prior
-        Pair(prior, CSV.read(joinpath(Main.ROOT, "results", "data", "countpreds_0.8_$(prior)_$(Main.SUFFIX).csv"), DataFrame))
+    map(priorsettings) do priorsetting
+        Pair(priorsetting, CSV.read(joinpath(Main.ROOT, "results", "data", "countpreds_0.8_$(priorsetting)_$(Main.SUFFIX).csv"), DataFrame))
     end
     Dict(_)
 end

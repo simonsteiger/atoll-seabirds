@@ -6,5 +6,5 @@
 *.jls
 .DS_Store
 *_files
-*.png
-*.svg
+**/*.png
+**/*.svg

@@ -1,8 +1,11 @@
-# NetCDF data frames are too large to share on GitHub
-# We are only uploading the specifications we used to download them
-# and the scripts we used to clean them.
+# This script is part of the project associated with
+# Article: Atolls are globally significant hubs for tropical seabirds
+# Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
+# Last edited: 2024-03-10
 
 import Pkg
+
+@info "Instantiating project"
 
 Pkg.instantiate()
 

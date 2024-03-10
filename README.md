@@ -1,8 +1,21 @@
 # Atoll seabird analysis
 
-Text about main findings 
+![](figures/fig_summary.png)
 
-(Tried adding the summary figure, but this currently contains a lot of whitespace at the bottom. Can add it back later after removing whitespace)
+Short summary of main findings goes here.
+
+## Cite
+
+**TODO**: Replace XXXX with a bibtex shorthand for the paper and journal.
+
+```bibtex
+@article{steibl2024XXXX,
+  title={Atolls are globally significant hubs for tropical seabirds},
+  author={Steibl, Sebastian and Steiger, Simon and Wegmann and Alex S and Holmes, Nick D and Young, Hillary S and Carr, Pete and Russell, James C},
+  journal={XXXX},
+  year={2024}
+}
+```
 
 ## Workflow
 
@@ -13,7 +26,9 @@ Drop or describe in text format?
 
 ### System-independent prerequisites
 
-Install the R programming language ([Windows](https://cran.r-project.org/bin/windows/), [MacOS](https://cran.r-project.org/bin/macosx/), [Linux](https://cran.r-project.org/bin/linux/)), and the [Julia programming language](https://julialang.org/downloads/).
+1. Install the R programming language ([Windows](https://cran.r-project.org/bin/windows/), [MacOS](https://cran.r-project.org/bin/macosx/), [Linux](https://cran.r-project.org/bin/linux/))
+2. Install the [Julia programming language](https://julialang.org/downloads/). Check the option to *Add julia to the PATH* to skip step 3.
+3. Add R and Julia to the PATH (Instructions for [Julia](https://julialang.org/downloads/platform/), the process is the same for R except that you will have to add the directory of the R binary). You can test if you previously added R or Julia to the PATH by running `R` or `julia` in a Unix shell. **Tip**: If you do not know the path to your Julia binary, you can write `Sys.BINDIR` in the Julia REPL. For the equivalent in R, run `R.home("bin")` in an R console.
 
 ### Windows-specific prerequisites
 
@@ -54,9 +69,8 @@ The third argument determines if sensitivity analyses with different prior setti
 Note that running sensitivity analyses quadruples the runtime.
 
 **Run-time:**
-The analyses were performed on a MacBook Pro (M1) and took 75 minutes.
-
-(If we / reviewers think that this runtime is too long, we can make running sensitivity analyses optional with another argument to `reproduce.sh`)
+The analyses were performed on a MacBook Pro (M1) and took 90 minutes, including 10 minutes of package download and precompilation.
+These values depend on the speed of your computer and internet connection.
 
 ## Project structure
 
@@ -64,7 +78,7 @@ A sentence or two about the project structure.
 
 ```
 ├── R                            # R scripts
-│   ├── wrangle                      # R scripts used for data wrangling
+│   ├── wrangle                      # Data wrangling of remotesensing data
 │   └── create_figures.R             # Creates raw figures for article
 ├── data                         # CSV files which are *inputs to* the model
 ├── figures                      # Final figures used in the article
@@ -84,3 +98,9 @@ A sentence or two about the project structure.
 .
 └── reproduce.sh                 # Execute entire model pipeline, see "Installation" above for instructions
 ```
+
+## Note on remotesensing data
+
+The raw data downloaded from [Copernicus](https://marine.copernicus.eu/access-data/ocean-monitoring-indicators) and [JISAO](https://www.pmel.noaa.gov/co2/story/JISAO) are too large to share on GitHub.
+We are only uploading the specifications we used to download them and the scripts we used to clean them.
+The scripts can be found in the `R/wrangle` directory.

@@ -1,9 +1,11 @@
-# This script is part of the project associated with the article
-# ...
-# Authors:
-# Last edited:
+# This script is part of the project associated with
+# Article: Atolls are globally significant hubs for tropical seabirds
+# Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
+# Last edited: 2024-03-10
 
 module PCs
+
+@info "Running PCA"
 
 export nothing
 

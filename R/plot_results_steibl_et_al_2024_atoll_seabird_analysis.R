@@ -1,17 +1,14 @@
-# This script is part of the project associated with the article
-# ...
-# Authors:
-# Last edited:
+# This script is part of the project associated with
+# Article: Atolls are globally significant hubs for tropical seabirds
+# Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
+# Last edited: 2024-03-10
 
 # Load packages ----
-
-# Should avoid importing tidyverse, as it adds many unused dependencies
-# I assume we would need `dplyr`, `tidyr`, and `purrr`? depends on for loop
-# Add all used libraries in `dependencies.R` and run `renv::snapshot()`
 
 library("dplyr")
 library("ggplot2")
 library("tidyr")
+library("stringr")
 library("sf")
 library("purrr")
 library("patchwork")
@@ -23,6 +20,7 @@ library("scales")
 library("fields")
 library("here")
 library("hdrcde")
+library("adespatial")
 
 suffix <- "_steibl_et_al_2024_atoll_seabird_analysis"
 
@@ -34,7 +32,6 @@ est <- read.csv(here(paste0("data/birdlife_hbw_globalestimates", suffix, ".csv")
 envs <- read.csv(here(paste0("data/vars_atoll", suffix, ".csv")))
 nest <- read.csv(here(paste0("data/vars_seabird", suffix, ".csv")))
 forag <- read.csv(here(paste0("data/vars_foraging", suffix, ".csv")))
-
 
 # Prepare data frames for plotting ----
 
@@ -49,9 +46,7 @@ envs <- envs %>%
 preds <- preds %>%
   select(atoll, species, nbirds, lower, upper) %>%
   mutate(across(1:2, as.factor))
-nest <- nest %>%
-  select(!filtercondition) %>%
-  mutate(across(1:3, as.factor))
+nest <- mutate(nest, across(1:3, as.factor))
 forag$species <- as.factor(forag$species)
 
 # turn predicted abundances into whole numbers
@@ -85,7 +80,6 @@ matrix.upr <- dat %>%
   as.data.frame()
 
 rm(dat) # no longer needed, keep tidy
-
 
 # calculate local contribution to beta diversity (LCBD) [and species contribution to beta diversity (SCBD)]
 beta.atoll <- matrix[c(which(rowMeans(matrix[, -c(1:5)]) > 0)), -c(1:5)] %>%
@@ -913,7 +907,7 @@ avgforag.atoll <- comb %>%
 out <- map(seq_len(nrow(avgforag.atoll)), \(i) {
   data.frame(
     atoll = avgforag.atoll[i, ]$atoll,
-    n = rnorm(
+    dist = rnorm(
       n = avgforag.atoll[i, ]$nbirds,
       mean = avgforag.atoll[i, ]$dist,
       sd = avgforag.atoll[i, ]$distvar
@@ -921,7 +915,6 @@ out <- map(seq_len(nrow(avgforag.atoll)), \(i) {
   )
 }) %>% list_rbind()
 
-colnames(out) <- c("dist", "atoll")
 out$dist <- abs(out$dist)
 
 mean.forag <- out %>%
