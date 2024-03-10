@@ -787,7 +787,7 @@ pnutrientsP <- pphosph.a + pphosph.b + plot_layout(widths = c(1, 1.3)) # figure 
 
 # Save and export figure 3 and S2
 # ggsave(pnutrientsN, path = here("results", "svg", "article"), filename = "fig_nitrogen_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
-ggsave(pnutrientsP, path = here("results", "svg", "article"), filename = "fig_phosphorous_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
+# ggsave(pnutrientsP, path = here("results", "svg", "article"), filename = "fig_phosphorous_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
 
 
 # FIGURE S1: significant breeding sites ----

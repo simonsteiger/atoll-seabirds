@@ -1,6 +1,6 @@
 # Atoll seabird analysis
 
-![](figures/fig_summary.png)
+![](img/fig_summary.png)
 
 Short summary of main findings goes here.
 
