@@ -4,6 +4,12 @@
 
 Short summary of main findings goes here.
 
+## Workflow
+
+![](img/fig_workflow.png)
+
+Very brief description of workflow graphic.
+
 ## Cite
 
 **TODO**: Replace XXXX with a bibtex shorthand for the paper and journal.
@@ -17,17 +23,12 @@ Short summary of main findings goes here.
 }
 ```
 
-## Workflow
-
-This would be nice, but we did not go with a figure for this.
-Drop or describe in text format?
-
 ## Installation
 
 ### System-independent prerequisites
 
 1. Install the R programming language ([Windows](https://cran.r-project.org/bin/windows/), [MacOS](https://cran.r-project.org/bin/macosx/), [Linux](https://cran.r-project.org/bin/linux/))
-2. Install the [Julia programming language](https://julialang.org/downloads/). Check the option to *Add julia to the PATH* to skip step 3.
+2. Install the [Julia programming language](https://julialang.org/downloads/). In the installation wizard, check the option to *Add julia to the PATH* to skip step 3.
 3. Add R and Julia to the PATH (Instructions for [Julia](https://julialang.org/downloads/platform/), the process is the same for R except that you will have to add the directory of the R binary). You can test if you previously added R or Julia to the PATH by running `R` or `julia` in a Unix shell. **Tip**: If you do not know the path to your Julia binary, you can write `Sys.BINDIR` in the Julia REPL. For the equivalent in R, run `R.home("bin")` in an R console.
 
 ### Windows-specific prerequisites
