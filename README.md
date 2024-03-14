@@ -1,12 +1,12 @@
 # Atoll seabird analysis
 
-![](img/fig_summary.png)
+![](img/readme_summary.png)
 
 Short summary of main findings goes here.
 
 ## Workflow
 
-![](img/fig_workflow.png)
+![](img/readme_workflow.png)
 
 Very brief description of workflow graphic.
 
