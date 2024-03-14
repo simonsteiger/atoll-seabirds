@@ -8,4 +8,4 @@
 *_files
 **/*.png
 **/*.svg
-!fig_summary.png
+!readme_*
