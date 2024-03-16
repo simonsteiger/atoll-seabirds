@@ -2,13 +2,16 @@
 
 ![](img/readme_summary.png)
 
-Short summary of main findings goes here.
+One third of all islands in the Indo-Pacific are atolls. Despite being the most common island type, atolls remain widely overlooked in global biodiversity studies. The importance of seabirds for the natural functioning and resilience is becoming increasingly recognised. Vice versa, however, it remains unquantified how relevant atolls are on a macro-ecological scale for seabirds. In this study, We gathered seabird nesting census data from atolls across the Indo-Pacific and developed a Bayesian predictive model two estimate seabird nesting colonies on all atolls of the Indo-Pacific. More than 27 million seabirds are nesting atolls - more than across entire Europe, and about 22% of all tropical seabirds worldwide. Atolls are globally important hubs for seabird nesting. Protecting and future-proofing atolls against global change has to become a priority to preserve a sginificant fraction of the world's tropical seabirds.
 
 ## Workflow
 
 ![](img/readme_workflow.png)
 
-Very brief description of workflow graphic.
+We compiled environmental data for each of the Indo-Pacific's 280 atolls from literature reports and remote-sensing satellite databases. Seabird nesting census data for each atoll was either abundance-based, incidence-based (presence/absence), or unknown.
+We computed a Principal Component Analysis (PCA) using the environmental data. We created to separate seabird datasets, (1) count (abundance)-based and (2) incidence-based.
+In the first step, we used the presence-absence seabird data to predict seabird occurrence (or absence) on the unknown atolls.
+In the second step, we used the coutn-based seabird data to predict seabird nesting abundances on the unknown atolls.
 
 ## Cite
 
@@ -17,7 +20,7 @@ Very brief description of workflow graphic.
 ```bibtex
 @article{steibl2024XXXX,
   title={Atolls are globally significant hubs for tropical seabirds},
-  author={Steibl, Sebastian and Steiger, Simon and Wegmann and Alex S and Holmes, Nick D and Young, Hillary S and Carr, Pete and Russell, James C},
+  author={Steibl, Sebastian and Steiger, Simon and Wegmann, Alex S and Holmes, Nick D and Young, Hillary S and Carr, Pete and Russell, James C},
   journal={XXXX},
   year={2024}
 }
