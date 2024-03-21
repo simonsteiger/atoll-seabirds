@@ -1,7 +1,7 @@
 # This script is part of the project associated with
 # Article: Atolls are globally significant hubs for tropical seabirds
 # Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
-# Last edited: 2024-03-10
+# Last edited: 2024-03-21
 
 # --- MODEL MODULE --- #
 
@@ -40,6 +40,8 @@ using Serialization, CSV
 using Random
 
 # Load custom modules
+include(joinpath(Main.ROOT, "julia", "src", "globalvars.jl"))
+using .GlobalVariables
 include(joinpath(Main.ROOT, "julia", "src", "countvars.jl"))
 using .CountVariables
 include(joinpath(Main.ROOT, "julia", "src", "utilities.jl"))
@@ -122,6 +124,19 @@ dict_pr = Dict(
 
 priorsettings = run_sensitivity ? collect(keys(dict_pr)) : ["default"]
 
+# Define container for target predictions which will be updated inside the loop's local scope
+preds_target = Dict{String,DataFrame}()
+
+# Set autodiff to ReverseDiff{true}
+Turing.setadbackend(:reversediff)
+Turing.setrdcache(true)
+
+# Configure sampling
+sampler = NUTS(1000, 0.95; max_depth=10)
+nsamples = 10_000
+nchains = 4
+config = (sampler, MCMCThreads(), nsamples, nchains)
+
 for priorsetting in priorsettings
 
     m = model(values(odict_inputs)..., zlogn; pr=dict_pr[priorsetting])
@@ -169,16 +184,6 @@ for priorsetting in priorsettings
 
         TuringBenchmarking.run(TuringBenchmarking.make_turing_suite(m, adbackends=backends);)
     end
-
-    # Set autodiff to ReverseDiff{true}
-    Turing.setadbackend(:reversediff)
-    Turing.setrdcache(true)
-
-    # Configure sampling
-    sampler = NUTS(1000, 0.95; max_depth=10)
-    nsamples = 10_000
-    nchains = 4
-    config = (sampler, MCMCThreads(), nsamples, nchains)
 
     # --- SAMPLING --- #
 
@@ -347,7 +352,7 @@ for priorsetting in priorsettings
 
     @info "Count model: Target predictions for $priorsetting model"
 
-    preds_target =
+    global preds_target =
         let thresholds = 0.75:0.05:0.85, odict_unknown_inputs = copy(odict_inputs)
             # Set names to be replaced in input dict, values will be subset in each iteration
             names = ["region", "species", "PC", "species_within_nesting"]
@@ -445,25 +450,7 @@ for priorsetting in priorsettings
 
 end
 
-end
-
-# --- GLOBAL ESTIMATES MODULE --- #
-
-"This module calculates global abundance estimates, runs sensitivity analysiess across prior settings, and exports the results."
-module GlobalEstimates
-
-export nothing
-
-import StatsBase: denserank
-using DataFrames, Chain, CSV, StatsPlots
-
-include(joinpath(Main.ROOT, "julia", "src", "globalvars.jl"))
-using .GlobalVariables
-include(joinpath(Main.ROOT, "julia", "src", "utilities.jl"))
-using .CustomUtilityFuns
-
-run_sensitivity = Main.ARGS[3] == "true"
-priorsettings = run_sensitivity ? ["default", "mean", "global", "narrow", "wide"] : ["default"]
+# --- GLOBAL ESTIMATES --- #
 
 known = @chain pop_known begin
     select(_, [:atoll, :region, :species, :nbirds])
@@ -481,7 +468,6 @@ rename!.([p75, p80, p85], :median => :nbirds)
 
 full75, full80, full85 = [vcat(known, df) for df in [p75, p80, p85]]
 
-
 tot75, tot80, tot85 = popsum.([full75, full80, full85])
 leftjoin!.([tot75, tot80, tot85], Ref(glob), on=:species)
 
@@ -494,6 +480,46 @@ histogram((tot75.ratio_nbirds .- tot85.ratio_nbirds) .* 100, title="Pop on atoll
 xticks!(-1:3, string.(-1:3) .* "%")
 
 CSV.write(joinpath(Main.ROOT, "results", "data", "pred_and_obs_atolls_$(Main.SUFFIX).csv"), full80)
+
+# Summarise raw samples before further summaries
+
+full_with_raw = @chain known begin
+    transform(_, :nbirds => ByRow(x -> fill(x, Int(nsamples*nchains))) => :raw)
+    rename(_, :nbirds => :median)
+    select(_, :atoll, :region, :species, :raw, :median, :lower, :upper)
+    vcat(preds_target["0.8"], _)
+end
+
+summary_specieswise = let df = full_with_raw
+    out = DataFrame()
+    for sp in unique(df.species)
+        tmp = @chain df begin
+            subset(_, :species => ByRow(x -> x == sp))
+            getproperty(_, :raw)
+            sum(_)
+            Dict("species" => sp, "median" => median(_), "lower" => quantile(_, 0.025), "upper" => quantile(_, 0.975))
+        end
+        append!(out, DataFrame(tmp))
+    end
+    out
+end
+
+summary_atollwise = let df = full_with_raw
+    out = DataFrame()
+    for atoll in unique(df.atoll)
+        tmp = @chain df begin
+            subset(_, :atoll => ByRow(x -> x == atoll))
+            getproperty(_, :raw)
+            sum(_)
+            Dict("atoll" => atoll, "median" => median(_), "lower" => quantile(_, 0.025), "upper" => quantile(_, 0.975))
+        end
+        append!(out, DataFrame(tmp))
+    end
+    out
+end
+
+CSV.write(joinpath(Main.ROOT, "results", "data", "summary_specieswise_$(Main.SUFFIX).csv"), summary_specieswise)
+CSV.write(joinpath(Main.ROOT, "results", "data", "summary_atollwise_$(Main.SUFFIX).csv"), summary_atollwise)
 
 # --- SENSITIVITY ANALYSIS --- # 
 

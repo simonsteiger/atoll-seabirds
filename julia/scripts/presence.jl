@@ -271,7 +271,6 @@ for priorsetting in priorsettings
     if run_loocv
         @info "Presence model: Crossvalidation for $priorsetting priors"
         cv_res = psis_loo(m, posterior.chains)
-        cv_res
         # - no overfit
         # - out of sample performance near in-sample performance (gmpd 0.76)
         # - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))
