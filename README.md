@@ -8,7 +8,7 @@ The importance of seabirds for the natural functioning and resilience is becomin
 Vice versa, however, it remains unquantified how relevant atolls are on a macro-ecological scale for seabirds.
 In this study, we gathered seabird nesting census data from atolls across the Indo-Pacific and developed a Bayesian predictive model to estimate seabird nesting colonies on all atolls of the Indo-Pacific.
 More than 27 million seabirds are nesting atolls - more than across entire Europe, and about 22% of all tropical seabirds worldwide.
-Atolls are globally important hubs for seabird nesting.
+Atolls are globally important sites for seabird nesting.
 Protecting and future-proofing atolls against global change has to become a priority to preserve a sginificant fraction of the world's tropical seabirds.
 
 ## Workflow
@@ -28,7 +28,7 @@ In the second step, we used the count-based seabird data to predict seabird nest
 
 ```bibtex
 @article{steibl2024XXXX,
-  title={Atolls are globally significant hubs for tropical seabirds},
+  title={Atolls are globally significant sites for tropical seabirds},
   author={Steibl, Sebastian and Steiger, Simon and Wegmann, Alex S and Holmes, Nick D and Young, Hillary S and Carr, Pete and Russell, James C},
   journal={XXXX},
   year={2024}
