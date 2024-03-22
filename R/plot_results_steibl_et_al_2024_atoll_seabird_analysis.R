@@ -1,7 +1,7 @@
 # This script is part of the project associated with
-# Article: Atolls are globally significant hubs for tropical seabirds
+# Article: Atolls are globally significant sites for tropical seabirds
 # Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
-# Last edited: 2024-03-10
+# Last edited: 2024-03-22
 
 # Load packages ----
 
@@ -22,16 +22,20 @@ library("here")
 library("hdrcde")
 library("adespatial")
 
+
 suffix <- "_steibl_et_al_2024_atoll_seabird_analysis"
 
 # Read data ----
 
-preds <- read.csv(here(paste0("results/data/pred_and_obs_atolls", suffix, ".csv")))
-# Currently the files in data/ are not renamed
-est <- read.csv(here(paste0("data/birdlife_hbw_globalestimates", suffix, ".csv")))
+# Load metadata. see suplementary file S1 for data source references
 envs <- read.csv(here(paste0("data/vars_atoll", suffix, ".csv")))
 nest <- read.csv(here(paste0("data/vars_seabird", suffix, ".csv")))
 forag <- read.csv(here(paste0("data/vars_foraging", suffix, ".csv")))
+
+# Load results file from Bayesian model analysis (julia-pipeline)
+preds <- read.csv(here(paste0("results/data/pred_and_obs_atolls", suffix, ".csv")))
+smr.atollw <- read.csv(here(paste0("results/data/summary_atollwise", suffix, ".csv")))
+smr.specw <- read.csv(here(paste0("results/data/summary_specieswise", suffix, ".csv")))
 
 # Prepare data frames for plotting ----
 
@@ -46,13 +50,15 @@ envs <- envs %>%
 preds <- preds %>%
   select(atoll, species, nbirds, lower, upper) %>%
   mutate(across(1:2, as.factor))
-nest <- mutate(nest, across(1:3, as.factor))
+nest <- mutate(nest, across(1:4, as.factor))
 forag$species <- as.factor(forag$species)
+smr.atollw$atoll <- as.factor(smr.atollw$atoll)
+smr.specw$species <- as.factor(smr.specw$species)
 
 # turn predicted abundances into whole numbers
-preds$nbirds <- round(preds$nbirds, 0)
-preds$lower <- round(preds$lower, 0)
-preds$upper <- round(preds$upper, 0)
+preds <- preds %>% mutate(across(3:5, round))
+smr.atollw <- smr.atollw %>% mutate(across(2:4, round))
+smr.specw <- smr.specw %>% mutate(across(2:4, round))
 
 # drop unneeded columns from foraging dataset
 forag <- forag %>% select(!c(location, reference))
@@ -178,11 +184,11 @@ comb$birdC <- comb$biomass * wat.cont * dry.carb
 
 # drop unneeded columns after computation
 comb <- comb %>% select(!c(
-  bodymass, nestingtype, BMR, AMR, dailyN, dailyP, seasonalN, seasonalP,
-  adultN, adultP, chickN, chickP, E_rearing, prod_per_pair, fledgling_mass, F_hab
+  bodymass, nestingtype, BMR, AMR, dailyN, dailyP, seasonalN, seasonalP, days_at_colony, time_at_colony,
+  adultN, adultP, chickN, chickP, E_rearing, prod_per_pair, fledgling_mass, F_hab, common.names
 ))
 
-
+##############################################################################################
 # summarize atoll-wise
 atoll <- comb %>%
   group_by(atoll, region, lat, long, land_area_sqkm) %>%
@@ -201,7 +207,7 @@ atoll <- atoll %>%
   left_join(., beta, by = "atoll") %>%
   mutate(lcbd = replace_na(lcbd, 0))
 
-
+##############################################################################################
 # summarize species-wise
 spec <- comb %>%
   group_by(species, group) %>%
@@ -214,58 +220,21 @@ spec <- comb %>%
   ) %>%
   as.data.frame()
 
-# add 95%-lower and -upper HDR abundance predictions
-preds.lwr <- preds %>%
-  group_by(species) %>%
-  summarise(lower = sum(lower)) %>%
+
+# calculate proportion contribution to global population for lower (2.5%), median, and upper (97.5%) estimate
+smr.specw <- smr.specw %>% 
+  left_join(., nest, by = "species") %>% 
+  select(c(species, common.names, group, lower, median, upper, global_est)) %>% 
   as.data.frame()
 
-preds.upr <- preds %>%
-  group_by(species) %>%
-  summarise(upper = sum(upper)) %>%
-  as.data.frame()
+smr.specw$ratio.lower <- smr.specw$lower/smr.specw$global_est
+smr.specw$ratio.median <- smr.specw$median/smr.specw$global_est
+smr.specw$ratio.upper <- smr.specw$upper/smr.specw$global_est
 
-spec <- left_join(spec, preds.lwr, by = "species")
-spec <- left_join(spec, preds.upr, by = "species")
+# set upper limit to 1
+smr.specw$ratio.upper[smr.specw$ratio.upper > 1] <- 0.999
 
-rm(preds.lwr) # no longer needed, keep tidy
-rm(preds.upr) # no longer needed, keep tidy
 
-# calculate proportion contribution to global population
-spec <- left_join(spec, est, by = "species")
-
-spec$ratios <- ifelse(is.na(spec$Otero) == FALSE, spec$nbirds * 1 / spec$Otero,
-  ifelse(is.na(spec$HBW) == FALSE, spec$nbirds * 1 / spec$HBW,
-    ifelse(is.na(spec$birdlife_max) == TRUE, spec$nbirds * 1 / spec$birdlife_min,
-      spec$nbirds * 1 / spec$birdlife_max
-    )
-  )
-)
-
-# calculate proportion contribution to global population using 95%-lower and 95%-upper HDR population predictions
-spec$ratios.lwr <- ifelse(is.na(spec$Otero) == FALSE, spec$lower * 1 / spec$Otero,
-  ifelse(is.na(spec$HBW) == FALSE, spec$lower * 1 / spec$HBW,
-    ifelse(is.na(spec$birdlife_max) == TRUE, spec$lower * 1 / spec$birdlife_min,
-      spec$lower * 1 / spec$birdlife_max
-    )
-  )
-)
-
-spec$ratios.upr <- ifelse(is.na(spec$Otero) == FALSE, spec$upper * 1 / spec$Otero,
-  ifelse(is.na(spec$HBW) == FALSE, spec$upper * 1 / spec$HBW,
-    ifelse(is.na(spec$birdlife_max) == TRUE, spec$upper * 1 / spec$birdlife_min,
-      spec$upper * 1 / spec$birdlife_max
-    )
-  )
-)
-
-# set maximum to 1
-spec$ratios[spec$ratios > 1] <- 0.999
-spec$ratios.lwr[spec$ratios.lwr > 1] <- 0.999
-spec$ratios.upr[spec$ratios.upr > 1] <- 0.999
-
-spec <- spec %>% select(c(species, group, nbirds, lower, upper, totbiomass, totN, totP, ratios, ratios.lwr, ratios.upr))
-spec$species <- as.factor(spec$species)
 
 # Base map ----
 
@@ -605,43 +574,29 @@ pmapbox <- p1a + p1b + p2a + p2b + p3a + p3b + plot_layout(widths = c(3, 1, 3, 1
 
 # FIGURE 2 PLOTTING: bird populations ----
 
-seabirdnames <- spec[, 1] %>% as.data.frame()
-colnames(seabirdnames) <- "species"
-seabirdnames$common.names <- c(
-  "Blue-grey Noddy", "Black Noddy", "Brown Noddy", "Lesser Noddy",
-  "Wedge-Tailed Shearwater", "Bulwer's Petrel", "Lesser Frigatebird", "Great Frigatebird",
-  "White Tern", "Tristram's Storm-Petrel", "Caspian Tern", "Polynesian Storm-Petrel",
-  "Bridled Tern", "Sooty Tern", "Grey-backed Tern", "White-tailed Tropicbird",
-  "Red-tailed Tropicbird", "Short-tailed Albatross", "Laysan Albatross",
-  "Black-footed Albatross", "Phoenix Petrel", "Herald Petrel", "Bonin Petrel",
-  "Kermadec Petrel", "Murphy's Petrel", "Tropical Shearwater", "Christmas Shearwater",
-  "Roseate Tern", "Black-naped Tern", "Australian Fairy Tern", "Saunder's Tern",
-  "Masked Booby", "Nazca Booby", "Brown Booby", "Red-footed Booby", "Lesser Crested Tern",
-  "Greater Crested Tern"
-) %>%
-  as.factor()
+smr.specw$range <- ifelse(smr.specw$ratio.median >= 0.95, ">95%", 
+                          ifelse(smr.specw$ratio.median >= 0.75, ">75%", 
+                                 ifelse(smr.specw$ratio.median >= 0.50, ">50%",
+                                        ifelse(smr.specw$ratio.median >= 0.25, ">25%",
+                                        "<25%")))) %>% as.factor()
 
-spec <- left_join(spec, seabirdnames, by = "species")
 
-spec$group <- factor(spec$group, levels = c("albatros", "booby", "frigatebird", "tubenose", "tern", "tropicbird"))
-
-p11 <- ggplot(data = spec) +
-  geom_bar(aes(x = ratios * 100, y = reorder(common.names, ratios), fill = group),
+pglobal <- ggplot(data = smr.specw) +
+  geom_bar(aes(x = ratio.median * 100, y = reorder(common.names, ratio.median), fill = range),
     stat = "identity", color = "black", width = 0.8, linewidth = 0.5
   ) +
   annotate("rect", xmin = 25, xmax = 50, ymin = 0, ymax = 37, fill = "#eeeeee") +
   annotate("rect", xmin = 50, xmax = 75, ymin = 0, ymax = 37, fill = "#dddddd") +
   annotate("rect", xmin = 75, xmax = 95, ymin = 0, ymax = 37, fill = "#cccccc") +
   annotate("rect", xmin = 95, xmax = 100, ymin = 0, ymax = 37, fill = "#bbbbbb") +
-  geom_bar(aes(x = ratios * 100, y = reorder(common.names, ratios), fill = group),
+  geom_bar(aes(x = ratio.median * 100, y = reorder(common.names, ratio.median), fill = range),
     stat = "identity", color = "black", width = 0.8, linewidth = 0.5
   ) +
-  geom_errorbarh(aes(xmin = ratios.lwr * 100, xmax = ratios.upr * 100, y = reorder(common.names, ratios)),
+  geom_errorbarh(aes(xmin = ratio.lower * 100, xmax = ratio.upper * 100, y = reorder(common.names, ratio.median)),
     linewidth = 0.7, height = 0.25
   ) +
   scale_fill_viridis_d(
-    aesthetics = "fill", option = "mako",
-    labels = c("Albatross", "Booby", "Frigatebird", "Petrel/ \nShearwater", "Tern", "Tropicbird")
+    aesthetics = "fill", option = "mako", direction = -1
   ) +
   guides(
     x = "axis_truncated", y = "axis_truncated",
@@ -656,15 +611,11 @@ p11 <- ggplot(data = spec) +
     axis.text.y = element_text(margin = margin(r = -6), size = 9),
     axis.text.x = element_text(size = 9),
     axis.title.x = element_text(size = 10),
-    legend.title = element_blank(),
-    legend.position = c(0.6, 0.2),
-    legend.text = element_text(size = 9),
-    legend.spacing.y = unit(1, "mm"),
-    legend.box.background = element_rect(colour = "black", linewidth = 1)
+    legend.position = "none"
   )
 
 # Save and export Figure 2
-# ggsave(p11, path = here("results", "svg", "article"), filename = "fig_proportion_species_global.svg", dpi = 300, width = 79, height = 150, units = "mm")
+# ggsave(pglobal, path = here("results", "svg", "article"), filename = "fig_proportion_species_global.svg", dpi = 300, width = 79, height = 150, units = "mm")
 
 
 
@@ -792,19 +743,12 @@ pnutrientsP <- pphosph.a + pphosph.b + plot_layout(widths = c(1, 1.3)) # figure 
 
 # FIGURE S1: significant breeding sites ----
 
-atollw <- left_join(comb, est, by = "species")
+atollw <- comb %>% select(c(atoll, region, lat, long, species, nbirds, group, global_est))
 
-atollw$atoll.ratios <- ifelse(is.na(atollw$Otero) == FALSE, atollw$nbirds * 1 / atollw$Otero,
-  ifelse(is.na(atollw$HBW) == FALSE, atollw$nbirds * 1 / atollw$HBW,
-    ifelse(is.na(atollw$birdlife_max) == TRUE, atollw$nbirds * 1 / atollw$birdlife_min,
-      atollw$nbirds * 1 / atollw$birdlife_max
-    )
-  )
-)
+atollw$atoll.ratios <- atollw$nbirds/atollw$global_est
 
 atollw$species <- as.factor(atollw$species)
 
-atollw <- atollw %>% select(!c(biomass, birdlife_min, birdlife_max, HBW, Otero))
 
 # subset only for largest value per atoll
 atollmax <- atollw %>%
@@ -823,7 +767,7 @@ atollmax <- atollmax %>% arrange(cuts)
 spatw <- st_as_sf(atollmax, coords = c("long", "lat"), crs = 4326)
 coordsw <- spatw %>% st_coordinates(extract())
 
-p10 <- map +
+psignif <- map +
   geom_point(
     data = spatw,
     aes(x = coordsw[, 1], y = coordsw[, 2], colour = cuts),
@@ -952,9 +896,6 @@ p.forag <- ggplot() +
     axis.text.y = element_blank()
   )
 
-p.forag
-
-
 # Save and export Figure 4 (part)
 # ggsave(p.forag, path = here("results", "svg", "article"), filename = "foraging.svg", dpi = 300, width = 575, height = 438, units = "px")
 
@@ -962,12 +903,13 @@ p.forag
 # Text-based results summary ----
 
 # The 280 Indo-Pacific atolls are nesting sites for an estimated total of
-sum(atoll$nbirds)
-c(sum(comb.lwr$lower), sum(comb.upr$upper))
+sum(smr.atollw$median)
+c(sum(smr.atollw$lower), sum(smr.atollw$upper)) #Confidence intervals
 
 # the mean nesting population per atoll is
-mean(atoll$nbirds)
-quantile(atoll$nbirds, probs = c(0.025, 0.975))
+mean(smr.atollw$median)
+median(smr.atollw$median)
+c(mean(smr.atollw$lower), mean(smr.atollw$upper)) #quantiles
 
 # Number of atolls that house a colony for a given species above the B3b IBA threshold of 13,200 birds
 # http://datazone.birdlife.org/site/ibacritreg
@@ -976,7 +918,7 @@ comb %>%
   distinct(atoll, .keep_all = TRUE) %>%
   nrow()
 
-# Number of atolls with a seabird colony that constitutes relative to the estimated global population
+# Number of atolls with a seabird colony that constitutes relative to the estimated global population more than
 # >1%
 atollmax %>%
   filter(cuts != "<1%") %>%
@@ -1002,20 +944,20 @@ quantile(atoll$totC, probs = c(0.025, 0.975)) / 1000
 
 # Number of species where on atolls are nesting of the relative global population more than
 # 25%
-spec %>%
-  filter(ratios > 0.25) %>%
+smr.specw %>%
+  filter(ratio.median > 0.25) %>%
   nrow()
 # 50%
-spec %>%
-  filter(ratios > 0.50) %>%
+smr.specw %>%
+  filter(ratio.median > 0.50) %>%
   nrow()
 # 75%
-spec %>%
-  filter(ratios > 0.75) %>%
+smr.specw %>%
+  filter(ratio.median > 0.75) %>%
   nrow()
 # 95%
-spec %>%
-  filter(ratios > 0.95) %>%
+smr.specw %>%
+  filter(ratio.median > 0.95) %>%
   nrow()
 
 # Total combined contribution of seabird nutrients to atolls
