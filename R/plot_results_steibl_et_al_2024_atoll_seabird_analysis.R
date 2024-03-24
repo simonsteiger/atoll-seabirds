@@ -1,7 +1,7 @@
 # This script is part of the project associated with
 # Article: Atolls are globally significant sites for tropical seabirds
 # Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
-# Last edited: 2024-03-22
+# Last edited: 2024-03-24
 
 # Load packages ----
 
@@ -34,8 +34,8 @@ forag <- read.csv(here(paste0("data/vars_foraging", suffix, ".csv")))
 
 # Load results file from Bayesian model analysis (julia-pipeline)
 preds <- read.csv(here(paste0("results/data/pred_and_obs_atolls", suffix, ".csv")))
-smr.atollw <- read.csv(here(paste0("results/data/summary_atollwise", suffix, ".csv")))
-smr.specw <- read.csv(here(paste0("results/data/summary_specieswise", suffix, ".csv")))
+smr.atollw <- read.csv(here(paste0("results/data/summary_count_atollwise", suffix, ".csv")))
+smr.specw <- read.csv(here(paste0("results/data/summary_count_specieswise", suffix, ".csv")))
 
 # Prepare data frames for plotting ----
 
@@ -48,6 +48,7 @@ envs <- envs %>%
   select(atoll, region, lat, long, land_area_sqkm) %>%
   mutate(across(1:2, as.factor))
 preds <- preds %>%
+  rename(nbirds = median) %>%
   select(atoll, species, nbirds, lower, upper) %>%
   mutate(across(1:2, as.factor))
 nest <- mutate(nest, across(1:4, as.factor))
@@ -56,9 +57,9 @@ smr.atollw$atoll <- as.factor(smr.atollw$atoll)
 smr.specw$species <- as.factor(smr.specw$species)
 
 # turn predicted abundances into whole numbers
-preds <- preds %>% mutate(across(3:5, round))
-smr.atollw <- smr.atollw %>% mutate(across(2:4, round))
-smr.specw <- smr.specw %>% mutate(across(2:4, round))
+preds <- preds %>% mutate(across(c(nbirds, lower, upper), round))
+smr.atollw <- smr.atollw %>% mutate(across(c(median, lower, upper), round))
+smr.specw <- smr.specw %>% mutate(across(c(median, lower, upper), round))
 
 # drop unneeded columns from foraging dataset
 forag <- forag %>% select(!c(location, reference))
@@ -185,7 +186,7 @@ comb$birdC <- comb$biomass * wat.cont * dry.carb
 # drop unneeded columns after computation
 comb <- comb %>% select(!c(
   bodymass, nestingtype, BMR, AMR, dailyN, dailyP, seasonalN, seasonalP, days_at_colony, time_at_colony,
-  adultN, adultP, chickN, chickP, E_rearing, prod_per_pair, fledgling_mass, F_hab, common.names
+  adultN, adultP, chickN, chickP, E_rearing, prod_per_pair, fledgling_mass, F_hab, common_names
 ))
 
 ##############################################################################################
@@ -224,7 +225,7 @@ spec <- comb %>%
 # calculate proportion contribution to global population for lower (2.5%), median, and upper (97.5%) estimate
 smr.specw <- smr.specw %>% 
   left_join(., nest, by = "species") %>% 
-  select(c(species, common.names, group, lower, median, upper, global_est)) %>% 
+  select(c(species, common_names, group, lower, median, upper, global_est)) %>% 
   as.data.frame()
 
 smr.specw$ratio.lower <- smr.specw$lower/smr.specw$global_est
@@ -275,6 +276,13 @@ boxplotaesth <- theme_classic() +
 
 # Analysis of missingness ----
 
+missing_theme <- theme(
+    legend.position = "none",
+    axis.title.y = element_text(size = 12),
+    axis.title.x = element_blank(),
+    axis.text = element_text(size = 11)
+  )
+
 spat.missing <- missing %>%
   arrange(rev(seabird_data)) %>%
   st_as_sf(., coords = c("long", "lat"), crs = 4326)
@@ -296,12 +304,7 @@ pmiss1 <- ggplot(data = missing, aes(x = seabird_data, y = number_islets, fill =
   ggtitle("a. Island per atoll") +
   theme_classic() +
   guides(x = "axis_truncated", y = "axis_truncated") +
-  theme(
-    legend.position = "none",
-    axis.title.y = element_text(size = 12),
-    axis.title.x = element_blank(),
-    axis.text = element_text(size = 11)
-  )
+  missing_theme
 
 pmiss2 <- ggplot(data = missing, aes(x = seabird_data, y = annual_precipitation_mm, fill = seabird_data)) +
   geom_boxplot() +
@@ -311,12 +314,7 @@ pmiss2 <- ggplot(data = missing, aes(x = seabird_data, y = annual_precipitation_
   ggtitle("b. Annual precipitation") +
   theme_classic() +
   guides(x = "axis_truncated", y = "axis_truncated") +
-  theme(
-    legend.position = "none",
-    axis.title.y = element_text(size = 12),
-    axis.title.x = element_blank(),
-    axis.text = element_text(size = 11)
-  )
+  missing_theme
 
 pmiss3 <- ggplot(data = missing, aes(x = seabird_data, y = land_area_sqkm, fill = seabird_data)) +
   geom_boxplot() +
@@ -330,12 +328,7 @@ pmiss3 <- ggplot(data = missing, aes(x = seabird_data, y = land_area_sqkm, fill 
   ) +
   guides(x = "axis_truncated", y = "axis_truncated") +
   theme_classic() +
-  theme(
-    legend.position = "none",
-    axis.title.y = element_text(size = 12),
-    axis.title.x = element_blank(),
-    axis.text = element_text(size = 11)
-  )
+  missing_theme
 
 pmiss4 <- ggplot(data = missing, aes(x = seabird_data, y = lagoon_area_sqkm, fill = seabird_data)) +
   geom_boxplot() +
@@ -345,12 +338,7 @@ pmiss4 <- ggplot(data = missing, aes(x = seabird_data, y = lagoon_area_sqkm, fil
   ggtitle("d. Atoll lagoon area") +
   guides(x = "axis_truncated", y = "axis_truncated") +
   theme_classic() +
-  theme(
-    legend.position = "none",
-    axis.title.y = element_text(size = 12),
-    axis.title.x = element_blank(),
-    axis.text = element_text(size = 11)
-  )
+  missing_theme
 
 pmiss5 <- ggplot(data = missing, aes(x = seabird_data, y = tropical_storms_50km, fill = seabird_data)) +
   geom_boxplot() +
@@ -360,12 +348,7 @@ pmiss5 <- ggplot(data = missing, aes(x = seabird_data, y = tropical_storms_50km,
   ggtitle("e. Tropical storms") +
   guides(x = "axis_truncated", y = "axis_truncated") +
   theme_classic() +
-  theme(
-    legend.position = "none",
-    axis.title.y = element_text(size = 12),
-    axis.title.x = element_blank(),
-    axis.text = element_text(size = 11)
-  )
+  missing_theme
 
 pmiss6 <- ggplot(data = missing, aes(x = seabird_data, y = hurricanes_50km, fill = seabird_data)) +
   geom_boxplot() +
@@ -375,12 +358,7 @@ pmiss6 <- ggplot(data = missing, aes(x = seabird_data, y = hurricanes_50km, fill
   ggtitle("f. Cyclones") +
   guides(x = "axis_truncated", y = "axis_truncated") +
   theme_classic() +
-  theme(
-    legend.position = "none",
-    axis.title.y = element_text(size = 12),
-    axis.title.x = element_blank(),
-    axis.text = element_text(size = 11)
-  )
+  missing_theme
 
 pmiss7 <- ggplot(data = missing, aes(x = seabird_data, y = distance_nearest_atoll_km, fill = seabird_data)) +
   geom_boxplot() +
@@ -393,12 +371,7 @@ pmiss7 <- ggplot(data = missing, aes(x = seabird_data, y = distance_nearest_atol
   ) +
   guides(x = "axis_truncated", y = "axis_truncated") +
   theme_classic() +
-  theme(
-    legend.position = "none",
-    axis.title.y = element_text(size = 12),
-    axis.title.x = element_blank(),
-    axis.text = element_text(size = 11)
-  )
+  missing_theme
 
 pmiss8 <- ggplot(data = missing, aes(x = seabird_data, y = distance_nearest_high_island_km, fill = seabird_data)) +
   geom_boxplot() +
@@ -582,17 +555,17 @@ smr.specw$range <- ifelse(smr.specw$ratio.median >= 0.95, ">95%",
 
 
 pglobal <- ggplot(data = smr.specw) +
-  geom_bar(aes(x = ratio.median * 100, y = reorder(common.names, ratio.median), fill = range),
+  geom_bar(aes(x = ratio.median * 100, y = reorder(common_names, ratio.median), fill = range),
     stat = "identity", color = "black", width = 0.8, linewidth = 0.5
   ) +
   annotate("rect", xmin = 25, xmax = 50, ymin = 0, ymax = 37, fill = "#eeeeee") +
   annotate("rect", xmin = 50, xmax = 75, ymin = 0, ymax = 37, fill = "#dddddd") +
   annotate("rect", xmin = 75, xmax = 95, ymin = 0, ymax = 37, fill = "#cccccc") +
   annotate("rect", xmin = 95, xmax = 100, ymin = 0, ymax = 37, fill = "#bbbbbb") +
-  geom_bar(aes(x = ratio.median * 100, y = reorder(common.names, ratio.median), fill = range),
+  geom_bar(aes(x = ratio.median * 100, y = reorder(common_names, ratio.median), fill = range),
     stat = "identity", color = "black", width = 0.8, linewidth = 0.5
   ) +
-  geom_errorbarh(aes(xmin = ratio.lower * 100, xmax = ratio.upper * 100, y = reorder(common.names, ratio.median)),
+  geom_errorbarh(aes(xmin = ratio.lower * 100, xmax = ratio.upper * 100, y = reorder(common_names, ratio.median)),
     linewidth = 0.7, height = 0.25
   ) +
   scale_fill_viridis_d(

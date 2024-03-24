@@ -1,4 +1,4 @@
-species,common.names,nestingtype,group,bodymass,days_at_colony,time_at_colony,prod_per_pair,fledgling_mass,global_est
+species,common_names,nestingtype,group,bodymass,days_at_colony,time_at_colony,prod_per_pair,fledgling_mass,global_est
 Anous_stolidus,Brown Noddy,vegetation,tern,177.8,122,0.6,0.5,150,1000000
 Anous_minutus,Black Noddy,vegetation,tern,112.4,122,0.6,0.5,100,1500000
 Anous_tenuirostris,Lesser Noddy,vegetation,tern,112,122,0.6,0.56,90,1200000

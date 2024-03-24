@@ -1,5 +1,5 @@
 # This script is part of the project associated with
-# Article: Atolls are globally significant hubs for tropical seabirds
+# Article: Atolls are globally significant sites for tropical seabirds
 # Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
 # Last edited: 2024-03-21
 
@@ -8,15 +8,9 @@
 "This module fits the count model, runs basic model diagnostics, summarises and exports the results."
 module CountModel
 
-export nothing
+export preds_target
 
 # --- WORKSPACE SETUP --- #
-
-# Cmd args
-# Need to check for "true" again because the shell script converts args to strings
-load = Main.ARGS[1] == "false"
-run_loocv = Main.ARGS[2] == "true"
-run_sensitivity = Main.ARGS[3] == "true"
 
 # Probabilistic programming
 using Turing, TuringBenchmarking, ReverseDiff, ParetoSmooth, PosteriorStats
@@ -122,7 +116,7 @@ dict_pr = Dict(
     "wide" => (μ_sxr=Ms, σ_sxr=[3, √2 * 3], μ_pxn=[0, 1 * 3], σ_pxn=[3, √2 * 3], σ2=[3, 2 * 3]),
 )
 
-priorsettings = run_sensitivity ? collect(keys(dict_pr)) : ["default"]
+priorsettings = Main.run_sensitivity ? collect(keys(dict_pr)) : ["default"]
 
 # Define container for target predictions which will be updated inside the loop's local scope
 preds_target = Dict{String,DataFrame}()
@@ -198,7 +192,7 @@ for priorsetting in priorsettings
 
     # ModelSummary object holds chains, parameter names, and parameter samples
     posterior = @chain begin
-        if load
+        if Main.load
             try
                 @info "Loading chains for $priorsetting prior."
                 deserialize(joinpath(Main.ROOT, "results", "chains", "count_$(priorsetting).jls"))
@@ -215,7 +209,7 @@ for priorsetting in priorsettings
 
     diagnose(posterior.chains)
 
-    !load && try
+    !Main.load && try
         path = joinpath(Main.ROOT, "results", "chains", "count_$(priorsetting)_$(Main.SUFFIX).jls")
         serialize(path, posterior.chains)
         @info "Count model: Chains saved to `$path`."
@@ -281,7 +275,7 @@ for priorsetting in priorsettings
                 pred = vec(median(preds[R, :][S, :], dims=2))
                 # Calculate quantile of predicted values for species S
                 lims = @chain preds[R, :][S, :] begin
-                    map(x -> hdi(x, prob=0.9), eachslice(_, dims=1))
+                    map(x -> hdi(x, prob=0.75), eachslice(_, dims=1))
                     map(i -> abs.(getproperty.(Ref(_[i]), [:lower, :upper]) .- pred[i]), eachindex(_))
                     reduce(hcat, _)
                 end
@@ -441,7 +435,7 @@ for priorsetting in priorsettings
 
     loomodel = broadcastmodel(values(odict_inputs)..., zlogn; pr=dict_pr[priorsetting])
 
-    if run_loocv
+    if Main.run_loocv
         @info "Count model: Crossvalidation for $priorsetting priors"
         cv_res = psis_loo(loomodel, posterior.chains)
     else
@@ -449,111 +443,5 @@ for priorsetting in priorsettings
     end
 
 end
-
-# --- GLOBAL ESTIMATES --- #
-
-known = @chain pop_known begin
-    select(_, [:atoll, :region, :species, :nbirds])
-    transform(_, :nbirds => ByRow(x -> (lower=x, upper=x)) => AsTable)
-end
-
-glob = CSV.read(joinpath(Main.ROOT, "data", "birdlife_hbw_globalestimates_$(Main.SUFFIX).csv"), DataFrame)
-
-DataFrames.transform!(pop_unknown, [:atoll, :species, :region] .=> denserank => x -> string("num_", x))
-
-# Load data sets
-p75, p80, p85 = CSV.read.(joinpath.(Main.ROOT, "results", "data", "countpreds_0." .* ["75", "8", "85"] .* "_default_$(Main.SUFFIX).csv"), DataFrame)
-select!.([p75, p80, p85], Ref([:atoll, :region, :species, :median, :lower, :upper]))
-rename!.([p75, p80, p85], :median => :nbirds)
-
-full75, full80, full85 = [vcat(known, df) for df in [p75, p80, p85]]
-
-tot75, tot80, tot85 = popsum.([full75, full80, full85])
-leftjoin!.([tot75, tot80, tot85], Ref(glob), on=:species)
-
-for n in [:nbirds, :lower, :upper], df in [tot75, tot80, tot85]
-    transform!(df, [:species, n, :birdlife_min, :birdlife_max, :HBW, :Otero] => ByRow(calcratio) => string("ratio_", n))
-end
-select!.([tot75, tot80, tot85], Ref(Not(:birdlife_min, :birdlife_max, :HBW, :Otero)))
-
-histogram((tot75.ratio_nbirds .- tot85.ratio_nbirds) .* 100, title="Pop on atoll ratio diff .75 - .85", label=:none)
-xticks!(-1:3, string.(-1:3) .* "%")
-
-CSV.write(joinpath(Main.ROOT, "results", "data", "pred_and_obs_atolls_$(Main.SUFFIX).csv"), full80)
-
-# Summarise raw samples before further summaries
-
-full_with_raw = @chain known begin
-    transform(_, :nbirds => ByRow(x -> fill(x, Int(nsamples*nchains))) => :raw)
-    rename(_, :nbirds => :median)
-    select(_, :atoll, :region, :species, :raw, :median, :lower, :upper)
-    vcat(preds_target["0.8"], _)
-end
-
-summary_specieswise = let df = full_with_raw
-    out = DataFrame()
-    for sp in unique(df.species)
-        tmp = @chain df begin
-            subset(_, :species => ByRow(x -> x == sp))
-            getproperty(_, :raw)
-            sum(_)
-            Dict("species" => sp, "median" => median(_), "lower" => quantile(_, 0.025), "upper" => quantile(_, 0.975))
-        end
-        append!(out, DataFrame(tmp))
-    end
-    out
-end
-
-summary_atollwise = let df = full_with_raw
-    out = DataFrame()
-    for atoll in unique(df.atoll)
-        tmp = @chain df begin
-            subset(_, :atoll => ByRow(x -> x == atoll))
-            getproperty(_, :raw)
-            sum(_)
-            Dict("atoll" => atoll, "median" => median(_), "lower" => quantile(_, 0.025), "upper" => quantile(_, 0.975))
-        end
-        append!(out, DataFrame(tmp))
-    end
-    out
-end
-
-CSV.write(joinpath(Main.ROOT, "results", "data", "summary_specieswise_$(Main.SUFFIX).csv"), summary_specieswise)
-CSV.write(joinpath(Main.ROOT, "results", "data", "summary_atollwise_$(Main.SUFFIX).csv"), summary_atollwise)
-
-# --- SENSITIVITY ANALYSIS --- # 
-
-# for 0.8 cutoffs
-
-dict_sensitivity = @chain begin
-    map(priorsettings) do priorsetting
-        Pair(priorsetting, CSV.read(joinpath(Main.ROOT, "results", "data", "countpreds_0.8_$(priorsetting)_$(Main.SUFFIX).csv"), DataFrame))
-    end
-    Dict(_)
-end
-
-select!.(values(dict_sensitivity), Ref([:atoll, :region, :species, :median, :lower, :upper]))
-rename!.(values(dict_sensitivity), :median => :nbirds)
-[dict_sensitivity[k] = vcat(known, v) for (k, v) in Pair.(keys(dict_sensitivity), values(dict_sensitivity))]
-[dict_sensitivity[k] = popsum(v) for (k, v) in Pair.(keys(dict_sensitivity), values(dict_sensitivity))]
-leftjoin!.(values(dict_sensitivity), Ref(glob), on=:species)
-
-for n in [:nbirds, :lower, :upper], df in values(dict_sensitivity)
-    transform!(df, [:species, n, :birdlife_min, :birdlife_max, :HBW, :Otero] => ByRow(calcratio) => string("ratio_", n))
-end
-
-for (k, v) in Pair.(keys(dict_sensitivity), values(dict_sensitivity))
-    dict_sensitivity[k] = insertcols(v, 1, :prior => k)
-end
-
-# Compare global predictions for different prior settings
-df_sens = reduce(vcat, values(dict_sensitivity))
-
-scatter(df_sens.ratio_nbirds, df_sens.species, group=df_sens.prior, alpha=0.75, markershape=:x)
-xlabel!("Global population on atolls")
-xticks!(0:0.5:2, string.(Int64.(collect(0:0.5:2) .* 100), "%"))
-yticks!(eachindex(unique(df_sens.species)), unique(df_sens.species), size=(600, 600), tickfontsize=7)
-
-foreach(ext -> savefig(joinpath(Main.ROOT, "results", ext, "count", "sensitivity_count.$ext")), ["svg", "png"])
 
 end

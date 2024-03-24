@@ -1,13 +1,13 @@
 # This script is part of the project associated with
-# Article: Atolls are globally significant hubs for tropical seabirds
+# Article: Atolls are globally significant sites for tropical seabirds
 # Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
-# Last edited: 2024-03-10
+# Last edited: 2024-03-24
 
 "This module contains helper functions for modeling and postprocessing."
 module CustomUtilityFuns
 
 # Modeling and wrangling
-using Turing, DataFrames, Chain
+using Turing, DataFrames, Chain, OrderedCollections
 # Plotting
 using Colors, ColorSchemes, StatsPlots
 
@@ -20,6 +20,7 @@ export getsamples,
        ModelSummary,
        diagnose,
        popsum,
+       summariseby,
        calcratio,
        blue_in_blue
 
@@ -90,8 +91,22 @@ end
 function popsum(df)
     out = @chain df begin
         groupby(_, :species)
-        combine(_, [:nbirds, :lower, :upper] .=> sum .=> identity)
+        combine(_, [:median, :lower, :upper] .=> sum .=> identity)
     end
+    return out
+end
+
+"This function expects a Vector of Vectors as the `target`. Useful for summarising posterior draws across groups."
+function summariseby(i, col, df; target="raw")
+    targetcolumn = df[:, target]
+    idx = df[:, col] .== i
+    summed_target = sum(targetcolumn[idx])
+    out = OrderedDict(
+        string(col) => i,
+        "median" => median(summed_target),
+        "lower" => quantile(summed_target, 0.025),
+        "upper" => quantile(summed_target, 0.975)
+    )
     return out
 end
 

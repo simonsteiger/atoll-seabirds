@@ -1,5 +1,5 @@
 # This script is part of the project associated with
-# Article: Atolls are globally significant hubs for tropical seabirds
+# Article: Atolls are globally significant sites for tropical seabirds
 # Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
 # Last edited: 2024-03-10
 
@@ -11,12 +11,6 @@ module PresenceModel
 export nothing
 
 # --- WORKSPACE SETUP --- #
-
-# Cmd args
-# Need to check for "true" again because the shell script converts args to strings
-load = Main.ARGS[1] == "false"
-run_loocv = Main.ARGS[2] == "true"
-run_sensitivity = Main.ARGS[3] == "true"
 
 # Probabilistic programming
 using Turing, ParetoSmooth, ReverseDiff
@@ -105,7 +99,7 @@ dict_pr = Dict(
     "wide" => (α_sxr=[0, 1 * 3], μ_pxn=[0, 0.2 * 3], σ_pxn=[3, 0.5 * 3]),
 )
 
-priorsettings = run_sensitivity ? collect(keys(dict_pr)) : ["default"]
+priorsettings = Main.run_sensitivity ? collect(keys(dict_pr)) : ["default"]
 
 for priorsetting in priorsettings
 
@@ -170,7 +164,7 @@ for priorsetting in priorsettings
     Random.seed!(42)
 
     posterior = @chain begin
-        if load
+        if Main.load
             try
                 @info "Loading chains for $priorsetting priors."
                 deserialize(joinpath(Main.ROOT, "results", "chains", "presence_$(priorsetting).jls"))
@@ -188,7 +182,7 @@ for priorsetting in priorsettings
     diagnose(posterior.chains)
 
 
-    !load && try
+    !Main.load && try
     path = joinpath(Main.ROOT, "results", "chains", "presence_$(priorsetting)_$(Main.SUFFIX).jls")
         serialize(path, posterior.chains)
         @info "Presence model: Chains saved to `$path`."
@@ -268,9 +262,10 @@ for priorsetting in priorsettings
     end
 
     # --- PSIS-LOO CV --- #
-    if run_loocv
+    if Main.run_loocv
         @info "Presence model: Crossvalidation for $priorsetting priors"
         cv_res = psis_loo(m, posterior.chains)
+        @info "GMPD for $priorsetting priors was $(round(cv_res.gmpd, digits=2))"
         # - no overfit
         # - out of sample performance near in-sample performance (gmpd 0.76)
         # - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))

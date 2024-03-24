@@ -1,7 +1,7 @@
 # This script is part of the project associated with
-# Article: Atolls are globally significant hubs for tropical seabirds
+# Article: Atolls are globally significant sites for tropical seabirds
 # Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
-# Last edited: 2024-03-10
+# Last edited: 2024-03-24
 
 "This module creates precursor objects for further processing in `countvars.jl` and `presencevars.jl`."
 module GlobalVariables
@@ -9,7 +9,9 @@ module GlobalVariables
 export envs_known,
        envs_unknown,
        pop_known,
-       pop_unknown
+       pop_unknown,
+       specinfo,
+       atollinfo
 
 # Working with tabular data
 using CSV, DataFrames, Chain
@@ -21,10 +23,8 @@ envscores = CSV.read(joinpath(Main.ROOT, "results", "data", "pca_scores_$(Main.S
 pop = CSV.read(joinpath(Main.ROOT, "data", "obs_seabird_populations_$(Main.SUFFIX).csv"), DataFrame)
 
 # Add data about nesting type
-specinfo = @chain begin
-    CSV.read(joinpath(Main.ROOT, "data", "vars_seabird_$(Main.SUFFIX).csv"), DataFrame)
-    select(_, [:species, :nestingtype])
-end
+specinfo = CSV.read(joinpath(Main.ROOT, "data", "vars_seabird_$(Main.SUFFIX).csv"), DataFrame)
+atollinfo = CSV.read(joinpath(Main.ROOT, "data", "vars_atoll_$(Main.SUFFIX).csv"), DataFrame)
 
 envs_known = subset(envscores, :presence => ByRow(x -> !ismissing(x)))
 envs_unknown = subset(envscores, :presence => ByRow(x -> ismissing(x)))
@@ -33,7 +33,7 @@ envs_unknown = subset(envscores, :presence => ByRow(x -> ismissing(x)))
 odict_atoll_unknown = sort(Dict(Pair.(denserank(envs_unknown.atoll), envs_unknown.atoll)))
 
 # Add nestingtype to envscores
-leftjoin!(envs_known, specinfo, on=:species)
+leftjoin!(envs_known, select(specinfo, [:species, :nestingtype]), on=:species)
 
 pop_known = @chain pop begin
     DataFrames.transform(_, All() .=> ByRow(x -> ismissing(x) ? 0 : x) => identity)
