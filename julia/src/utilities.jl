@@ -7,7 +7,7 @@
 module CustomUtilityFuns
 
 # Modeling and wrangling
-using Turing, DataFrames, Chain, OrderedCollections
+using Turing, DataFrames, Chain, OrderedCollections, PosteriorStats
 # Plotting
 using Colors, ColorSchemes, StatsPlots
 
@@ -21,6 +21,7 @@ export getsamples,
        diagnose,
        popsum,
        summariseby,
+       stringify,
        calcratio,
        blue_in_blue
 
@@ -97,16 +98,33 @@ function popsum(df)
 end
 
 "This function expects a Vector of Vectors as the `target`. Useful for summarising posterior draws across groups."
-function summariseby(i, col, df; target="raw", percentiles=[0.025, 0.975])
+function summariseby(i, col, df; target="raw", prob=0.95)
     targetcolumn = df[:, target]
     idx = df[:, col] .== i
     summed_target = sum(targetcolumn[idx])
     out = OrderedDict(
-        string(col) => i,
-        "median" => median(summed_target),
-        "lower" => quantile(summed_target, percentiles[1]),
-        "upper" => quantile(summed_target, percentiles[2])
+        Symbol(col) => i,
+        :median => median(summed_target),
+        pairs(hdi(summed_target, prob=prob))...
     )
+    return out
+end
+
+function summariseby(::Nothing, df; target="raw", prob=0.95)
+    summed_target = sum(df[:, target])
+    out = OrderedDict(
+        :median => median(summed_target),
+        pairs(hdi(summed_target, prob=prob))...
+    )
+    return out
+end
+
+"Turn a dict into a string, prefixed with `prefix`."
+function stringify(d::Dict; prefix="")
+    out = prefix
+    for k in keys(d)
+        out = "$out $k => $(round.(Int, [d[k][:lower], d[k][:median], d[k][:upper]]))\n"
+    end
     return out
 end
 

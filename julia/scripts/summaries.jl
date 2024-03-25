@@ -59,8 +59,8 @@ end
 
 summary_count =
     let indices = [:species, :atoll]
-        out = map(indices) do index
-            out = map(i -> summariseby(i, index, full_samples; percentiles=[0.1, 0.9]), unique(full_samples[:, index]))
+        out = map(indices, [0.8, 0.95]) do index, prob
+            out = map(i -> summariseby(i, index, full_samples; prob=prob), unique(full_samples[:, index]))
             DataFrame(out)
         end
         Dict(Pair.(string.(indices), out))
@@ -173,5 +173,17 @@ summary_nutrient = let indices = [:atoll, :species]
 end
 
 foreach(k -> CSV.write(joinpath(Main.ROOT, "results", "data", "summary_nutrient_$(k)wise_$(Main.SUFFIX).csv"), summary_nutrient[k]), keys(summary_nutrient))
+
+# Create global summaries for text
+summary_global = map(nutrient -> summariseby(nothing, df_comb_nutr; target=nutrient), names(df_raw_nutrients))
+global_dict = Dict(Pair.(names(df_raw_nutrients), summary_global))
+push!(global_dict, Pair("count", summariseby(nothing, full_samples)))
+
+textsummary = stringify(global_dict, prefix="FORMAT [lower, median, upper]\n\n")
+
+# Write text-based summary
+open(joinpath(Main.ROOT, "results", "data", "summary_textbased.txt"), "w") do file
+    write(file, textsummary)
+end
 
 end
