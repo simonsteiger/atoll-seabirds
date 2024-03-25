@@ -19,7 +19,7 @@ Phaethon_rubricauda,Red-tailed Tropicbird,ground,tropicbird,671.9,183,0.6,0.48,6
 Phoebastria_immutabilis,Laysan Albatross,ground,albatros,3145.9,274,0.6,0.48,2310,1600000
 Phoebastria_nigripes,Black-footed Albatross,ground,albatros,3188.4,274,0.6,0.5,2310,139800
 Phoebastria_albatrus,Short-tailed Albatross,ground,albatros,4411,243,0.6,0.51,3710,1734
-Nesofregetta_fuliginosa,Polynesian Storm-Petrel,burrow,tubenose,70,160,0.1,0.5,60,1000
+Nesofregetta_fuliginosa,Polynesian Storm-Petrel,burrow,tubenose,70,160,0.1,0.5,60,999
 Hydrobates_tristrami,Tristram's Storm-Petrel,burrow,tubenose,89.1,122,0.1,0.45,50,20000
 Pterodroma_neglecta,Kermadec Petrel,ground,tubenose,501,122,0.6,0.1,500,200000
 Pterodroma_heraldica,Herald Petrel,ground,tubenose,394,90,0.3,0.3,420,150000

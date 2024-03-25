@@ -27,15 +27,17 @@ suffix <- "_steibl_et_al_2024_atoll_seabird_analysis"
 
 # Read data ----
 
-# Load metadata. see suplementary file S1 for data source references
+# Load metadata. see supplementary file S1 for data source references
 envs <- read.csv(here(paste0("data/vars_atoll", suffix, ".csv")))
 nest <- read.csv(here(paste0("data/vars_seabird", suffix, ".csv")))
 forag <- read.csv(here(paste0("data/vars_foraging", suffix, ".csv")))
 
 # Load results file from Bayesian model analysis (julia-pipeline)
 preds <- read.csv(here(paste0("results/data/pred_and_obs_atolls", suffix, ".csv")))
-smr.atollw <- read.csv(here(paste0("results/data/summary_count_atollwise", suffix, ".csv")))
-smr.specw <- read.csv(here(paste0("results/data/summary_count_specieswise", suffix, ".csv")))
+atollw <- read.csv(here(paste0("results/data/summary_count_atollwise", suffix, ".csv"))) ##### why only 244 atolls?
+specw <- read.csv(here(paste0("results/data/summary_count_specieswise", suffix, ".csv")))
+nutr.atollw <- read.csv(here(paste0("results/data/summary_nutrient_atollwise", suffix, ".csv")))
+nutr.specw <- read.csv(here(paste0("results/data/summary_nutrient_specieswise", suffix, ".csv")))
 
 # Prepare data frames for plotting ----
 
@@ -44,6 +46,7 @@ envs$long <- ifelse(envs$long < 0, envs$long + 360, envs$long)
 
 # turn into factors
 missing <- envs %>% mutate(across(1:3, as.factor))
+
 envs <- envs %>%
   select(atoll, region, lat, long, land_area_sqkm) %>%
   mutate(across(1:2, as.factor))
@@ -53,36 +56,34 @@ preds <- preds %>%
   mutate(across(1:2, as.factor))
 nest <- mutate(nest, across(1:4, as.factor))
 forag$species <- as.factor(forag$species)
-smr.atollw$atoll <- as.factor(smr.atollw$atoll)
-smr.specw$species <- as.factor(smr.specw$species)
+atollw$atoll <- as.factor(atollw$atoll)
+specw$species <- as.factor(specw$species)
+nutr.atollw$atoll <- as.factor(nutr.atollw$atoll)
+nutr.specw$species <- as.factor(nutr.specw$species)
 
-# turn predicted abundances into whole numbers
+# turn predicted counts into whole numbers
 preds <- preds %>% mutate(across(c(nbirds, lower, upper), round))
-smr.atollw <- smr.atollw %>% mutate(across(c(median, lower, upper), round))
-smr.specw <- smr.specw %>% mutate(across(c(median, lower, upper), round))
+atollw <- atollw %>% mutate(across(c(median, lower, upper), round))
+specw <- specw %>% mutate(across(c(median, lower, upper), round))
 
 # drop unneeded columns from foraging dataset
 forag <- forag %>% select(!c(location, reference))
 
-# add 'empty' atolls to count pred data frame
+# add 'empty' atolls to count data frames
 dat <- left_join(envs, preds, by = "atoll") %>% mutate_at(c("nbirds", "lower", "upper"), ~ replace_na(., 0))
+atollw <- left_join(envs, atollw, by = "atoll") %>% 
+                mutate(across(where(is.numeric), ~replace_na(.x, 0))) %>% 
+                select(!c("region", "land_area_sqkm")) %>% 
+                rename_with(~paste0(.x, "_nbirds"), c(median, lower, upper))
+nutr.atollw <- left_join(envs, nutr.atollw, by = "atoll") %>% 
+                    mutate(across(where(is.numeric), ~replace_na(.x, 0))) %>% 
+                    select(!c("region", "lat", "long", "land_area_sqkm"))
+                  
 
 # convert long format into atoll x species matrix for beta-diversity computation
 matrix <- dat %>%
   select(!c("lower", "upper")) %>%
   pivot_wider(names_from = species, values_from = nbirds, values_fill = 0) %>%
-  select(!"NA") %>%
-  as.data.frame()
-
-matrix.lwr <- dat %>%
-  select(!c("nbirds", "upper")) %>%
-  pivot_wider(names_from = species, values_from = lower, values_fill = 0) %>%
-  select(!"NA") %>%
-  as.data.frame()
-
-matrix.upr <- dat %>%
-  select(!c("lower", "nbirds")) %>%
-  pivot_wider(names_from = species, values_from = upper, values_fill = 0) %>%
   select(!"NA") %>%
   as.data.frame()
 
@@ -96,10 +97,7 @@ beta$atoll <- matrix[c(which(rowMeans(matrix[, -c(1:5)]) > 0)), ]$atoll
 colnames(beta)[1] <- "lcbd"
 rm(beta.atoll) # no longer needed, keep tidy
 
-# Richness differences and species turnover
-comp.atoll <- matrix[c(which(rowMeans(matrix[, -c(1:5)]) > 0)), -c(1:5)] %>% beta.div.comp(., coef = "J", quant = FALSE)
-
-# add seabird metadata and calculate atoll-wise biomass per species
+# add seabird metadata 
 comb <- matrix %>% pivot_longer(!c(atoll, region, lat, long, land_area_sqkm),
   names_to = "species", values_to = "nbirds"
 )
@@ -107,16 +105,6 @@ comb$species <- as.factor(comb$species)
 comb <- comb %>%
   left_join(., nest, by = "species") %>%
   as.data.frame()
-
-comb.lwr <- matrix.lwr %>% pivot_longer(!c(atoll, region, lat, long, land_area_sqkm),
-  names_to = "species", values_to = "lower"
-)
-comb.lwr$species <- as.factor(comb.lwr$species)
-
-comb.upr <- matrix.upr %>% pivot_longer(!c(atoll, region, lat, long, land_area_sqkm),
-  names_to = "species", values_to = "upper"
-)
-comb.lwr$species <- as.factor(comb.upr$species)
 
 # calculate total N and P input in per year and per seabird and atoll using
 # https://doi.org/10.1038/s41467-017-02446-8 and https://doi.org/0.1016/j.envpol.2004.02.008
@@ -186,54 +174,38 @@ comb$birdC <- comb$biomass * wat.cont * dry.carb
 # drop unneeded columns after computation
 comb <- comb %>% select(!c(
   bodymass, nestingtype, BMR, AMR, dailyN, dailyP, seasonalN, seasonalP, days_at_colony, time_at_colony,
-  adultN, adultP, chickN, chickP, E_rearing, prod_per_pair, fledgling_mass, F_hab, common_names
+  adultN, adultP, chickN, chickP, E_rearing, prod_per_pair, fledgling_mass, F_hab, common_names, global_est
 ))
 
-##############################################################################################
-# summarize atoll-wise
-atoll <- comb %>%
-  group_by(atoll, region, lat, long, land_area_sqkm) %>%
-  summarise(
-    nspec = sum(nbirds > 0),
-    nbirds = sum(nbirds),
-    totbiomass = sum(biomass),
-    totN = sum(excretedN),
-    totP = sum(excretedP),
-    totNH3 = sum(NH3emit),
-    totC = sum(birdC)
-  ) %>%
-  as.data.frame()
+
+# summarize atoll-wise: merge data frames, add species richness per atoll
+atoll <- left_join(atollw, nutr.atollw, by = "atoll")
 
 atoll <- atoll %>%
   left_join(., beta, by = "atoll") %>%
   mutate(lcbd = replace_na(lcbd, 0))
 
-##############################################################################################
-# summarize species-wise
-spec <- comb %>%
-  group_by(species, group) %>%
-  summarise(
-    nbirds = sum(nbirds),
-    totbiomass = sum(biomass),
-    totN = sum(excretedN),
-    totP = sum(excretedP),
-    totNH3 = sum(NH3emit)
-  ) %>%
-  as.data.frame()
+spec.ric <- comb %>% group_by(atoll) %>% summarise(nspec = sum(nbirds > 0)) %>% as.data.frame()
+atoll <- atoll %>% 
+  left_join(., spec.ric, by = "atoll")
 
+# no longer needed, keep tidy
+rm(spec.ric)
+rm(beta)
 
+# summarize species-wise:
 # calculate proportion contribution to global population for lower (2.5%), median, and upper (97.5%) estimate
-smr.specw <- smr.specw %>% 
+specw <- specw %>% 
   left_join(., nest, by = "species") %>% 
   select(c(species, common_names, group, lower, median, upper, global_est)) %>% 
   as.data.frame()
 
-smr.specw$ratio.lower <- smr.specw$lower/smr.specw$global_est
-smr.specw$ratio.median <- smr.specw$median/smr.specw$global_est
-smr.specw$ratio.upper <- smr.specw$upper/smr.specw$global_est
+specw$ratio.lower <- specw$lower/specw$global_est
+specw$ratio.median <- specw$median/specw$global_est
+specw$ratio.upper <- specw$upper/specw$global_est
 
 # set upper limit to 1
-smr.specw$ratio.upper[smr.specw$ratio.upper > 1] <- 0.999
+specw$ratio.upper[specw$ratio.upper > 1] <- 0.999
 
 
 
@@ -434,14 +406,14 @@ plotmissing <- (pmiss1 + pmiss2 + pmiss3) / (pmiss4 + pmiss5 + pmiss6) / (pmiss7
 
 # total bird numbers
 spat.1a <- atoll %>%
-  arrange(nbirds) %>%
+  arrange(median_nbirds) %>%
   st_as_sf(., coords = c("long", "lat"), crs = 4326)
 coords.1a <- spat.1a %>% st_coordinates(extract())
 
 p1a <- map +
   geom_point(
     data = spat.1a,
-    aes(x = coords.1a[, 1], y = coords.1a[, 2], colour = log10(nbirds + 1)),
+    aes(x = coords.1a[, 1], y = coords.1a[, 2], colour = log10(median_nbirds + 1)),
     size = 1.1, shape = 21, alpha = 0.9, stroke = 1.9
   ) +
   scale_colour_gradientn(
@@ -492,9 +464,9 @@ p3a <- map +
 
 
 # boxplot abundance
-p1b <- ggplot(data = atoll[which(atoll$nbirds > 0), ], aes(x = "identity", y = nbirds)) +
+p1b <- ggplot(data = atoll[which(atoll$median_nbirds > 0), ], aes(x = "identity", y = median_nbirds)) +
   geom_violin(fill = "#EBEBEB", alpha = 0.5) +
-  geom_jitter(aes(colour = log(nbirds + 1)), width = 0.15, size = 1.5) +
+  geom_jitter(aes(colour = log(median_nbirds + 1)), width = 0.15, size = 1.5) +
   geom_boxplot(fill = "#EBEBEB", width = 0.1, alpha = 0.5, outlier.shape = NA) +
   scale_y_continuous(
     trans = "log",
@@ -526,7 +498,7 @@ p2b <- ggplot(data = atoll, aes(x = "identity", y = nspec)) +
   boxplotaesth
 
 # boxplot lcbd
-p3b <- ggplot(data = atoll[which(atoll$nbirds > 0), ], aes(x = "identity", y = lcbd)) +
+p3b <- ggplot(data = atoll[which(atoll$median_nbirds > 0), ], aes(x = "identity", y = lcbd)) +
   geom_violin(fill = "#EBEBEB", alpha = 0.5) +
   geom_jitter(aes(colour = lcbd), width = 0.15, size = 1.5) +
   geom_boxplot(fill = "#EBEBEB", width = 0.1, alpha = 0.5, outlier.shape = NA) +
@@ -542,19 +514,19 @@ p3b <- ggplot(data = atoll[which(atoll$nbirds > 0), ], aes(x = "identity", y = l
 pmapbox <- p1a + p1b + p2a + p2b + p3a + p3b + plot_layout(widths = c(3, 1, 3, 1, 3, 1), nrow = 3, ncol = 2)
 
 # Save and export Figure 1
-# ggsave(pmapbox, path = here("results", "svg", "article"), filename = "fig_pop-ric-lcbd.svg", dpi = 300, width = 210, height = 170, units = "mm")
+# ggsave(pmapbox, path = here("results", "svg", "article"), filename = "fig01_pop-ric-lcbd.svg", dpi = 300, width = 210, height = 170, units = "mm")
 
 
 # FIGURE 2 PLOTTING: bird populations ----
 
-smr.specw$range <- ifelse(smr.specw$ratio.median >= 0.95, ">95%", 
-                          ifelse(smr.specw$ratio.median >= 0.75, ">75%", 
-                                 ifelse(smr.specw$ratio.median >= 0.50, ">50%",
-                                        ifelse(smr.specw$ratio.median >= 0.25, ">25%",
+specw$range <- ifelse(specw$ratio.median >= 0.95, ">95%", 
+                          ifelse(specw$ratio.median >= 0.75, ">75%", 
+                                 ifelse(specw$ratio.median >= 0.50, ">50%",
+                                        ifelse(specw$ratio.median >= 0.25, ">25%",
                                         "<25%")))) %>% as.factor()
 
 
-pglobal <- ggplot(data = smr.specw) +
+pglobal <- ggplot(data = specw) +
   geom_bar(aes(x = ratio.median * 100, y = reorder(common_names, ratio.median), fill = range),
     stat = "identity", color = "black", width = 0.8, linewidth = 0.5
   ) +
@@ -588,15 +560,15 @@ pglobal <- ggplot(data = smr.specw) +
   )
 
 # Save and export Figure 2
-# ggsave(pglobal, path = here("results", "svg", "article"), filename = "fig_proportion_species_global.svg", dpi = 300, width = 79, height = 150, units = "mm")
+# ggsave(pglobal, path = here("results", "svg", "article"), filename = "fig02_proportion_species_global.svg", dpi = 300, width = 79, height = 150, units = "mm")
 
 
 
 # FIGURE 3 AND S2 PLOTTING: nutrient inputs ----
 
-pnitrog.a <- ggplot(data = atoll[which(atoll$nbirds > 0), ], aes(x = "identity", y = totN)) +
+pnitrog.a <- ggplot(data = atoll[which(atoll$median_nbirds > 0), ], aes(x = "identity", y = median_excretedN)) +
   geom_violin(fill = "#EBEBEB", alpha = 0.5) +
-  geom_jitter(aes(colour = totN), width = 0.15, size = 1.5) +
+  geom_jitter(aes(colour = median_excretedN), width = 0.15, size = 1.5) +
   geom_boxplot(fill = "#EBEBEB", width = 0.1, alpha = 0.5, outlier.shape = NA) +
   scale_y_continuous(
     trans = "log10", labels = scales::comma,
@@ -612,9 +584,9 @@ pnitrog.a <- ggplot(data = atoll[which(atoll$nbirds > 0), ], aes(x = "identity",
   boxplotaesth +
   theme(axis.line.x = element_blank())
 
-pphosph.a <- ggplot(data = atoll[which(atoll$nbirds > 0), ], aes(x = "identity", y = totP)) +
+pphosph.a <- ggplot(data = atoll[which(atoll$median_nbirds > 0), ], aes(x = "identity", y = median_excretedP)) +
   geom_violin(fill = "#EBEBEB", alpha = 0.5) +
-  geom_jitter(aes(colour = totP), width = 0.15, size = 1.5) +
+  geom_jitter(aes(colour = median_excretedP), width = 0.15, size = 1.5) +
   geom_boxplot(fill = "#EBEBEB", width = 0.1, alpha = 0.5, outlier.shape = NA) +
   scale_y_continuous(
     trans = "log10", labels = scales::comma,
@@ -710,27 +682,27 @@ pnutrientsN <- pnitrog.a + pnitrog.b + plot_layout(widths = c(1, 1.3)) # figure 
 pnutrientsP <- pphosph.a + pphosph.b + plot_layout(widths = c(1, 1.3)) # figure S2
 
 # Save and export figure 3 and S2
-# ggsave(pnutrientsN, path = here("results", "svg", "article"), filename = "fig_nitrogen_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
-# ggsave(pnutrientsP, path = here("results", "svg", "article"), filename = "fig_phosphorous_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
+# ggsave(pnutrientsN, path = here("results", "svg", "article"), filename = "fig03_nitrogen_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
+# ggsave(pnutrientsP, path = here("results", "svg", "article"), filename = "figS2_phosphorous_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
 
 
 # FIGURE S1: significant breeding sites ----
 
-atollw <- comb %>% select(c(atoll, region, lat, long, species, nbirds, group, global_est))
+sitew <- comb %>% select(c(atoll, region, lat, long, species, nbirds, group, global_est))
 
-atollw$atoll.ratios <- atollw$nbirds/atollw$global_est
+sitew$atoll.ratios <- sitew$nbirds/sitew$global_est
 
-atollw$species <- as.factor(atollw$species)
+sitew$species <- as.factor(sitew$species)
 
 
 # subset only for largest value per atoll
-atollmax <- atollw %>%
+atollmax <- sitew %>%
   group_by(atoll, lat, long) %>%
   summarise(atoll.ratios = max(atoll.ratios)) %>%
   as.data.frame()
 atollmax$cuts <- cut(atollmax$atoll.ratios,
   breaks = c(0, 0.01, 0.10, 0.25, 0.50, 0.70, 1),
-  labels = c("<1%", "1-10%", "10-25%", "25-50%", "50-70%", ">70%")
+  labels = c("<1%", "1-10%", "10-25%", "25-50%", "50-70%", "70%")
 )
 
 atollmax[is.na(atollmax$cuts), ]$cuts <- "<1%"
@@ -753,7 +725,7 @@ psignif <- map +
   )
 
 # Save and export Figure S1
-# ggsave(p10, path = here("results", "svg", "article"), filename = "fig_atollw_contribution_NO-ICONS.svg", dpi = 300, width = 210, height = 100, units = "mm")
+# ggsave(psignif, path = here("results", "svg", "article"), filename = "figS1_atollw_contribution_NO-ICONS.svg", dpi = 300, width = 210, height = 100, units = "mm")
 
 # FIGURE 4 (PART): foraging distance plots ----
 
@@ -876,18 +848,21 @@ p.forag <- ggplot() +
 # Text-based results summary ----
 
 # The 280 Indo-Pacific atolls are nesting sites for an estimated total of
-sum(smr.atollw$median)
-c(sum(smr.atollw$lower), sum(smr.atollw$upper)) #Confidence intervals
+sum(atoll$median_nbirds)
+c(sum(atoll$lower_nbirds), sum(atoll$upper_nbirds)) #Confidence intervals
+
+# Individual atoll nesting populations ranging from ... to ...
+min(atoll$median_nbirds)
+max(atoll$median_nbirds)
 
 # the mean nesting population per atoll is
-mean(smr.atollw$median)
-median(smr.atollw$median)
-c(mean(smr.atollw$lower), mean(smr.atollw$upper)) #quantiles
+mean(atoll$median_nbirds)
+c(mean(atoll$lower_nbirds), mean(atoll$upper_nbirds)) #quantiles
 
 # Number of atolls that house a colony for a given species above the B3b IBA threshold of 13,200 birds
 # http://datazone.birdlife.org/site/ibacritreg
-comb %>%
-  filter(nbirds >= 13200) %>%
+atoll %>%
+  filter(median_nbirds >= 13200) %>%
   distinct(atoll, .keep_all = TRUE) %>%
   nrow()
 
@@ -906,46 +881,69 @@ atollmax %>%
   nrow()
 
 # Biomass of all nesting seabirds combined
-sum(atoll$totbiomass) / 1000
-mean(atoll$totbiomass) / 1000
-quantile(atoll$totbiomass, probs = c(0.025, 0.975)) / 1000
+# (divide by water content and dry carb content to extrapolate from C to tot biomass, see Bar-On et al. 2018)
+sum(atoll$median_bird_C/(wat.cont * dry.carb))/1000
+c(sum(atoll$lower_bird_C/(wat.cont * dry.carb))/1000,
+  sum(atoll$upper_bird_C/(wat.cont * dry.carb))/1000)
+
+
+mean(atoll$median_bird_C/(wat.cont * dry.carb))/1000
+c(mean(atoll$lower_bird_C/(wat.cont * dry.carb))/1000,
+  mean(atoll$upper_bird_C/(wat.cont * dry.carb))/1000)
 
 # Total carbon of all nesting seabirds combined
-sum(atoll$totC) / 1000
-mean(atoll$totC) / 1000
-quantile(atoll$totC, probs = c(0.025, 0.975)) / 1000
+sum(atoll$median_bird_C) / 1000
+c(sum(atoll$lower_bird_C/1000),
+  sum(atoll$upper_bird_C/1000))
+
+# Atollwise seabird carbon stock
+mean(atoll$median_bird_C) / 1000
+c(mean(atoll$lower_bird_C/1000),
+  mean(atoll$upper_bird_C/1000))
 
 # Number of species where on atolls are nesting of the relative global population more than
 # 25%
-smr.specw %>%
+specw %>%
   filter(ratio.median > 0.25) %>%
   nrow()
 # 50%
-smr.specw %>%
+specw %>%
   filter(ratio.median > 0.50) %>%
   nrow()
 # 75%
-smr.specw %>%
+specw %>%
   filter(ratio.median > 0.75) %>%
   nrow()
 # 95%
-smr.specw %>%
+specw %>%
   filter(ratio.median > 0.95) %>%
   nrow()
 
 # Total combined contribution of seabird nutrients to atolls
-sum(atoll$totN)
-sum(atoll$totP)
+sum(atoll$median_excretedN)
+c(sum(atoll$lower_excretedN),
+  sum(atoll$upper_excretedN))
+
+sum(atoll$median_excretedP)
+c(sum(atoll$lower_excretedP),
+  sum(atoll$upper_excretedP))
 
 # Seabird colonies on atolls import on average nitrogen in quantities of
-mean(atoll$totN)
-quantile(atoll$totN, probs = c(0.025, 0.975))
+mean(atoll$median_excretedN)
+c(mean(atoll$lower_excretedN),
+  mean(atoll$upper_excretedN))
 
-# Seabird colonies on atolls import on averge phosphorous in quantities of
-mean(atoll$totP)
-quantile(atoll$totP, probs = c(0.025, 0.975))
+# Seabird colonies on atolls import on average phosphorous in quantities of
+mean(atoll$median_excretedP)
+c(mean(atoll$lower_excretedP),
+  mean(atoll$upper_excretedP))
 
-# Estimated global ammonia emissions from seabirds
-sum(atoll$totNH3)
-mean(atoll$totNH3)
-quantile(atoll$totNH3, probs = c(0.025, 0.975))
+# Estimated total global ammonia emissions from seabirds
+sum(atoll$median_NH3emit)
+c(sum(atoll$lower_NH3emit),
+  sum(atoll$upper_NH3emit))
+
+# Estimated average global ammonia emissions from seabirds per atoll
+mean(atoll$median_NH3emit)
+c(mean(atoll$lower_NH3emit),
+  mean(atoll$upper_NH3emit))
