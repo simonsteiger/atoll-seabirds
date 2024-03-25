@@ -34,10 +34,10 @@ forag <- read.csv(here(paste0("data/vars_foraging", suffix, ".csv")))
 
 # Load results file from Bayesian model analysis (julia-pipeline)
 preds <- read.csv(here(paste0("results/data/pred_and_obs_atolls", suffix, ".csv")))
-atollw <- read.csv(here(paste0("results/data/summary_count_atollwise", suffix, ".csv"))) ##### why only 244 atolls?
-specw <- read.csv(here(paste0("results/data/summary_count_specieswise", suffix, ".csv")))
-nutr.atollw <- read.csv(here(paste0("results/data/summary_nutrient_atollwise", suffix, ".csv")))
-nutr.specw <- read.csv(here(paste0("results/data/summary_nutrient_specieswise", suffix, ".csv")))
+atollw <- read.csv(here(paste0("results/data/summary_count_atollwise", suffix, ".csv"))) # lower and upper is 95% HDI
+specw <- read.csv(here(paste0("results/data/summary_count_specieswise", suffix, ".csv"))) # lower and upper is 80% HDI
+nutr.atollw <- read.csv(here(paste0("results/data/summary_nutrient_atollwise", suffix, ".csv"))) # lower and upper is 95% HDI
+nutr.specw <- read.csv(here(paste0("results/data/summary_nutrient_specieswise", suffix, ".csv"))) # lower and upper is 95% HID
 
 # Prepare data frames for plotting ----
 
@@ -174,7 +174,7 @@ comb$birdC <- comb$biomass * wat.cont * dry.carb
 # drop unneeded columns after computation
 comb <- comb %>% select(!c(
   bodymass, nestingtype, BMR, AMR, dailyN, dailyP, seasonalN, seasonalP, days_at_colony, time_at_colony,
-  adultN, adultP, chickN, chickP, E_rearing, prod_per_pair, fledgling_mass, F_hab, common_names, global_est
+  adultN, adultP, chickN, chickP, E_rearing, prod_per_pair, fledgling_mass, F_hab, common_names
 ))
 
 
@@ -849,7 +849,7 @@ p.forag <- ggplot() +
 
 # The 280 Indo-Pacific atolls are nesting sites for an estimated total of
 sum(atoll$median_nbirds)
-c(sum(atoll$lower_nbirds), sum(atoll$upper_nbirds)) #Confidence intervals
+c(sum(atoll$lower_nbirds), sum(atoll$upper_nbirds)) # 80% HDI 
 
 # Individual atoll nesting populations ranging from ... to ...
 min(atoll$median_nbirds)
