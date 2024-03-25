@@ -3,6 +3,9 @@
 # Authors: Steibl S, Steiger S, Wegmann AS, Holmes ND, Young, HS, Carr P, Russell JC 
 # Last edited: 2024-03-24
 
+# Depends on count.jl, so make sure it is loaded
+isdefined(Main, :CountModel) || include(joinpath(Main.ROOT, "julia", "scripts", "count.jl"))
+
 """
 This module calculates summarises the results of the count pipeline by
 - calculating global estimates
@@ -18,9 +21,6 @@ include(joinpath(Main.ROOT, "julia", "src", "utilities.jl"))
 using .CustomUtilityFuns
 include(joinpath(Main.ROOT, "julia", "src", "globalvars.jl"))
 using .GlobalVariables
-
-# Depends on count.jl, so make sure it is loaded
-isdefined(Main, :CountModel) || include(joinpath(Main.ROOT, "julia", "scripts", "count.jl"))
 
 # --- GLOBAL ESTIMATES --- #
 
@@ -52,15 +52,15 @@ CSV.write(joinpath(Main.ROOT, "results", "data", "pred_and_obs_atolls_$(Main.SUF
 
 # Join posterior samples onto full data frame
 full_samples = @chain known begin
-    transform(_, :median => ByRow(x -> fill(x, Int(CountModel.nsamples * CountModel.nchains))) => :raw)
+    transform(_, :median => ByRow(x -> fill(x, Int(Main.CountModel.nsamples * Main.CountModel.nchains))) => :raw)
     select(_, :atoll, :region, :species, :raw, :median, :lower, :upper)
-    vcat(CountModel.preds_target["0.8"], _)
+    vcat(Main.CountModel.preds_target["0.8"], _)
 end
 
 summary_count =
     let indices = [:species, :atoll]
         out = map(indices) do index
-            out = map(i -> summariseby(i, index, full_samples), unique(full_samples[:, index]))
+            out = map(i -> summariseby(i, index, full_samples; percentiles=[0.1, 0.9]), unique(full_samples[:, index]))
             DataFrame(out)
         end
         Dict(Pair.(string.(indices), out))
@@ -173,11 +173,5 @@ summary_nutrient = let indices = [:atoll, :species]
 end
 
 foreach(k -> CSV.write(joinpath(Main.ROOT, "results", "data", "summary_nutrient_$(k)wise_$(Main.SUFFIX).csv"), summary_nutrient[k]), keys(summary_nutrient))
-
-# After that, median, lower, upper
-
-# Write result to CSV for N, P, NH3, carbon stock
-# - seabirdwise
-# - atollwise
 
 end

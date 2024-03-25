@@ -97,15 +97,15 @@ function popsum(df)
 end
 
 "This function expects a Vector of Vectors as the `target`. Useful for summarising posterior draws across groups."
-function summariseby(i, col, df; target="raw")
+function summariseby(i, col, df; target="raw", percentiles=[0.025, 0.975])
     targetcolumn = df[:, target]
     idx = df[:, col] .== i
     summed_target = sum(targetcolumn[idx])
     out = OrderedDict(
         string(col) => i,
         "median" => median(summed_target),
-        "lower" => quantile(summed_target, 0.025),
-        "upper" => quantile(summed_target, 0.975)
+        "lower" => quantile(summed_target, percentiles[1]),
+        "upper" => quantile(summed_target, percentiles[2])
     )
     return out
 end
