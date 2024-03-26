@@ -5,3 +5,5 @@
 
 const ROOT = dirname(Base.active_project())
 const SUFFIX = "steibl_et_al_2024_atoll_seabird_analysis"
+const PRESENCE_PRIORSETTINGS = ["narrow", "wide", "default"]
+const COUNT_PRIORSETTINGS = ["global", "mean", "narrow", "wide", "default"]

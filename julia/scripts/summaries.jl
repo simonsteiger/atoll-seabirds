@@ -66,17 +66,15 @@ summary_count =
         Dict(Pair.(string.(indices), out))
     end
 
-foreach(k -> CSV.write(joinpath(Main.ROOT, "results", "data", "summary_count_$(k)wise_$(Main.SUFFIX).csv"), summary_count[k]), keys(summary_count))
+foreach(k -> CSV.write(joinpath(Main.ROOT, "results", "data", "summary_count_$(k)wise_$(Main.priorsetting)_$(Main.SUFFIX).csv"), summary_count[k]), keys(summary_count))
 
 # --- SENSITIVITY ANALYSIS --- # 
 
 # for 0.8 cutoffs
 
-priorsettings = Main.run_sensitivity ? ["default", "mean", "global", "narrow", "wide"] : ["default"]
-
 dict_sensitivity = @chain begin
-    map(priorsettings) do priorsetting
-        Pair(priorsetting, CSV.read(joinpath(Main.ROOT, "results", "data", "countpreds_0.8_$(priorsetting)_$(Main.SUFFIX).csv"), DataFrame))
+    map(Main.COUNT_PRIORSETTINGS) do ps # always run all priorsettings here
+        Pair(ps, CSV.read(joinpath(Main.ROOT, "results", "data", "countpreds_0.8_$(ps)_$(Main.SUFFIX).csv"), DataFrame))
     end
     Dict(_)
 end
@@ -172,7 +170,7 @@ summary_nutrient = let indices = [:atoll, :species]
     Dict(Pair.(string.(indices), out))
 end
 
-foreach(k -> CSV.write(joinpath(Main.ROOT, "results", "data", "summary_nutrient_$(k)wise_$(Main.SUFFIX).csv"), summary_nutrient[k]), keys(summary_nutrient))
+foreach(k -> CSV.write(joinpath(Main.ROOT, "results", "data", "summary_nutrient_$(k)wise_$(Main.priorsetting)_$(Main.SUFFIX).csv"), summary_nutrient[k]), keys(summary_nutrient))
 
 # Create global summaries for text
 summary_global = map(nutrient -> summariseby(nothing, df_comb_nutr; target=nutrient), names(df_raw_nutrients))

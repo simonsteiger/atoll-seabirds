@@ -17,7 +17,20 @@ run_loocv = ARGS[2] == "true"
 run_sensitivity = ARGS[3] == "true"
 
 include(joinpath(dirname(Base.active_project()), "julia", "src", "constants.jl"));
+
+active_presence_priorsettings = run_sensitivity ? PRESENCE_PRIORSETTINGS : ["default"]
+active_count_priorsettings = run_sensitivity ? COUNT_PRIORSETTINGS : ["default"]
+priorsetting = ""
+
 include(joinpath(ROOT, "julia", "scripts", "pca.jl"));
-include(joinpath(ROOT, "julia", "scripts", "presence.jl"));
-include(joinpath(ROOT, "julia", "scripts", "count.jl"));
-include(joinpath(ROOT, "julia", "scripts", "summaries.jl"));
+
+for current_priorsetting in active_presence_priorsettings
+    global priorsetting = current_priorsetting
+    include(joinpath(ROOT, "julia", "scripts", "presence.jl"));
+end
+
+for current_priorsetting in active_count_priorsettings
+    global priorsetting = current_priorsetting
+    include(joinpath(ROOT, "julia", "scripts", "count.jl"));
+    include(joinpath(ROOT, "julia", "scripts", "summaries.jl"));
+end
