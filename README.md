@@ -7,7 +7,7 @@ Despite being the most common island type, atolls remain widely overlooked in gl
 The importance of seabirds for the natural functioning and resilience is becoming increasingly recognised.
 Vice versa, however, it remains unquantified how relevant atolls are on a macro-ecological scale for seabirds.
 In this study, we gathered seabird nesting census data from atolls across the Indo-Pacific and developed a Bayesian predictive model to estimate seabird nesting colonies on all atolls of the Indo-Pacific.
-More than 27 million seabirds are nesting atolls - more than across entire Europe, and about 22% of all tropical seabirds worldwide.
+More than 31 million seabirds are nesting atolls - more than across entire Europe, and about 25% of all tropical seabirds worldwide.
 Atolls are globally important sites for seabird nesting.
 Protecting and future-proofing atolls against global change has to become a priority to preserve a sginificant fraction of the world's tropical seabirds.
 
