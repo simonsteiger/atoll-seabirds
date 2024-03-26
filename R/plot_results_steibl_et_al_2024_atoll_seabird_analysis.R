@@ -398,8 +398,8 @@ pmiss10 <- ggplot(data = na.omit(missing), aes(x = seabird_data, y = human_popul
 plotmissing <- (pmiss1 + pmiss2 + pmiss3) / (pmiss4 + pmiss5 + pmiss6) / (pmiss7 + pmiss8 + pmiss9) / (pmiss10 + ggplot() + ggplot())
 
 # Save and export plot for analysis of missingness
-# ggsave(plotmissing, path = here("results", "svg", "article"), filename = "fig_analysis_missing01.svg", dpi = 300, width = 210, height = 250, units = "mm")
-# ggsave(map.missing, path = here("results", "svg", "article"), filename = "fig_analysis_missing02.svg", dpi = 300, width = 210, height = 100, units = "mm")
+# ggsave(map.missing, path = here("results", "svg", "article"), filename = "figS3_analysis_missing_map.svg", dpi = 300, width = 210, height = 100, units = "mm")
+# ggsave(plotmissing, path = here("results", "svg", "article"), filename = "figS4_analysis_missing_boxplot.svg", dpi = 300, width = 210, height = 250, units = "mm")
 
 
 # FIGURE 1 PLOTTING: abundance and richness ----
@@ -847,17 +847,13 @@ p.forag <- ggplot() +
 
 # Text-based results summary ----
 
-# The 280 Indo-Pacific atolls are nesting sites for an estimated total of
-sum(atoll$median_nbirds)
-c(sum(atoll$lower_nbirds), sum(atoll$upper_nbirds)) # 80% HDI 
-
 # Individual atoll nesting populations ranging from ... to ...
 min(atoll$median_nbirds)
 max(atoll$median_nbirds)
 
 # the mean nesting population per atoll is
 mean(atoll$median_nbirds)
-c(mean(atoll$lower_nbirds), mean(atoll$upper_nbirds)) #quantiles
+c(mean(atoll$lower_nbirds), mean(atoll$upper_nbirds)) # 95% HDI
 
 # Number of atolls that house a colony for a given species above the B3b IBA threshold of 13,200 birds
 # http://datazone.birdlife.org/site/ibacritreg
@@ -877,24 +873,14 @@ atollmax %>%
   nrow()
 # >70%
 atollmax %>%
-  filter(cuts == ">70%") %>%
+  filter(cuts == "70%") %>%
   nrow()
 
-# Biomass of all nesting seabirds combined
+# Biomass of all nesting seabirds per atoll combined
 # (divide by water content and dry carb content to extrapolate from C to tot biomass, see Bar-On et al. 2018)
-sum(atoll$median_bird_C/(wat.cont * dry.carb))/1000
-c(sum(atoll$lower_bird_C/(wat.cont * dry.carb))/1000,
-  sum(atoll$upper_bird_C/(wat.cont * dry.carb))/1000)
-
-
 mean(atoll$median_bird_C/(wat.cont * dry.carb))/1000
 c(mean(atoll$lower_bird_C/(wat.cont * dry.carb))/1000,
   mean(atoll$upper_bird_C/(wat.cont * dry.carb))/1000)
-
-# Total carbon of all nesting seabirds combined
-sum(atoll$median_bird_C) / 1000
-c(sum(atoll$lower_bird_C/1000),
-  sum(atoll$upper_bird_C/1000))
 
 # Atollwise seabird carbon stock
 mean(atoll$median_bird_C) / 1000
@@ -919,15 +905,6 @@ specw %>%
   filter(ratio.median > 0.95) %>%
   nrow()
 
-# Total combined contribution of seabird nutrients to atolls
-sum(atoll$median_excretedN)
-c(sum(atoll$lower_excretedN),
-  sum(atoll$upper_excretedN))
-
-sum(atoll$median_excretedP)
-c(sum(atoll$lower_excretedP),
-  sum(atoll$upper_excretedP))
-
 # Seabird colonies on atolls import on average nitrogen in quantities of
 mean(atoll$median_excretedN)
 c(mean(atoll$lower_excretedN),
@@ -937,11 +914,6 @@ c(mean(atoll$lower_excretedN),
 mean(atoll$median_excretedP)
 c(mean(atoll$lower_excretedP),
   mean(atoll$upper_excretedP))
-
-# Estimated total global ammonia emissions from seabirds
-sum(atoll$median_NH3emit)
-c(sum(atoll$lower_NH3emit),
-  sum(atoll$upper_NH3emit))
 
 # Estimated average global ammonia emissions from seabirds per atoll
 mean(atoll$median_NH3emit)
