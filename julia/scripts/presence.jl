@@ -266,6 +266,8 @@ if Main.run_loocv
     # - out of sample performance near in-sample performance (gmpd 0.76)
     # - not many outliers in the p_eff plot (the outliers are logical => Clipperton, Ant (PCs?))
     # - in line with posterior predictive check
+    path = joinpath(Main.ROOT, "results", "crossvalidation", "presence_$(Main.priorsetting)_$(Main.SUFFIX).jls")
+    serialize(path, cv_res)
 else
     @warn "Presence model: Skipping crossvalidation for $(Main.priorsetting) priors"
 end
