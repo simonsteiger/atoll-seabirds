@@ -228,11 +228,12 @@ map <- ggplot() +
   theme(
     axis.title = element_blank(),
     axis.line = element_blank(),
-    axis.text = element_text(size = 11),
+    axis.text = element_text(size = 7),
     axis.ticks = element_line(linewidth = 0.8),
-    title = element_text(size = 13),
-    legend.text = element_text(size = 9),
-    legend.background = element_rect(color = "black", fill = "white")
+    title = element_text(size = 8),
+    legend.text = element_text(size = 5),
+    legend.background = element_rect(color = "black", fill = "white"),
+    plot.title = element_text(margin = margin(b = -7))
   )
 
 # set up base structure aesthetics for boxplots
@@ -242,8 +243,8 @@ boxplotaesth <- theme_classic() +
     axis.title.x = element_blank(),
     axis.ticks.x = element_blank(),
     axis.text.x = element_blank(),
-    axis.text.y = element_text(size = 11),
-    axis.title.y = element_text(size = 12)
+    axis.text.y = element_text(size = 7),
+    axis.title.y = element_text(size = 8)
   )
 
 # Analysis of missingness ----
@@ -480,7 +481,7 @@ p1b <- ggplot(data = atoll[which(atoll$median_nbirds > 0), ], aes(x = "identity"
   guides(x = "axis_truncated", y = guide_axis_truncated(trunc_lower = 10, trunc_upper = 1000000)) +
   ylab("abundance") +
   geom_hline(yintercept = 13200, linetype = "dotted", linewidth = 0.5) +
-  annotate("text", label = "B3b (A4iii)", x = 1.4, y = 25000, size = 3, fontface = "italic") +
+  annotate("text", label = "B3b (A4iii)", x = 1.4, y = 25000, size = 2, fontface = "italic") +
   boxplotaesth
 
 # boxplot richness
@@ -514,7 +515,7 @@ p3b <- ggplot(data = atoll[which(atoll$median_nbirds > 0), ], aes(x = "identity"
 pmapbox <- p1a + p1b + p2a + p2b + p3a + p3b + plot_layout(widths = c(3, 1, 3, 1, 3, 1), nrow = 3, ncol = 2)
 
 # Save and export Figure 1
-# ggsave(pmapbox, path = here("results", "svg", "article"), filename = "fig01_pop-ric-lcbd.svg", dpi = 300, width = 210, height = 170, units = "mm")
+ggsave(pmapbox, path = here("results", "svg", "article"), filename = "fig01_pop-ric-lcbd.svg", dpi = 300, width = 180, height = 146, units = "mm")
 
 
 # FIGURE 2 PLOTTING: bird populations ----
@@ -553,14 +554,14 @@ pglobal <- ggplot(data = specw) +
     axis.title.y = element_blank(),
     axis.line.y = element_blank(),
     axis.ticks.y = element_blank(),
-    axis.text.y = element_text(margin = margin(r = -6), size = 9),
-    axis.text.x = element_text(size = 9),
-    axis.title.x = element_text(size = 10),
+    axis.text.y = element_text(margin = margin(r = -6), size = 7),
+    axis.text.x = element_text(size = 7),
+    axis.title.x = element_text(size = 8),
     legend.position = "none"
   )
 
 # Save and export Figure 2
-# ggsave(pglobal, path = here("results", "svg", "article"), filename = "fig02_proportion_species_global.svg", dpi = 300, width = 79, height = 150, units = "mm")
+ggsave(pglobal, path = here("results", "svg", "article"), filename = "fig02_proportion_species_global.svg", dpi = 300, width = 88, height = 165, units = "mm")
 
 
 
@@ -582,7 +583,8 @@ pnitrog.a <- ggplot(data = atoll[which(atoll$median_nbirds > 0), ], aes(x = "ide
   ggtitle("a. atoll-wise import") +
   guides(y = guide_axis_truncated(trunc_lower = 1, trunc_upper = 1000000)) +
   boxplotaesth +
-  theme(axis.line.x = element_blank())
+  theme(axis.line.x = element_blank(),
+        plot.title = element_text(size = 8))
 
 pphosph.a <- ggplot(data = atoll[which(atoll$median_nbirds > 0), ], aes(x = "identity", y = median_excretedP)) +
   geom_violin(fill = "#EBEBEB", alpha = 0.5) +
@@ -600,7 +602,8 @@ pphosph.a <- ggplot(data = atoll[which(atoll$median_nbirds > 0), ], aes(x = "ide
   ggtitle("a. phosphorous import") +
   guides(y = guide_axis_truncated(trunc_lower = 1, trunc_upper = 100000)) +
   boxplotaesth +
-  theme(axis.line.x = element_blank())
+  theme(axis.line.x = element_blank(),
+        plot.title = element_text(size = 8))
 
 
 # Summarise nutrient-level input by species group
@@ -641,10 +644,11 @@ pnitrog.b <- ggplot(
   ggtitle("b. keystone importers") +
   theme(
     legend.position = "none",
-    axis.text.x = element_text(size = 11, angle = 30, vjust = 0.8),
-    axis.text.y = element_text(size = 11),
-    axis.title.x = element_text(size = 12),
-    axis.title.y = element_blank()
+    axis.text.x = element_text(size = 7, angle = 30, vjust = 0.8),
+    axis.text.y = element_text(size = 7),
+    axis.title.x = element_text(size = 8),
+    axis.title.y = element_blank(),
+    plot.title = element_text(size = 8)
   )
 
 pphosph.b <- ggplot(
@@ -672,18 +676,19 @@ pphosph.b <- ggplot(
   ggtitle("b. keystone importers") +
   theme(
     legend.position = "none",
-    axis.text.x = element_text(size = 11, angle = 30, vjust = 0.8),
-    axis.text.y = element_text(size = 11),
-    axis.title.x = element_text(size = 12),
-    axis.title.y = element_blank()
+    axis.text.x = element_text(size = 7, angle = 30, vjust = 0.8),
+    axis.text.y = element_text(size = 7),
+    axis.title.x = element_text(size = 8),
+    axis.title.y = element_blank(),
+    plot.title = element_text(size = 8)
   )
 
 pnutrientsN <- pnitrog.a + pnitrog.b + plot_layout(widths = c(1, 1.3)) # figure 3
 pnutrientsP <- pphosph.a + pphosph.b + plot_layout(widths = c(1, 1.3)) # figure S2
 
 # Save and export figure 3 and S2
-# ggsave(pnutrientsN, path = here("results", "svg", "article"), filename = "fig03_nitrogen_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
-# ggsave(pnutrientsP, path = here("results", "svg", "article"), filename = "figS2_phosphorous_import.svg", dpi = 300, width = 210, height = 85, units = "mm")
+ ggsave(pnutrientsN, path = here("results", "svg", "article"), filename = "fig03_nitrogen_import.svg", dpi = 300, width = 180, height = 72, units = "mm")
+ ggsave(pnutrientsP, path = here("results", "svg", "article"), filename = "figS2_phosphorous_import.svg", dpi = 300, width = 180, height = 72, units = "mm")
 
 
 # FIGURE S1: significant breeding sites ----
