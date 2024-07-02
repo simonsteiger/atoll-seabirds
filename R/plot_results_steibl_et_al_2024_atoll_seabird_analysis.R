@@ -459,7 +459,7 @@ p3a <- map +
     values = c(1, 0.65, 0.001, 0),
     name = "LCBD"
   ) +
-  ggtitle("c. compositional distinctness of atolls") +
+  ggtitle("c. compositional distinctness") +
   theme(legend.position = "none")
 
 
