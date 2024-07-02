@@ -243,12 +243,12 @@ postpred_plot_view = let preds = exp.(unstandardise(reduce(hcat, preds_train), l
         # Calculate mean of predicted values for species S
         pred = vec(median(preds[R, :][S, :], dims=2))
         # Assemble plot for species S
-        scatter(obs, markersize=2, msc=1, alpha=0.8, label="O", xformatter=_ -> "")
+        scatter(obs, markersize=2, msc=1, alpha=0.8, label="O")
         scatter!(pred, markersize=2, msc=2, alpha=0.8, label="P")
         title!(replace(sp, "_" => " "), titlefontsize=12)
     end
     # Collect all plots in a dictionary (plotting all at once is a bit busy, maybe by nesting type or genus?)
-    plot(plots..., layout=(8, 5), titlefontsize=8, size=(800, 1000))
+    plot(plots..., layout=(8, 5), titlefontsize=8, tickfontsize=6, size=(800, 1000))
 end
 
 foreach(ext -> savefig(joinpath(Main.ROOT, "results", ext, "count", "posterior_$(Main.priorsetting)_$(Main.SUFFIX).$ext")), ["svg", "png"])
@@ -434,6 +434,8 @@ loomodel = broadcastmodel(values(odict_inputs)..., zlogn; pr=dict_pr[Main.priors
 if Main.run_loocv
     @info "Count model: Crossvalidation for $(Main.priorsetting) priors"
     cv_res = psis_loo(loomodel, posterior.chains)
+    path = joinpath(Main.ROOT, "results", "crossvalidation", "count_$(Main.priorsetting)_$(Main.SUFFIX).jls")
+    serialize(path, cv_res)
 else
     @warn "Count model: Skipping crossvalidation for $(Main.priorsetting) priors"
 end

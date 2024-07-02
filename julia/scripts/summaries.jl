@@ -98,7 +98,7 @@ df_sens = reduce(vcat, values(dict_sensitivity))
 scatter(df_sens.ratio_median, df_sens.species, group=df_sens.prior, alpha=0.75, markershape=:x)
 xlabel!("Global population on atolls")
 xticks!(0:0.5:2, string.(Int64.(collect(0:0.5:2) .* 100), "%"))
-yticks!(eachindex(unique(df_sens.species)), unique(df_sens.species), size=(600, 600), tickfontsize=7)
+yticks!(eachindex(unique(df_sens.species)).-0.5, unique(df_sens.species), size=(600, 600), tickfontsize=7)
 
 foreach(ext -> savefig(joinpath(Main.ROOT, "results", ext, "count", "sensitivity_count.$ext")), ["svg", "png"])
 
