@@ -1,4 +1,5 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.12622076.svg)](https://doi.org/10.5281/zenodo.12622076)
+[![DOI](https://zenodo.org/badge/DOI/10.1038/s41559-024-02496-4.svg)](https://doi.org/10.1038/s41559-024-02496-4)
 
 # Atoll seabird analysis
 
@@ -26,14 +27,13 @@ In the second step, we used the count-based seabird data to predict seabird nest
 
 ## Cite
 
-**TODO**: Replace XXXX with a bibtex shorthand for the paper and journal.
-
 ```bibtex
-@article{steibl2024XXXX,
-  title={Atolls are globally significant sites for tropical seabirds},
+@article{steibl2024seabird,
+  title={Atolls are globally important sites for tropical seabirds},
   author={Steibl, Sebastian and Steiger, Simon and Wegmann, Alex S and Holmes, Nick D and Young, Hillary S and Carr, Pete and Russell, James C},
-  journal={XXXX},
+  journal={Nature Ecology & Evolution},
   year={2024}
+  doi={10.1038/s41559-024-02496-4}
 }
 ```
 
