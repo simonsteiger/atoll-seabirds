@@ -580,7 +580,7 @@ pnitrog.a <- ggplot(data = atoll[which(atoll$median_nbirds > 0), ], aes(x = "ide
     values = c(1, 0.001, 0.0001, 0)
   ) +
   ylab(expression(paste("imported nitrogen per atoll [kg N  ", year^-1, "]"))) +
-  ggtitle("a. atoll-wise import") +
+  ggtitle("a. Nitrogen import per atoll") +
   guides(y = guide_axis_truncated(trunc_lower = 1, trunc_upper = 1000000)) +
   boxplotaesth +
   theme(axis.line.x = element_blank(),
@@ -599,7 +599,7 @@ pphosph.a <- ggplot(data = atoll[which(atoll$median_nbirds > 0), ], aes(x = "ide
     values = c(1, 0.001, 0.0001, 0)
   ) +
   ylab(expression(paste("imported phosphorous per atoll [kg P ", year^-1, "]"))) +
-  ggtitle("a. phosphorous import") +
+  ggtitle("a. phosphorous import per atoll") +
   guides(y = guide_axis_truncated(trunc_lower = 1, trunc_upper = 100000)) +
   boxplotaesth +
   theme(axis.line.x = element_blank(),
@@ -632,7 +632,7 @@ pnitrog.b <- ggplot(
     )
   ) +
   scale_y_discrete(
-    labels = c("Tropicbirds", "Petrels &\n Shearwater", "Frigatebirds", "Terns", "Boobies", "Albatross")
+    labels = c("Tropicbirds", "Petrels &\n Shearwaters", "Frigatebirds", "Terns", "Boobies", "Albatrosses")
   ) +
   scale_fill_manual(values = c(
     "#DEF5E5FF", "#3497A9FF", "#395D9CFF",
@@ -664,7 +664,7 @@ pphosph.b <- ggplot(
     )
   ) +
   scale_y_discrete(
-    labels = c("Tropicbirds", "Petrels &\n Shearwater", "Frigatebirds", "Terns", "Boobies", "Albatross")
+    labels = c("Tropicbirds", "Petrels &\n Shearwaters", "Frigatebirds", "Terns", "Boobies", "Albatrosses")
   ) +
   scale_fill_manual(values = c(
     "#DEF5E5FF", "#3497A9FF", "#395D9CFF",
